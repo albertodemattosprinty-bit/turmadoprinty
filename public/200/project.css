@@ -16705,7 +16705,7 @@ body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-she
     linear-gradient(180deg, rgba(5, 15, 29, .99), rgba(4, 12, 23, .99));
 }
 
-/* Tarefas compartilhadas */
+/* Ações compartilhadas */
 .shared-tasks-modal-workspace{padding:0;background:transparent}
 .shared-tasks-shell{position:relative;width:min(100%,760px);height:100dvh;min-height:100%;margin:0 auto;display:flex;flex-direction:column;overflow:hidden;color:var(--social-ink,#0b1f3a);background:var(--surface-1,#f7fbff);border-radius:28px;box-shadow:0 24px 70px rgba(5,32,70,.2)}
 .shared-tasks-topbar{display:flex;align-items:center;gap:12px;padding:max(16px,env(safe-area-inset-top,0px)) 18px 14px;border-bottom:0;color:#fff;background:linear-gradient(135deg,#1258c9,#0b2e77);z-index:2}
@@ -16744,3 +16744,252 @@ body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-she
 body[data-background-theme="dark"] .shared-tasks-shell,body[data-background-theme="black"] .shared-tasks-shell{color:#eef6ff;background:#0c1422}
 body[data-background-theme="dark"] .shared-tasks-card,body[data-background-theme="black"] .shared-tasks-card{background:#131f31;border-color:#263b56}
 body[data-background-theme="dark"] .shared-tasks-metric,body[data-background-theme="black"] .shared-tasks-metric,body[data-background-theme="dark"] .shared-tasks-list-item,body[data-background-theme="black"] .shared-tasks-list-item{background:#1a2a40}
+
+/* Ações compartilhadas */
+.shared-tasks-content{padding:14px 16px 126px;background:linear-gradient(180deg,color-mix(in srgb,var(--surface-1,#f7fbff) 82%,#ddecff) 0,var(--surface-1,#f7fbff) 220px)}
+.shared-tasks-overview{display:grid;justify-items:center;margin:2px 0 18px;padding:19px 16px 17px;border:1px solid color-mix(in srgb,var(--social-blue-600,#2f7df2) 18%,transparent);border-radius:24px;text-align:center;background:linear-gradient(145deg,color-mix(in srgb,var(--social-blue-100,#eaf3ff) 88%,#fff),var(--surface-2,#fff));box-shadow:0 12px 34px rgba(17,61,112,.08)}
+.shared-tasks-overview-avatars{display:flex;justify-content:center;margin-bottom:10px}
+.shared-tasks-overview-avatars>div{width:48px;height:48px;display:grid;place-items:center;overflow:hidden;border:3px solid var(--surface-2,#fff);border-radius:50%;color:#fff;background:linear-gradient(145deg,#2f7df2,#0b3f98);font-size:13px;font-weight:950;box-shadow:0 6px 16px rgba(11,87,208,.18)}
+.shared-tasks-overview-avatars>div+div{margin-left:-12px}
+.shared-tasks-overview-avatars img,.shared-tasks-duel-avatar img{width:100%;height:100%;display:block;object-fit:cover}
+.shared-tasks-overview h2{margin:0;font-size:19px;line-height:1.15}
+.shared-tasks-overview h2 span,.shared-tasks-overview h2 strong{display:block}
+.shared-tasks-overview h2 strong{margin-top:4px;color:var(--social-blue-700,#0b57d0);font-size:24px}
+.shared-tasks-overview p{margin:9px 0 0;color:var(--social-muted,#62738a);font-size:12px;font-weight:850;text-transform:uppercase;letter-spacing:.08em}
+.shared-tasks-result-card{padding:17px 15px 15px;border-radius:24px}
+.shared-tasks-duel{display:grid;grid-template-columns:minmax(68px,1fr) minmax(92px,1.2fr) minmax(68px,1fr);align-items:center;gap:8px}
+.shared-tasks-duel-person{min-width:0;display:grid;justify-items:center;gap:5px}
+.shared-tasks-duel-person>span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--social-muted,#62738a);font-size:11px;font-weight:900}
+.shared-tasks-duel-avatar{width:60px;height:60px;display:grid;place-items:center;overflow:hidden;border:3px solid color-mix(in srgb,var(--social-blue-600,#2f7df2) 22%,var(--surface-2,#fff));border-radius:50%;color:#fff;background:linear-gradient(145deg,#2f7df2,#0b3f98);font-size:14px;font-weight:950;box-shadow:0 8px 20px rgba(11,87,208,.16)}
+.shared-tasks-score{text-align:center}
+.shared-tasks-score strong{display:flex;align-items:center;justify-content:center;color:var(--social-ink,#0b1f3a);font-size:31px;line-height:1;font-weight:950;letter-spacing:-.06em}
+.shared-tasks-score strong i{margin:0 5px;color:var(--social-blue-600,#2f7df2);font-size:17px;font-style:normal;letter-spacing:0}
+.shared-tasks-score small{display:block;margin-top:4px;color:var(--social-muted,#62738a);font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}
+.shared-tasks-result-copy{padding:14px 2px 11px;text-align:center}
+.shared-tasks-result-copy>span,.shared-tasks-choice-kicker{display:block;margin-bottom:4px;color:var(--social-blue-700,#0b57d0);font-size:10px;font-weight:950;letter-spacing:.12em;text-transform:uppercase}
+.shared-tasks-result-copy h2{margin:0;font-size:18px;line-height:1.2}
+.shared-tasks-result-copy p{margin:5px 0 0;font-size:11px}
+.shared-tasks-person{min-width:0;text-align:center}
+.shared-tasks-person b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:18px}
+.shared-tasks-invite-card,.shared-tasks-choice-card,.shared-tasks-waiting-card{padding:19px}
+.shared-tasks-invite-card h2,.shared-tasks-choice-card h2,.shared-tasks-waiting-card h2{margin:0 0 8px;font-size:19px;line-height:1.28}
+.shared-tasks-invite-card p,.shared-tasks-choice-card p,.shared-tasks-waiting-card p{margin-bottom:16px}
+.shared-tasks-invite-card .shared-tasks-action+.shared-tasks-action,.shared-tasks-choice-card .shared-tasks-action{margin-top:9px}
+.shared-tasks-action-add{border:1px solid color-mix(in srgb,var(--social-blue-600,#2f7df2) 22%,transparent)}
+.shared-tasks-text-action{display:block;margin:11px auto 0;padding:6px 10px;border:0;color:var(--social-muted,#62738a);background:transparent;font-size:11px;font-weight:800;cursor:pointer}
+.shared-tasks-periods{position:absolute;left:0;right:0;bottom:0;z-index:3;align-items:center;justify-content:center;gap:14px;padding:9px 14px max(12px,env(safe-area-inset-bottom,0px));border-top:1px solid var(--social-line,#dce8f5);background:color-mix(in srgb,var(--surface-1,#f7fbff) 94%,transparent);box-shadow:0 -8px 25px rgba(11,47,93,.06);backdrop-filter:blur(16px)}
+.shared-tasks-periods .shared-tasks-period-arrow{width:42px;height:42px;min-width:42px;display:grid;place-items:center;padding:0;border:1px solid var(--social-line,#dce8f5);border-radius:50%;color:var(--social-blue-700,#0b57d0);background:var(--surface-2,#fff);cursor:pointer}
+.shared-tasks-period-arrow svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.shared-tasks-period-current{min-width:118px;text-align:center}
+.shared-tasks-period-current small{display:block;color:var(--social-muted,#62738a);font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}
+.shared-tasks-period-current strong{display:block;margin-top:1px;font-size:16px}
+.shared-tasks-fab{bottom:88px}
+body[data-background-theme="dark"] .shared-tasks-content,body[data-background-theme="black"] .shared-tasks-content{background:linear-gradient(180deg,#10223c 0,#0c1422 220px)}
+body[data-background-theme="dark"] .shared-tasks-overview,body[data-background-theme="black"] .shared-tasks-overview{background:linear-gradient(145deg,#162b47,#101c2e);border-color:#294c76}
+body[data-background-theme="dark"] .shared-tasks-score strong,body[data-background-theme="black"] .shared-tasks-score strong{color:#f2f7ff}
+body[data-background-theme="dark"] .shared-tasks-periods,body[data-background-theme="black"] .shared-tasks-periods{background:rgba(12,20,34,.94);border-color:#263b56}
+@media(max-width:560px){.shared-tasks-content{padding-left:12px;padding-right:12px}.shared-tasks-duel-avatar{width:56px;height:56px}.shared-tasks-score strong{font-size:28px}}
+
+/* Restore the compact repetition/date modal from commit 1591017 (2026-08-08 04:06). */
+:is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal,#dataselectModal).universal-schedule-modal {
+  --universal-schedule-surface:#eef5ff;
+  --universal-schedule-panel:#f8fbff;
+  --universal-schedule-card:#fff;
+  --universal-schedule-text:#152331;
+  --universal-schedule-muted:#586778;
+  --universal-schedule-border:rgba(21,35,49,.12);
+  --universal-schedule-accent:#1f67d7;
+}
+:is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal,#dataselectModal).universal-schedule-modal.active {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  place-items:initial;
+  padding:14px;
+  overflow:auto;
+  background:transparent;
+}
+#dailyrepetitionModal.active { z-index:2500; }
+:is(#repeatuntilModal,#dataselectModal).active { z-index:2600; }
+:is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal,#dataselectModal) .universal-schedule-panel {
+  width:min(430px,100%);
+  max-width:430px;
+  height:auto;
+  max-height:min(86vh,760px);
+  display:flex;
+  flex-direction:column;
+  grid-template-rows:none;
+  border:0;
+  border-radius:8px;
+  overflow:hidden;
+  background:var(--universal-schedule-panel);
+  color:var(--universal-schedule-text);
+  box-shadow:0 24px 80px rgba(0,0,0,.34);
+}
+:is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal,#dataselectModal) .universal-schedule-head {
+  position:relative;
+  width:auto;
+  min-height:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  padding:16px 44px 12px;
+  border-bottom:1px solid var(--universal-schedule-border);
+  color:var(--universal-schedule-text);
+}
+:is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal,#dataselectModal) .universal-schedule-title {
+  margin:0;
+  color:var(--universal-schedule-text);
+  font-size:1.06rem;
+  line-height:1.15;
+  font-weight:900;
+  text-align:center;
+  letter-spacing:0;
+}
+:is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal,#dataselectModal) .universal-schedule-head .history-mission-modal-close {
+  position:absolute;
+  top:10px;
+  right:12px;
+  width:38px;
+  height:38px;
+  border:0;
+  background:transparent;
+  color:var(--universal-schedule-text);
+  font-size:1rem;
+}
+:is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal,#dataselectModal) .universal-schedule-body {
+  width:auto;
+  min-height:0;
+  display:grid;
+  align-content:initial;
+  gap:10px;
+  padding:12px;
+  overflow:auto;
+  background:var(--universal-schedule-surface);
+  scrollbar-width:auto;
+}
+:is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal,#dataselectModal) .universal-schedule-body::-webkit-scrollbar { display:initial; }
+:is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal,#dataselectModal) .universal-schedule-card {
+  display:grid;
+  gap:9px;
+  padding:12px;
+  border:1px solid var(--universal-schedule-border);
+  border-radius:8px;
+  background:var(--universal-schedule-card);
+  color:var(--universal-schedule-text);
+}
+:is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal,#dataselectModal) .universal-schedule-card>label:first-child {
+  color:var(--universal-schedule-muted);
+  font-size:.78rem;
+  font-weight:900;
+  letter-spacing:0;
+  text-transform:none;
+}
+:is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal) .universal-schedule-options { gap:6px; }
+:is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal) .universal-schedule-options button {
+  position:static;
+  min-height:38px;
+  display:block;
+  padding:8px 10px;
+  border:1px solid var(--universal-schedule-border);
+  border-radius:8px;
+  background:var(--universal-schedule-card);
+  color:var(--universal-schedule-text);
+  font:inherit;
+  font-weight:800;
+  text-align:left;
+  transform:none;
+  box-shadow:none;
+}
+:is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal) .universal-schedule-options button::before { content:none; }
+:is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal) .universal-schedule-options button.active {
+  border-color:var(--universal-schedule-accent);
+  background:var(--universal-schedule-accent);
+  color:#fff;
+  box-shadow:inset 3px 0 0 rgba(255,255,255,.38);
+}
+:is(#universalScheduleModal,#dailyrepetitionModal) .universal-schedule-inline input,
+:is(#universalScheduleModal,#dailyrepetitionModal) .universal-schedule-inline select,
+:is(#universalScheduleModal,#dailyrepetitionModal) .universal-schedule-card>select,
+:is(#universalScheduleModal,#dailyrepetitionModal) .universal-schedule-card>input[type="date"] {
+  min-height:38px;
+  border:1px solid var(--universal-schedule-border);
+  border-radius:8px;
+  background:var(--universal-schedule-card);
+  color:var(--universal-schedule-text);
+  padding:6px 8px;
+  font:inherit;
+  font-weight:800;
+}
+:is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal) .universal-schedule-card label { color:var(--universal-schedule-text); }
+:is(#universalScheduleModal,#dailyrepetitionModal) .dailyrepetition-feedback,
+:is(#universalScheduleModal,#dailyrepetitionModal) .universal-schedule-avoid small { color:var(--universal-schedule-muted); }
+:is(#universalScheduleModal,#dailyrepetitionModal) .dailyrepetition-date-button {
+  min-height:42px;
+  border:1px solid var(--universal-schedule-border);
+  border-radius:8px;
+  background:var(--universal-schedule-card);
+  color:var(--universal-schedule-text);
+}
+:is(#universalScheduleModal,#dailyrepetitionModal) .universal-weekdays button {
+  min-width:0;
+  border-color:var(--universal-schedule-border);
+  background:var(--universal-schedule-card);
+  color:var(--universal-schedule-text);
+}
+:is(#universalScheduleModal,#dailyrepetitionModal) .universal-weekdays button.active {
+  border-color:var(--universal-schedule-accent);
+  background:var(--universal-schedule-accent);
+  color:#fff;
+}
+:is(#universalScheduleModal,#dailyrepetitionModal) .universal-weekdays-avoid button.active { border-color:#ff6b6b; background:#df3030; }
+:is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal,#dataselectModal) .universal-schedule-footer {
+  width:auto;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  padding:12px;
+  border-top:1px solid var(--universal-schedule-border);
+  background:var(--universal-schedule-panel);
+}
+:is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal,#dataselectModal) .universal-schedule-footer button {
+  min-height:42px;
+  border-radius:8px;
+  font-size:inherit;
+}
+#dataselectModal .dataselect-card { align-self:auto; }
+#dataselectModal .dataselect-unit {
+  grid-template-rows:34px minmax(42px,auto) 18px 34px;
+  gap:4px;
+  padding:8px 6px;
+  border-color:var(--universal-schedule-border);
+  border-radius:8px;
+  background:var(--universal-schedule-card);
+}
+#dataselectModal .dataselect-unit button {
+  width:34px;
+  height:34px;
+  border-color:var(--universal-schedule-border);
+  background:var(--universal-schedule-card);
+  color:var(--universal-schedule-text);
+}
+#dataselectModal :is(.dataselect-unit strong,.dataselect-feedback) { color:var(--universal-schedule-text); }
+#dataselectModal .dataselect-unit span { color:var(--universal-schedule-muted); }
+body[data-background-theme="black"] :is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal,#dataselectModal) {
+  --universal-schedule-surface:#0c131d;
+  --universal-schedule-panel:#101923;
+  --universal-schedule-card:#172433;
+  --universal-schedule-text:#f7fbff;
+  --universal-schedule-muted:rgba(247,251,255,.7);
+  --universal-schedule-border:rgba(255,255,255,.14);
+}
+body[data-background-theme="edge"] :is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal,#dataselectModal) {
+  --universal-schedule-surface:#07140f;
+  --universal-schedule-panel:#0d1d16;
+  --universal-schedule-card:#122a1f;
+  --universal-schedule-text:#effff5;
+  --universal-schedule-muted:rgba(239,255,245,.72);
+  --universal-schedule-border:rgba(174,255,205,.18);
+  --universal-schedule-accent:#2fd36b;
+}

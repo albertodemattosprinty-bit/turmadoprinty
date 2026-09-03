@@ -3,9 +3,11 @@ import { ensureActionsSchema } from "./actions.js";
 import { ensureExtraGoalsSchema } from "./extra-goals.js";
 import { ensureProject200FriendsSchema } from "./project200-friends.js";
 import { ensureProject200WellnessSchema } from "./project200-wellness.js";
+import { ensureProject200ProfilesSchema, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 
 const TIME_ZONE = "America/Sao_Paulo";
-const PERIODS = [1, 3, 7, 15, 30, 60, 90, 120];
+const PERIODS = [0, 1, 3, 7, 15, 30, 60, 90, 120];
+const DIRECT_COMPARISON_TYPES = new Set(["series_exercise", "walking", "bicycle", "nutrition_quality"]);
 let schemaPromise = null;
 
 function dateKey(value = new Date()) {
@@ -18,7 +20,10 @@ function addDays(value, delta) {
   date.setUTCDate(date.getUTCDate() + Number(delta || 0));
   return dateKey(date);
 }
-function safeDays(value) { return Math.max(1, Math.min(120, Math.trunc(Number(value || 1) || 1))); }
+function safeDays(value) {
+  const parsed = Math.trunc(Number(value));
+  return Number.isFinite(parsed) ? Math.max(0, Math.min(120, parsed)) : 0;
+}
 function normalizeStatus(value) {
   const status = String(value || "").trim().toLowerCase();
   return status === "accepted" || status === "rejected" ? status : "pending";
@@ -36,7 +41,7 @@ function labelForType(type) {
 async function ensureSchema() {
   if (!schemaPromise) {
     schemaPromise = (async () => {
-      await Promise.all([ensureProject200FriendsSchema(), ensureActionsSchema(), ensureExtraGoalsSchema(), ensureProject200WellnessSchema()]);
+      await Promise.all([ensureProject200FriendsSchema(), ensureActionsSchema(), ensureExtraGoalsSchema(), ensureProject200WellnessSchema(), ensureProject200ProfilesSchema()]);
       await query(`create table if not exists project200_shared_task_links (
         id uuid primary key default gen_random_uuid(),
         requester_user_id uuid not null references users(id) on delete cascade,
@@ -62,9 +67,19 @@ export async function assertProject200SharedTaskFriendship(userId, friendId) {
   await assertFriendship(String(userId || "").trim(), String(friendId || "").trim());
 }
 async function userName(userId) {
-  const result = await query("select id, name, username from users where id = $1 limit 1", [userId]);
+  const result = await query(`select u.id, u.name, u.username, profile.avatar_preset, profile.avatar_data_url, profile.svg_icon_url, profile.svg_icon_label
+    from users u
+    left join lateral (
+      select avatar_preset, avatar_data_url, svg_icon_url, svg_icon_label
+      from project200_profiles where user_id = u.id and deleted_at is null
+      order by case when lower(trim(coalesce(name, ''))) = lower($2) then 0 else 1 end, sort_order asc, created_at asc limit 1
+    ) profile on true where u.id = $1 limit 1`, [userId, PROJECT200_DEFAULT_PROFILE_NAME]);
   const row = result.rows[0] || {};
-  return { userId: String(row.id || userId), name: String(row.name || row.username || "Usuário") };
+  return {
+    userId: String(row.id || userId), name: String(row.name || row.username || "Usuário"), username: String(row.username || ""),
+    avatarPreset: String(row.avatar_preset || ""), avatarDataUrl: String(row.avatar_data_url || ""),
+    svgIconUrl: String(row.svg_icon_url || ""), svgIconLabel: String(row.svg_icon_label || "")
+  };
 }
 function typeForExercise(row) {
   const text = `${row.exercise_id || ""} ${row.exercise_name || ""}`.toLocaleLowerCase("pt-BR");
@@ -130,15 +145,117 @@ export async function getProject200SharedTaskCandidates(userId, linkId) {
   await ensureSchema();
   const link = await findLinkForRecipient(userId, linkId);
   if (normalizeStatus(link.status) !== "pending") throw new Error("Essa solicitação já foi respondida.");
-  return { link: { id: String(link.id), sourceType: String(link.source_type), sourceLabel: String(link.source_label) }, candidates: (await listItems(userId)).filter((item) => item.type === String(link.source_type)) };
+  const sourceType = String(link.source_type);
+  return {
+    link: { id: String(link.id), sourceType, sourceLabel: String(link.source_label), directComparison: DIRECT_COMPARISON_TYPES.has(sourceType) },
+    candidates: DIRECT_COMPARISON_TYPES.has(sourceType) ? [] : (await listItems(userId)).filter((item) => item.type === sourceType)
+  };
+}
+
+async function cloneSharedItem(recipientUserId, link) {
+  const sourceUserId = String(link.requester_user_id), sourceType = String(link.source_type), sourceKey = String(link.source_key);
+  if (sourceType === "scheduled_task") {
+    const result = await query(`insert into actions (
+      user_id, title, music_default_mode, music_station_name, music_track_name, music_track_url, assignee, category_id,
+      svg_icon_url, svg_icon_label, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, repeat_config
+    ) select $1, title, music_default_mode, music_station_name, music_track_name, music_track_url, $2, category_id,
+      svg_icon_url, svg_icon_label, start_at, end_at, gen_random_uuid(), repeat_rule, repeat_days, repeat_config
+      from actions where user_id=$3 and id=$4::uuid returning id, title`, [recipientUserId, PROJECT200_DEFAULT_PROFILE_NAME, sourceUserId, sourceKey]);
+    if (!result.rows[0]) throw new Error("A tarefa original não está mais disponível.");
+    return { type: sourceType, key: String(result.rows[0].id), label: String(result.rows[0].title) };
+  }
+  if (sourceType === "simple_mission" || sourceType === "compound_mission") {
+    const result = await query(`insert into extra_goals (
+      user_id, assigned_profile, title, category_id, goal_kind, target_value, unit_duration_minutes, unit_duration_seconds,
+      limit_interval_value, limit_interval_unit, limit_cycle_started_at, count_sleep_time, is_folder, repeat_days, schedule_config,
+      svg_icon_url, svg_icon_label, progress_value, progress_date, last_progress_at, created_at, updated_at
+    ) select $1, $2, title, category_id, goal_kind, target_value, unit_duration_minutes, unit_duration_seconds,
+      limit_interval_value, limit_interval_unit, now(), count_sleep_time, is_folder, repeat_days, schedule_config,
+      svg_icon_url, svg_icon_label, 0, null, null, now(), now()
+      from extra_goals where user_id=$3 and id=$4::uuid returning id, title`, [recipientUserId, PROJECT200_DEFAULT_PROFILE_NAME, sourceUserId, sourceKey]);
+    if (!result.rows[0]) throw new Error("A missão original não está mais disponível.");
+    const clonedGoalId = String(result.rows[0].id);
+    if (sourceType === "compound_mission") {
+      await query(`insert into extra_goal_variants (
+        user_id, goal_id, assigned_profile, title, interval_value, target_value, interval_unit, repeat_days,
+        unit_duration_seconds, next_due_at, schedule_mode, avoid_days, schedule_config, last_completed_at, created_at, updated_at
+      ) select $1, $2::uuid, $3, title, interval_value, target_value, interval_unit, repeat_days,
+        unit_duration_seconds, null, schedule_mode, avoid_days, schedule_config, null, now(), now()
+        from extra_goal_variants where user_id=$4 and goal_id=$5::uuid order by created_at asc`,
+      [recipientUserId, clonedGoalId, PROJECT200_DEFAULT_PROFILE_NAME, sourceUserId, sourceKey]);
+    }
+    return { type: sourceType, key: clonedGoalId, label: String(result.rows[0].title) };
+  }
+  if (sourceType === "microtask") {
+    const parent = await query(`insert into extra_goals (
+      user_id, assigned_profile, title, category_id, goal_kind, target_value, unit_duration_minutes, unit_duration_seconds,
+      limit_interval_value, limit_interval_unit, limit_cycle_started_at, count_sleep_time, is_folder, repeat_days, schedule_config,
+      svg_icon_url, svg_icon_label, progress_value, progress_date, last_progress_at, created_at, updated_at
+    ) select $1, $2, goal.title, goal.category_id, goal.goal_kind, goal.target_value, 0, 0,
+      goal.limit_interval_value, goal.limit_interval_unit, now(), goal.count_sleep_time, true, goal.repeat_days, goal.schedule_config,
+      goal.svg_icon_url, goal.svg_icon_label, 0, null, null, now(), now()
+      from extra_goal_variants variant join extra_goals goal on goal.id=variant.goal_id
+      where variant.user_id=$3 and variant.id=$4::uuid returning id`, [recipientUserId, PROJECT200_DEFAULT_PROFILE_NAME, sourceUserId, sourceKey]);
+    if (!parent.rows[0]) throw new Error("A microtarefa original não está mais disponível.");
+    const variant = await query(`insert into extra_goal_variants (
+      user_id, goal_id, assigned_profile, title, interval_value, target_value, interval_unit, repeat_days,
+      unit_duration_seconds, next_due_at, schedule_mode, avoid_days, schedule_config, last_completed_at, created_at, updated_at
+    ) select $1, $2::uuid, $3, title, interval_value, target_value, interval_unit, repeat_days,
+      unit_duration_seconds, null, schedule_mode, avoid_days, schedule_config, null, now(), now()
+      from extra_goal_variants where user_id=$4 and id=$5::uuid returning id, title`,
+    [recipientUserId, parent.rows[0].id, PROJECT200_DEFAULT_PROFILE_NAME, sourceUserId, sourceKey]);
+    return { type: sourceType, key: String(variant.rows[0].id), label: String(variant.rows[0].title) };
+  }
+  if (sourceType === "series_exercise") {
+    const clonedExerciseId = `shared-${crypto.randomUUID()}`;
+    const result = await query(`insert into project200_exercise_library (
+      user_id, assigned_profile, exercise_id, exercise_name, category, tracking_type, equipment,
+      daily_goal, target_series, target_reps, target_minutes, target_distance_meters, created_at, updated_at
+    ) select $1, $2, $3, exercise_name, category, tracking_type, equipment,
+      daily_goal, target_series, target_reps, target_minutes, target_distance_meters, now(), now()
+      from project200_exercise_library where user_id=$4 and exercise_id=$5 returning exercise_id, exercise_name`,
+    [recipientUserId, PROJECT200_DEFAULT_PROFILE_NAME, clonedExerciseId, sourceUserId, sourceKey]);
+    if (!result.rows[0]) throw new Error("O exercício original não está mais disponível.");
+    return { type: sourceType, key: String(result.rows[0].exercise_id), label: String(result.rows[0].exercise_name) };
+  }
+  if (sourceType === "walking" || sourceType === "bicycle") {
+    const existing = (await listItems(recipientUserId)).find((item) => item.type === sourceType);
+    if (existing) return existing;
+    const clonedExerciseId = `shared-${crypto.randomUUID()}`;
+    const result = await query(`insert into project200_exercise_library (
+      user_id, assigned_profile, exercise_id, exercise_name, category, tracking_type, equipment,
+      daily_goal, target_series, target_reps, target_minutes, target_distance_meters, created_at, updated_at
+    ) select $1, $2, $3, exercise_name, category, tracking_type, equipment,
+      daily_goal, target_series, target_reps, target_minutes, target_distance_meters, now(), now()
+      from project200_exercise_library where user_id=$4 and (
+        ($5='walking' and (lower(exercise_id || ' ' || exercise_name) like '%camin%' or lower(exercise_id || ' ' || exercise_name) like '%esteira%' or lower(exercise_id || ' ' || exercise_name) like '%corrida%'))
+        or ($5='bicycle' and (lower(exercise_id || ' ' || exercise_name) like '%bicic%' or lower(exercise_id || ' ' || exercise_name) like '%bike%'))
+      ) order by created_at asc limit 1 returning exercise_id, exercise_name`,
+    [recipientUserId, PROJECT200_DEFAULT_PROFILE_NAME, clonedExerciseId, sourceUserId, sourceType]);
+    if (!result.rows[0]) throw new Error("A atividade original não está mais disponível.");
+    return { type: sourceType, key: sourceType, label: String(result.rows[0].exercise_name) };
+  }
+  if (DIRECT_COMPARISON_TYPES.has(sourceType)) return { type: sourceType, key: sourceKey, label: String(link.source_label) };
+  throw new Error("Este tipo de ação ainda não pode ser clonado.");
 }
 export async function respondProject200SharedTaskLink(userId, linkId, action, payload = {}) {
   await ensureSchema();
   const link = await findLinkForRecipient(userId, linkId);
   if (normalizeStatus(link.status) !== "pending") throw new Error("Essa solicitação já foi respondida.");
-  if (String(action || "").toLowerCase() === "reject") {
+  const normalizedAction = String(action || "").toLowerCase();
+  if (normalizedAction === "reject") {
     await query("update project200_shared_task_links set status='rejected', responded_at=now(), updated_at=now() where id=$1", [link.id]);
     return { id: link.id, status: "rejected" };
+  }
+  if (normalizedAction === "clone") {
+    const cloned = await cloneSharedItem(String(userId || ""), link);
+    await query("update project200_shared_task_links set target_type=$2, target_key=$3, target_label=$4, status='accepted', responded_at=now(), updated_at=now() where id=$1", [link.id, cloned.type, cloned.key, cloned.label]);
+    return { id: link.id, status: "accepted", cloned: true, item: cloned };
+  }
+  if (DIRECT_COMPARISON_TYPES.has(String(link.source_type))) {
+    const direct = { type: String(link.source_type), key: String(link.source_key), label: String(link.source_label) };
+    await query("update project200_shared_task_links set target_type=$2, target_key=$3, target_label=$4, status='accepted', responded_at=now(), updated_at=now() where id=$1", [link.id, direct.type, direct.key, direct.label]);
+    return { id: link.id, status: "accepted", direct: true };
   }
   const candidate = await getItem(userId, link.source_type, payload.targetKey);
   if (!candidate || candidate.type !== String(link.source_type)) throw new Error("Escolha um item do mesmo tipo para comparar.");
@@ -164,8 +281,11 @@ async function metricForItem(userId, item, startDate, endDate) {
     return { value: Number(result.rows[0]?.movements || 0), extra: Number(result.rows[0]?.series || 0), unit: "movimentos", extraUnit: "séries" };
   }
   if (item.type === "walking" || item.type === "bicycle") {
-    const term = item.type === "walking" ? "%camin%" : "%bicic%";
-    const result = await query("select coalesce(sum(distance_meters),0)::numeric/1000 as kilometers, coalesce(sum(duration_minutes),0)::numeric as minutes from project200_exercise_sessions where user_id=$1 and status='completed' and lower(exercise_name) like $2 and coalesce(completed_at,started_at)::date between $3::date and $4::date", [userId, term, startDate, endDate]);
+    const result = await query(`select coalesce(sum(distance_meters),0)::numeric/1000 as kilometers, coalesce(sum(duration_minutes),0)::numeric as minutes
+      from project200_exercise_sessions where user_id=$1 and status='completed' and (
+        ($2='walking' and (lower(exercise_id || ' ' || exercise_name) like '%camin%' or lower(exercise_id || ' ' || exercise_name) like '%esteira%' or lower(exercise_id || ' ' || exercise_name) like '%corrida%'))
+        or ($2='bicycle' and (lower(exercise_id || ' ' || exercise_name) like '%bicic%' or lower(exercise_id || ' ' || exercise_name) like '%bike%'))
+      ) and coalesce(completed_at,started_at)::date between $3::date and $4::date`, [userId, item.type, startDate, endDate]);
     const kilometers = Number(result.rows[0]?.kilometers || 0), minutes = Number(result.rows[0]?.minutes || 0);
     return { value: kilometers, unit: "km", extra: minutes, extraUnit: "min", speed: minutes > 0 ? kilometers / (minutes / 60) : 0 };
   }
@@ -179,11 +299,11 @@ async function metricForItem(userId, item, startDate, endDate) {
   }
   return { value: 0, unit: "" };
 }
-export async function getProject200SharedTaskLinks(userId, friendId, days = 1) {
+export async function getProject200SharedTaskLinks(userId, friendId, days = 0) {
   await ensureSchema();
   const selfId = String(userId || "").trim(), otherId = String(friendId || "").trim();
   await assertFriendship(selfId, otherId);
-  const rangeDays = safeDays(days), endDate = dateKey(), startDate = addDays(endDate, -(rangeDays - 1));
+  const rangeDays = safeDays(days), endDate = dateKey(), startDate = rangeDays === 0 ? "2000-01-01" : addDays(endDate, -(rangeDays - 1));
   const rows = await query("select * from project200_shared_task_links where ((requester_user_id=$1 and recipient_user_id=$2) or (requester_user_id=$2 and recipient_user_id=$1)) and status in ('pending','accepted') order by updated_at desc", [selfId, otherId]);
   const active = [], pending = [];
   for (const row of rows.rows) {

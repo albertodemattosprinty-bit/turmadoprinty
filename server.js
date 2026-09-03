@@ -15028,9 +15028,9 @@ const server = http.createServer(async (request, response) => {
       const authUser = await requireAuth(request, response);
       if (!authUser) return;
       const friendId = decodeURIComponent(pathname.replace(/^\/api\/200\/friends\/([^/]+)\/shared-links$/, "$1"));
-      sendJson(response, 200, { ok: true, ...(await getProject200SharedTaskLinks(authUser.id, friendId, requestUrl.searchParams.get("days") || "1")) });
+      sendJson(response, 200, { ok: true, ...(await getProject200SharedTaskLinks(authUser.id, friendId, requestUrl.searchParams.get("days") || "0")) });
     } catch (error) {
-      sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível carregar as tarefas compartilhadas." });
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível carregar as ações compartilhadas." });
     }
     return;
   }
@@ -15047,11 +15047,11 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (request.method === "POST" && pathname.match(/^\/api\/200\/shared-task-links\/[^/]+\/(accept|reject)$/)) {
+  if (request.method === "POST" && pathname.match(/^\/api\/200\/shared-task-links\/[^/]+\/(accept|clone|reject)$/)) {
     try {
       const authUser = await requireAuth(request, response);
       if (!authUser) return;
-      const match = pathname.match(/^\/api\/200\/shared-task-links\/([^/]+)\/(accept|reject)$/);
+      const match = pathname.match(/^\/api\/200\/shared-task-links\/([^/]+)\/(accept|clone|reject)$/);
       const body = await readJsonBody(request);
       const result = await respondProject200SharedTaskLink(authUser.id, decodeURIComponent(match?.[1] || ""), match?.[2], body);
       sendJson(response, 200, { ok: true, ...result });

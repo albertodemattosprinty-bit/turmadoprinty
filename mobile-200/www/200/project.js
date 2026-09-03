@@ -12,7 +12,7 @@ import {
 } from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
-const project200AppVersion = "1.06";
+const project200AppVersion = "1.07";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
 
@@ -1443,7 +1443,7 @@ const state = {
     incomingInvites: [],
     friends: []
   },
-  sharedTasks: { friend: null, payload: null, items: [], candidates: null, directItem: null, mode: "", loading: false, days: 1 },
+  sharedTasks: { friend: null, payload: null, items: [], candidates: null, directItem: null, mode: "", loading: false, days: 0 },
   friendAssignment: {
     mode: "",
     action: null,
@@ -14140,12 +14140,39 @@ function sharedTasksNumber(value, fractionDigits = 0) {
   return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: fractionDigits }).format(Math.max(0, Number(value || 0)));
 }
 
+let sharedTasksPeriodTimer = 0;
+let sharedTasksPeriodWasMoved = false;
+
+function sharedTasksPeriodLabel(days) {
+  const value = Number(days);
+  if (value === 0) return "Geral";
+  if (value === 1) return "Hoje";
+  return `${value} dias`;
+}
+
+function stopSharedTasksPeriodRotation(manual = false) {
+  if (sharedTasksPeriodTimer) window.clearInterval(sharedTasksPeriodTimer);
+  sharedTasksPeriodTimer = 0;
+  if (manual) sharedTasksPeriodWasMoved = true;
+}
+
+function startSharedTasksPeriodRotation(periods = []) {
+  const values = Array.isArray(periods) ? periods.map(Number).filter(Number.isFinite) : [];
+  if (sharedTasksPeriodWasMoved || sharedTasksPeriodTimer || values.length < 2 || !sharedTasksModal?.classList.contains("active")) return;
+  sharedTasksPeriodTimer = window.setInterval(() => {
+    if (!sharedTasksModal?.classList.contains("active") || state.sharedTasks?.mode || state.sharedTasks?.periodRefreshing) return;
+    const currentIndex = Math.max(0, values.indexOf(Number(state.sharedTasks.days)));
+    void loadSharedTasksComparison(values[(currentIndex + 1) % values.length], { silent: true });
+  }, 2000);
+}
+
 function renderSharedTasksPeriods(periods = []) {
   if (!sharedTasksPeriods) return;
-  const values = Array.isArray(periods) ? periods : [];
+  const values = Array.isArray(periods) ? periods.map(Number).filter(Number.isFinite) : [];
   sharedTasksPeriods.hidden = !values.length;
   if (!values.length) { sharedTasksPeriods.innerHTML = ""; return; }
-  sharedTasksPeriods.innerHTML = values.map((days) => `<button type="button" class="${Number(days) === Number(state.sharedTasks.days) ? "active" : ""}" data-shared-tasks-days="${Number(days)}">${Number(days) === 1 ? "Hoje" : Number(days) + " dias"}</button>`).join("");
+  sharedTasksPeriods.innerHTML = `<button type="button" class="shared-tasks-period-arrow" data-shared-period-step="-1" aria-label="Período anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><div class="shared-tasks-period-current"><small>Prazo</small><strong>${escapeHtml(sharedTasksPeriodLabel(state.sharedTasks.days))}</strong></div><button type="button" class="shared-tasks-period-arrow" data-shared-period-step="1" aria-label="Próximo período"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>`;
+  startSharedTasksPeriodRotation(values);
 }
 function sharedMetricText(metric = {}) {
   const value = Number(metric?.value || 0);
@@ -14153,28 +14180,44 @@ function sharedMetricText(metric = {}) {
   return `${sharedTasksNumber(value, decimals)}${metric?.unit ? " " + metric.unit : ""}`;
 }
 function sharedTaskTypeLabel(type) {
-  return ({ scheduled_task: "tarefa", simple_mission: "missão", compound_mission: "pack", series_exercise: "séries", walking: "caminhada", bicycle: "bicicleta", weight: "peso", nutrition_quality: "alimentação" })[String(type || "")] || "item";
+  return ({ scheduled_task: "tarefa", simple_mission: "missão", compound_mission: "missão composta", series_exercise: "grupo de exercícios", walking: "caminhada", bicycle: "bicicleta", weight: "peso", nutrition_quality: "nutrição", microtask: "microtarefa" })[String(type || "")] || "ação";
 }
-function renderSharedLinkCard(link = {}, friendName = "") {
+function sharedScoreValue(metric = {}) {
+  const value = Math.max(0, Number(metric?.value || 0));
+  return sharedTasksNumber(value, Number.isInteger(value) ? 0 : 1);
+}
+function renderSharedLinkCard(link = {}, self = {}, friend = {}) {
   const selfMetric = link.selfMetric || {}, friendMetric = link.friendMetric || {};
   const extras = (metric) => metric?.extraUnit ? `<small>${sharedTasksNumber(metric.extra || 0)} ${escapeHtml(metric.extraUnit)}${metric.speed ? " · " + sharedTasksNumber(metric.speed, 1) + " km/h" : ""}</small>` : (metric?.speed ? `<small>${sharedTasksNumber(metric.speed, 1)} km/h</small>` : "");
-  return `<section class="shared-tasks-card"><h2>${escapeHtml(link.selfItem?.label || "Seu item")} × ${escapeHtml(link.friendItem?.label || friendName || "amigo")}</h2><div class="shared-tasks-compare"><div class="shared-tasks-person"><strong>Você</strong><b>${sharedMetricText(selfMetric)}</b>${extras(selfMetric)}</div><div class="shared-tasks-person"><strong>${escapeHtml(friendName || "Amigo")}</strong><b>${sharedMetricText(friendMetric)}</b>${extras(friendMetric)}</div></div></section>`;
+  const selfLabel = String(link.selfItem?.label || "Sua ação"), friendLabel = String(link.friendItem?.label || "Ação compartilhada");
+  const sameLabel = selfLabel.localeCompare(friendLabel, "pt-BR", { sensitivity: "base" }) === 0;
+  return `<article class="shared-tasks-card shared-tasks-result-card">
+    <div class="shared-tasks-duel">
+      <div class="shared-tasks-duel-person"><div class="shared-tasks-duel-avatar">${renderSocialCardAvatar(self)}</div><span>Você</span></div>
+      <div class="shared-tasks-score" aria-label="Placar: você ${sharedScoreValue(selfMetric)}, ${escapeHtml(friend.name || "amigo")} ${sharedScoreValue(friendMetric)}"><strong>${sharedScoreValue(selfMetric)}<i>x</i>${sharedScoreValue(friendMetric)}</strong><small>placar</small></div>
+      <div class="shared-tasks-duel-person"><div class="shared-tasks-duel-avatar">${renderSocialCardAvatar(friend)}</div><span>${escapeHtml(friend.name || "Amigo")}</span></div>
+    </div>
+    <div class="shared-tasks-result-copy"><span>${escapeHtml(sharedTaskTypeLabel(link.type))}</span><h2>${escapeHtml(selfLabel)}</h2>${sameLabel ? "" : `<p>Comparando com “${escapeHtml(friendLabel)}”</p>`}</div>
+    <div class="shared-tasks-compare"><div class="shared-tasks-person"><strong>Você</strong><b>${sharedMetricText(selfMetric)}</b>${extras(selfMetric)}</div><div class="shared-tasks-person"><strong>${escapeHtml(friend.name || "Amigo")}</strong><b>${sharedMetricText(friendMetric)}</b>${extras(friendMetric)}</div></div>
+  </article>`;
 }
 function renderSharedItemsPicker() {
   if (!sharedTasksContent) return;
+  stopSharedTasksPeriodRotation();
   const items = Array.isArray(state.sharedTasks?.items) ? state.sharedTasks.items : [];
   renderSharedTasksPeriods([]);
   sharedTasksContent.innerHTML = `<section class="shared-tasks-card"><h2>O que você quer compartilhar?</h2><p>Escolha somente um item da sua lista. Seu amigo escolherá um item do mesmo tipo para comparar.</p><div class="shared-tasks-list">${items.length ? items.map((item) => `<button type="button" class="shared-tasks-list-item shared-tasks-action" data-shared-item data-shared-item-type="${escapeHtml(item.type)}" data-shared-item-key="${escapeHtml(item.key)}"><span>${escapeHtml(item.label)}</span><b>${escapeHtml(sharedTaskTypeLabel(item.type))}</b></button>`).join("") : "<p>Você ainda não tem itens disponíveis para compartilhar.</p>"}</div></section>`;
 }
 function renderSharedCandidates() {
   if (!sharedTasksContent) return;
+  stopSharedTasksPeriodRotation();
   const candidateData = state.sharedTasks?.candidates || {}, candidates = Array.isArray(candidateData.candidates) ? candidateData.candidates : [];
   renderSharedTasksPeriods([]);
-  sharedTasksContent.innerHTML = `<section class="shared-tasks-card"><h2>Escolha a sua tarefa</h2><p>${escapeHtml(state.sharedTasks?.friend?.name || "Este amigo")} quer compartilhar “${escapeHtml(candidateData.link?.sourceLabel || "um item")}” com você. Escolha uma ${escapeHtml(sharedTaskTypeLabel(candidateData.link?.sourceType))} sua para comparar.</p><div class="shared-tasks-list">${candidates.length ? candidates.map((item) => `<button type="button" class="shared-tasks-list-item shared-tasks-action" data-shared-candidate data-shared-candidate-key="${escapeHtml(item.key)}"><span>${escapeHtml(item.label)}</span><b>comparar</b></button>`).join("") : "<p>Você ainda não tem um item compatível para essa comparação.</p>"}</div><button class="shared-tasks-action secondary" type="button" data-shared-link-reject>Agora não</button></section>`;
+  sharedTasksContent.innerHTML = `<section class="shared-tasks-card shared-tasks-choice-card"><span class="shared-tasks-choice-kicker">Ação similar</span><h2>Qual dessas ações você quer comparar com “${escapeHtml(candidateData.link?.sourceLabel || "esta ação")}” de ${escapeHtml(state.sharedTasks?.friend?.name || "seu amigo")}?</h2><div class="shared-tasks-list">${candidates.length ? candidates.map((item) => `<button type="button" class="shared-tasks-list-item shared-tasks-action" data-shared-candidate data-shared-candidate-key="${escapeHtml(item.key)}"><span>${escapeHtml(item.label)}</span><b>comparar</b></button>`).join("") : "<p>Você ainda não tem uma ação compatível. Volte e escolha adicionar uma cópia agora.</p>"}</div><button class="shared-tasks-action secondary" type="button" data-shared-link-back>Voltar</button></section>`;
 }
 function renderSharedTasksModal() {
   const payload = state.sharedTasks?.payload || {}, friend = state.sharedTasks?.friend || payload.friend || {};
-  if (sharedTasksFriendName) sharedTasksFriendName.textContent = friend.name ? `Comparando com ${friend.name}` : "Comparativo privado";
+  if (sharedTasksFriendName) sharedTasksFriendName.textContent = friend.name ? `Você + ${friend.name}` : "Comparativo privado";
   if (sharedTasksStatus) sharedTasksStatus.textContent = state.sharedTasks?.loading ? "Carregando..." : "";
   if (!sharedTasksContent) return;
   if (state.sharedTasks?.loading) { sharedTasksContent.innerHTML = '<div class="shared-tasks-empty">Carregando comparativo...</div>'; return; }
@@ -14183,25 +14226,37 @@ function renderSharedTasksModal() {
   const active = Array.isArray(payload.active) ? payload.active : [], pending = Array.isArray(payload.pending) ? payload.pending : [];
   renderSharedTasksPeriods(active.length ? payload.periods : []);
   const incoming = pending.filter((item) => item.incoming), outgoing = pending.filter((item) => !item.incoming);
-  const pendingHtml = incoming.map((item) => `<section class="shared-tasks-card"><h2>Solicitação recebida</h2><p>${escapeHtml(item.requesterName || friend.name || "Um amigo")} quer compartilhar “${escapeHtml(item.source?.label || "um item")}” com você.</p><button class="shared-tasks-action" type="button" data-shared-link-choose="${escapeHtml(item.id)}">Escolher minha tarefa para comparar</button><button class="shared-tasks-action secondary" type="button" data-shared-link-reject-id="${escapeHtml(item.id)}">Recusar</button></section>`).join("");
-  const outgoingHtml = outgoing.map((item) => `<section class="shared-tasks-card"><p>Você enviou “${escapeHtml(item.source?.label || "um item")}”. Aguardando ${escapeHtml(friend.name || "seu amigo")} escolher uma tarefa compatível.</p></section>`).join("");
-  const emptyHtml = !active.length && !pending.length ? `<div class="shared-tasks-empty">Você e ${escapeHtml(friend.name || "este amigo")} ainda não têm tarefas compartilhadas.</div>` : "";
-  const scoreHtml = active.length ? `<section class="shared-tasks-card"><h2>Placar · ${payload.days === 1 ? "Hoje" : payload.days + " dias"}</h2><p>Somente as tarefas que vocês escolheram aparecem aqui.</p></section>${active.map((item) => renderSharedLinkCard(item, friend.name || "Amigo")).join("")}` : "";
-  sharedTasksContent.innerHTML = `${emptyHtml}${pendingHtml}${outgoingHtml}${scoreHtml}`;
+  const directTypes = new Set(["series_exercise", "walking", "bicycle", "nutrition_quality"]);
+  const pendingHtml = incoming.map((item) => {
+    const sourceLabel = escapeHtml(item.source?.label || "esta ação"), friendName = escapeHtml(item.requesterName || friend.name || "Seu amigo");
+    if (directTypes.has(String(item.source?.type || ""))) return `<section class="shared-tasks-card shared-tasks-invite-card"><span class="shared-tasks-choice-kicker">Desafio recebido</span><h2>${friendName} compartilhou “${sourceLabel}” com você</h2><p>Essa ação é de comparação direta e será vinculada ao mesmo tipo na sua conta.</p><button class="shared-tasks-action" type="button" data-shared-link-clone="${escapeHtml(item.id)}">Começar comparação</button><button class="shared-tasks-action secondary" type="button" data-shared-link-reject-id="${escapeHtml(item.id)}">Agora não</button></section>`;
+    return `<section class="shared-tasks-card shared-tasks-invite-card"><span class="shared-tasks-choice-kicker">Desafio recebido</span><h2>Você já tem uma ação igual a “${sourceLabel}”?</h2><p>${friendName} quer comparar essa ação com você.</p><button class="shared-tasks-action" type="button" data-shared-link-choose="${escapeHtml(item.id)}">Sim, tenho igual ou similar</button><button class="shared-tasks-action secondary shared-tasks-action-add" type="button" data-shared-link-clone="${escapeHtml(item.id)}">Ainda não, adicionar agora</button><button class="shared-tasks-text-action" type="button" data-shared-link-reject-id="${escapeHtml(item.id)}">Recusar desafio</button></section>`;
+  }).join("");
+  const outgoingHtml = outgoing.map((item) => `<section class="shared-tasks-card shared-tasks-waiting-card"><span class="shared-tasks-choice-kicker">Convite enviado</span><h2>${escapeHtml(item.source?.label || "Ação compartilhada")}</h2><p>Aguardando ${escapeHtml(friend.name || "seu amigo")} aceitar ou escolher uma ação similar.</p></section>`).join("");
+  const emptyHtml = !active.length && !pending.length ? `<div class="shared-tasks-empty">Você e ${escapeHtml(friend.name || "este amigo")} ainda não têm ações compartilhadas.</div>` : "";
+  const count = active.length;
+  const summaryHtml = count ? `<section class="shared-tasks-overview"><div class="shared-tasks-overview-avatars"><div>${renderSocialCardAvatar(payload.self || {})}</div><div>${renderSocialCardAvatar(payload.friend || friend)}</div></div><h2><span>Você e ${escapeHtml(friend.name || "seu amigo")} têm</span><strong>${count} ${count === 1 ? "ação compartilhada" : "ações compartilhadas"}</strong></h2><p>Prazo: ${escapeHtml(sharedTasksPeriodLabel(payload.days))}</p></section>` : "";
+  const scoreHtml = active.map((item) => renderSharedLinkCard(item, payload.self || {}, payload.friend || friend)).join("");
+  sharedTasksContent.innerHTML = `${pendingHtml}${outgoingHtml}${summaryHtml}${scoreHtml}${emptyHtml}`;
 }
-async function loadSharedTasksComparison(days = state.sharedTasks.days) {
+async function loadSharedTasksComparison(days = state.sharedTasks.days, options = {}) {
   const friendId = String(state.sharedTasks?.friend?.userId || "").trim();
   if (!friendId) return;
-  state.sharedTasks.days = Number(days || 1); state.sharedTasks.loading = true; state.sharedTasks.mode = ""; renderSharedTasksModal();
+  if (options.silent && state.sharedTasks?.periodRefreshing) return;
+  const nextDays = Number(days);
+  state.sharedTasks.days = Number.isFinite(nextDays) ? nextDays : 0;
+  state.sharedTasks.periodRefreshing = Boolean(options.silent);
+  if (!options.silent) { state.sharedTasks.loading = true; state.sharedTasks.mode = ""; renderSharedTasksModal(); }
   try { state.sharedTasks.payload = await apiRequest(`/api/200/friends/${encodeURIComponent(friendId)}/shared-links?days=${encodeURIComponent(state.sharedTasks.days)}`, { skipGlobalLoading: true }); }
   catch (error) { state.sharedTasks.payload = { friend: state.sharedTasks.friend, active: [], pending: [] }; if (sharedTasksStatus) sharedTasksStatus.textContent = error instanceof Error ? error.message : "Não foi possível carregar o comparativo."; }
-  finally { state.sharedTasks.loading = false; renderSharedTasksModal(); }
+  finally { state.sharedTasks.loading = false; state.sharedTasks.periodRefreshing = false; renderSharedTasksModal(); }
 }
 async function openSharedTasksForFriend(userId) {
   const friend = (Array.isArray(state.social?.friends) ? state.social.friends : []).find((entry) => String(entry?.userId || "") === String(userId || ""));
   if (!friend) return;
-  state.sharedTasks.friend = friend; state.sharedTasks.payload = null; state.sharedTasks.items = []; state.sharedTasks.candidates = null; state.sharedTasks.mode = ""; state.sharedTasks.days = 1;
-  openModal("sharedTasksModal"); await loadSharedTasksComparison(1);
+  stopSharedTasksPeriodRotation(); sharedTasksPeriodWasMoved = false;
+  state.sharedTasks.friend = friend; state.sharedTasks.payload = null; state.sharedTasks.items = []; state.sharedTasks.candidates = null; state.sharedTasks.mode = ""; state.sharedTasks.days = 0;
+  openModal("sharedTasksModal"); await loadSharedTasksComparison(0);
 }
 async function openSharedItemsPicker() {
   const friendId = String(state.sharedTasks?.friend?.userId || "").trim();
@@ -14222,7 +14277,8 @@ function openDirectSharedItemPicker(item = {}) {
 async function shareDirectItemWithFriend(friend) {
   const item = state.sharedTasks.directItem;
   if (!item || !friend?.userId) return;
-  state.sharedTasks.friend = friend; state.sharedTasks.payload = null; state.sharedTasks.days = 1;
+  stopSharedTasksPeriodRotation(); sharedTasksPeriodWasMoved = false;
+  state.sharedTasks.friend = friend; state.sharedTasks.payload = null; state.sharedTasks.days = 0;
   closeModal("socialModal"); openModal("sharedTasksModal");
   await sendSharedItem(item.type, item.key);
   state.sharedTasks.directItem = null;
@@ -21117,21 +21173,30 @@ runningHomeSleepButton?.addEventListener("click", () => {
   void openSleepModal();
 });
 socialCloseButton?.addEventListener("click", () => closeModal("socialModal"));
-sharedTasksCloseButton?.addEventListener("click", () => { closeModal("sharedTasksModal"); openModal("socialModal"); });
+sharedTasksCloseButton?.addEventListener("click", () => { stopSharedTasksPeriodRotation(); closeModal("sharedTasksModal"); openModal("socialModal"); });
 sharedTasksShareButton?.addEventListener("click", () => { void openSharedItemsPicker(); });
 sharedTasksContent?.addEventListener("click", (event) => {
   const item = event.target.closest("[data-shared-item]");
   if (item) { void sendSharedItem(String(item.dataset.sharedItemType || ""), String(item.dataset.sharedItemKey || "")); return; }
   const choose = event.target.closest("[data-shared-link-choose]");
   if (choose) { void chooseSharedTaskLink(String(choose.dataset.sharedLinkChoose || "")); return; }
+  const clone = event.target.closest("[data-shared-link-clone]");
+  if (clone) { void respondSharedTaskLink("clone", String(clone.dataset.sharedLinkClone || "")); return; }
   const candidate = event.target.closest("[data-shared-candidate]");
   if (candidate) { void respondSharedTaskLink("accept", "", String(candidate.dataset.sharedCandidateKey || "")); return; }
+  if (event.target.closest("[data-shared-link-back]")) { state.sharedTasks.mode = ""; state.sharedTasks.candidates = null; renderSharedTasksModal(); return; }
   const reject = event.target.closest("[data-shared-link-reject], [data-shared-link-reject-id]");
   if (reject) { void respondSharedTaskLink("reject", String(reject.dataset.sharedLinkRejectId || "")); }
 });
 sharedTasksPeriods?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-shared-tasks-days]");
-  if (button) void loadSharedTasksComparison(Number(button.dataset.sharedTasksDays || 1));
+  const button = event.target.closest("[data-shared-period-step]");
+  if (!button) return;
+  const periods = Array.isArray(state.sharedTasks?.payload?.periods) ? state.sharedTasks.payload.periods.map(Number) : [];
+  if (!periods.length) return;
+  stopSharedTasksPeriodRotation(true);
+  const currentIndex = Math.max(0, periods.indexOf(Number(state.sharedTasks.days)));
+  const nextIndex = (currentIndex + Number(button.dataset.sharedPeriodStep || 1) + periods.length) % periods.length;
+  void loadSharedTasksComparison(periods[nextIndex]);
 });
 socialSearchButton?.addEventListener("click", () => {
   state.social.searchOpen = !state.social.searchOpen;
