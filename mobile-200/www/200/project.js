@@ -12,7 +12,7 @@ import {
 } from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
-const project200AppVersion = "1.07";
+const project200AppVersion = "1.08";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
 
@@ -14174,11 +14174,6 @@ function renderSharedTasksPeriods(periods = []) {
   sharedTasksPeriods.innerHTML = `<button type="button" class="shared-tasks-period-arrow" data-shared-period-step="-1" aria-label="Período anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><div class="shared-tasks-period-current"><small>Prazo</small><strong>${escapeHtml(sharedTasksPeriodLabel(state.sharedTasks.days))}</strong></div><button type="button" class="shared-tasks-period-arrow" data-shared-period-step="1" aria-label="Próximo período"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>`;
   startSharedTasksPeriodRotation(values);
 }
-function sharedMetricText(metric = {}) {
-  const value = Number(metric?.value || 0);
-  const decimals = ["km", "kg", "%"].includes(String(metric?.unit || "")) ? 1 : 0;
-  return `${sharedTasksNumber(value, decimals)}${metric?.unit ? " " + metric.unit : ""}`;
-}
 function sharedTaskTypeLabel(type) {
   return ({ scheduled_task: "tarefa", simple_mission: "missão", compound_mission: "missão composta", series_exercise: "grupo de exercícios", walking: "caminhada", bicycle: "bicicleta", weight: "peso", nutrition_quality: "nutrição", microtask: "microtarefa" })[String(type || "")] || "ação";
 }
@@ -14188,17 +14183,16 @@ function sharedScoreValue(metric = {}) {
 }
 function renderSharedLinkCard(link = {}, self = {}, friend = {}) {
   const selfMetric = link.selfMetric || {}, friendMetric = link.friendMetric || {};
-  const extras = (metric) => metric?.extraUnit ? `<small>${sharedTasksNumber(metric.extra || 0)} ${escapeHtml(metric.extraUnit)}${metric.speed ? " · " + sharedTasksNumber(metric.speed, 1) + " km/h" : ""}</small>` : (metric?.speed ? `<small>${sharedTasksNumber(metric.speed, 1)} km/h</small>` : "");
-  const selfLabel = String(link.selfItem?.label || "Sua ação"), friendLabel = String(link.friendItem?.label || "Ação compartilhada");
-  const sameLabel = selfLabel.localeCompare(friendLabel, "pt-BR", { sensitivity: "base" }) === 0;
+  const selfLabel = String(link.selfItem?.label || "Sua ação");
   return `<article class="shared-tasks-card shared-tasks-result-card">
     <div class="shared-tasks-duel">
       <div class="shared-tasks-duel-person"><div class="shared-tasks-duel-avatar">${renderSocialCardAvatar(self)}</div><span>Você</span></div>
-      <div class="shared-tasks-score" aria-label="Placar: você ${sharedScoreValue(selfMetric)}, ${escapeHtml(friend.name || "amigo")} ${sharedScoreValue(friendMetric)}"><strong>${sharedScoreValue(selfMetric)}<i>x</i>${sharedScoreValue(friendMetric)}</strong><small>placar</small></div>
+      <div class="shared-tasks-result-center">
+        <div class="shared-tasks-result-copy"><span>${escapeHtml(sharedTaskTypeLabel(link.type))}</span><h2>${escapeHtml(selfLabel)}</h2></div>
+        <div class="shared-tasks-score" aria-label="Placar: você ${sharedScoreValue(selfMetric)}, ${escapeHtml(friend.name || "amigo")} ${sharedScoreValue(friendMetric)}"><strong>${sharedScoreValue(selfMetric)}<i>x</i>${sharedScoreValue(friendMetric)}</strong><small>placar</small></div>
+      </div>
       <div class="shared-tasks-duel-person"><div class="shared-tasks-duel-avatar">${renderSocialCardAvatar(friend)}</div><span>${escapeHtml(friend.name || "Amigo")}</span></div>
     </div>
-    <div class="shared-tasks-result-copy"><span>${escapeHtml(sharedTaskTypeLabel(link.type))}</span><h2>${escapeHtml(selfLabel)}</h2>${sameLabel ? "" : `<p>Comparando com “${escapeHtml(friendLabel)}”</p>`}</div>
-    <div class="shared-tasks-compare"><div class="shared-tasks-person"><strong>Você</strong><b>${sharedMetricText(selfMetric)}</b>${extras(selfMetric)}</div><div class="shared-tasks-person"><strong>${escapeHtml(friend.name || "Amigo")}</strong><b>${sharedMetricText(friendMetric)}</b>${extras(friendMetric)}</div></div>
   </article>`;
 }
 function renderSharedItemsPicker() {

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=1.07-repetition-modal-v1" />
+  <link rel="stylesheet" href="/200/project.css?v=1.08-books-shared-card-v1" />
   <link rel="stylesheet" href="/200/life-capture.css?v=20260802-gallery-inline-v1" />
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
   <link rel="stylesheet" href="/200/books.css?v=20260831-minimal-icons-v1" />
@@ -163,7 +163,7 @@
         </button>
       </div>
       <div class="running-home-brand">
-        <img class="running-home-logo" id="runningHomeLogoButton" src="/200/images/ilife-mindsetplan-home.png" alt="iLife MindsetPlan" role="button" tabindex="0" data-app-version="1.07" aria-label="Baixar atualização mais recente do iLife, versão atual 1.07" title="Baixar atualização do iLife · versão 1.07" />
+        <img class="running-home-logo" id="runningHomeLogoButton" src="/200/images/ilife-mindsetplan-home.png" alt="iLife MindsetPlan" role="button" tabindex="0" data-app-version="1.08" aria-label="Baixar atualização mais recente do iLife, versão atual 1.08" title="Baixar atualização do iLife · versão 1.08" />
         <button class="marin-home-entry" type="button" id="marinHomeEntryButton" aria-label="Conversar com Marin">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.4a3.8 3.8 0 0 0 3.8-3.8V6.2a3.8 3.8 0 1 0-7.6 0v5.4a3.8 3.8 0 0 0 3.8 3.8Zm-6-4.1a6 6 0 0 0 12 0M12 17.4V22m-3 0h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           <span>Conversar com <strong id="marinHomePersonaName">Marin</strong></span>
@@ -753,7 +753,7 @@
           <div class="book-create-intro"><h2>Escreva com Luna</h2><p>Você define a ideia. Luna planeja, cria de 1 a 200 páginas e publica o livro completo na biblioteca geral.</p></div>
           <label class="book-field"><span>Título</span><input id="bookTitleInput" type="text" maxlength="140" autocomplete="off" placeholder="Título do livro" required /></label>
           <div class="book-field"><span>Estilo literário</span><div class="book-style-grid" role="group" aria-label="Estilos literários">
-            <button class="book-style-chip is-selected" type="button" data-book-style="Romance">Romance</button><button class="book-style-chip" type="button" data-book-style="Fantasia">Fantasia</button><button class="book-style-chip" type="button" data-book-style="Ficção científica">Ficção científica</button><button class="book-style-chip" type="button" data-book-style="Suspense">Suspense</button><button class="book-style-chip" type="button" data-book-style="Terror">Terror</button><button class="book-style-chip" type="button" data-book-style="Aventura">Aventura</button><button class="book-style-chip" type="button" data-book-style="Drama">Drama</button><button class="book-style-chip" type="button" data-book-style="Comédia">Comédia</button><button class="book-style-chip" type="button" data-book-style="Poesia">Poesia</button><button class="book-style-chip" type="button" data-book-style="Biografia">Biografia</button><button class="book-style-chip" type="button" data-book-style="Autobiografia">Autobiografia</button><button class="book-style-chip" type="button" data-book-style="Desenvolvimento pessoal">Desenvolvimento pessoal</button><button class="book-style-chip" type="button" data-book-style="Filosofia">Filosofia</button><button class="book-style-chip" type="button" data-book-style="História">História</button><button class="book-style-chip" type="button" data-book-style="Infantil">Infantil</button><button class="book-style-chip" type="button" data-book-style="Crônica">Crônica</button>
+            <button class="book-style-chip" type="button" data-book-style="Neutro" title="Sem estilo predefinido: segue somente o seu prompt">Neutro</button><button class="book-style-chip is-selected" type="button" data-book-style="Romance">Romance</button><button class="book-style-chip" type="button" data-book-style="Fantasia">Fantasia</button><button class="book-style-chip" type="button" data-book-style="Ficção científica">Ficção científica</button><button class="book-style-chip" type="button" data-book-style="Suspense">Suspense</button><button class="book-style-chip" type="button" data-book-style="Terror">Terror</button><button class="book-style-chip" type="button" data-book-style="Aventura">Aventura</button><button class="book-style-chip" type="button" data-book-style="Drama">Drama</button><button class="book-style-chip" type="button" data-book-style="Comédia">Comédia</button><button class="book-style-chip" type="button" data-book-style="Poesia">Poesia</button><button class="book-style-chip" type="button" data-book-style="Biografia">Biografia</button><button class="book-style-chip" type="button" data-book-style="Autobiografia">Autobiografia</button><button class="book-style-chip" type="button" data-book-style="Desenvolvimento pessoal">Desenvolvimento pessoal</button><button class="book-style-chip" type="button" data-book-style="Filosofia">Filosofia</button><button class="book-style-chip" type="button" data-book-style="História">História</button><button class="book-style-chip" type="button" data-book-style="Infantil">Infantil</button><button class="book-style-chip" type="button" data-book-style="Crônica">Crônica</button>
           </div></div>
           <label class="book-field"><span>Estilo da capa</span><select id="bookCoverStyleSelect"><option>Editorial cinematográfica</option><option>Minimalista premium</option><option>Ilustração 3D</option><option>Aquarela artística</option><option>Fantasia épica</option><option>Fotográfica realista</option><option>Vintage clássica</option><option>Anime contemporâneo</option><option>Infantil colorida</option><option>Sombria e misteriosa</option></select></label>
           <label class="book-field"><span>Quantidade de páginas</span><input id="bookPageCountInput" type="number" min="1" max="200" value="12" required /></label>
@@ -2207,9 +2207,10 @@
   </button>
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
-  <script type="module" src="/200/project.js?v=1.07-shared-actions-v1"></script>
+  <script type="module" src="/200/project.js?v=1.08-books-shared-card-v1"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
   <script type="module" src="/200/wellness.js?v=20260829-direct-share-v1"></script>
+  <script src="/200/books.js?v=20260903-library-neutral-v1"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260730-admin-texts-v1"></script>
 </body>

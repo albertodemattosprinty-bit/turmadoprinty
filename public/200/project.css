@@ -16756,7 +16756,8 @@ body[data-background-theme="dark"] .shared-tasks-metric,body[data-background-the
 .shared-tasks-overview h2 span,.shared-tasks-overview h2 strong{display:block}
 .shared-tasks-overview h2 strong{margin-top:4px;color:var(--social-blue-700,#0b57d0);font-size:24px}
 .shared-tasks-overview p{margin:9px 0 0;color:var(--social-muted,#62738a);font-size:12px;font-weight:850;text-transform:uppercase;letter-spacing:.08em}
-.shared-tasks-result-card{padding:17px 15px 15px;border-radius:24px}
+.shared-tasks-result-card{padding:14px 12px 12px;border-radius:24px}
+.shared-tasks-result-card .shared-tasks-duel{grid-template-columns:70px minmax(0,1fr) 70px;min-height:88px;gap:7px}
 .shared-tasks-duel{display:grid;grid-template-columns:minmax(68px,1fr) minmax(92px,1.2fr) minmax(68px,1fr);align-items:center;gap:8px}
 .shared-tasks-duel-person{min-width:0;display:grid;justify-items:center;gap:5px}
 .shared-tasks-duel-person>span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--social-muted,#62738a);font-size:11px;font-weight:900}
@@ -16765,9 +16766,10 @@ body[data-background-theme="dark"] .shared-tasks-metric,body[data-background-the
 .shared-tasks-score strong{display:flex;align-items:center;justify-content:center;color:var(--social-ink,#0b1f3a);font-size:31px;line-height:1;font-weight:950;letter-spacing:-.06em}
 .shared-tasks-score strong i{margin:0 5px;color:var(--social-blue-600,#2f7df2);font-size:17px;font-style:normal;letter-spacing:0}
 .shared-tasks-score small{display:block;margin-top:4px;color:var(--social-muted,#62738a);font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}
-.shared-tasks-result-copy{padding:14px 2px 11px;text-align:center}
+.shared-tasks-result-center{min-width:0;display:grid;align-content:center;justify-items:center;text-align:center}
+.shared-tasks-result-copy{min-width:0;padding:0 0 5px;text-align:center}
 .shared-tasks-result-copy>span,.shared-tasks-choice-kicker{display:block;margin-bottom:4px;color:var(--social-blue-700,#0b57d0);font-size:10px;font-weight:950;letter-spacing:.12em;text-transform:uppercase}
-.shared-tasks-result-copy h2{margin:0;font-size:18px;line-height:1.2}
+.shared-tasks-result-copy h2{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;margin:0;font-size:17px;line-height:1.08}
 .shared-tasks-result-copy p{margin:5px 0 0;font-size:11px}
 .shared-tasks-person{min-width:0;text-align:center}
 .shared-tasks-person b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:18px}
@@ -16788,7 +16790,7 @@ body[data-background-theme="dark"] .shared-tasks-content,body[data-background-th
 body[data-background-theme="dark"] .shared-tasks-overview,body[data-background-theme="black"] .shared-tasks-overview{background:linear-gradient(145deg,#162b47,#101c2e);border-color:#294c76}
 body[data-background-theme="dark"] .shared-tasks-score strong,body[data-background-theme="black"] .shared-tasks-score strong{color:#f2f7ff}
 body[data-background-theme="dark"] .shared-tasks-periods,body[data-background-theme="black"] .shared-tasks-periods{background:rgba(12,20,34,.94);border-color:#263b56}
-@media(max-width:560px){.shared-tasks-content{padding-left:12px;padding-right:12px}.shared-tasks-duel-avatar{width:56px;height:56px}.shared-tasks-score strong{font-size:28px}}
+@media(max-width:560px){.shared-tasks-content{padding-left:12px;padding-right:12px}.shared-tasks-result-card .shared-tasks-duel{grid-template-columns:64px minmax(0,1fr) 64px}.shared-tasks-duel-avatar{width:54px;height:54px}.shared-tasks-score strong{font-size:28px}}
 
 /* Restore the compact repetition/date modal from commit 1591017 (2026-08-08 04:06). */
 :is(#universalScheduleModal,#dailyrepetitionModal,#repeatuntilModal,#dataselectModal).universal-schedule-modal {

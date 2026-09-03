@@ -18,10 +18,23 @@ const IMAGE_MODEL = String(process.env.PROJECT200_BOOK_IMAGE_MODEL || "gpt-image
 const COVER_PREFIX = "project200/books/covers";
 const PUBLIC_BASE_URL = String(process.env.R2_PUBLIC_BASE_URL || process.env.CONTENT_BASE_URL || "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev").replace(/\/+$/, "");
 const LITERARY_STYLES = Object.freeze([
-  "Romance", "Fantasia", "Ficção científica", "Suspense", "Terror", "Aventura",
+  "Neutro", "Romance", "Fantasia", "Ficção científica", "Suspense", "Terror", "Aventura",
   "Drama", "Comédia", "Poesia", "Biografia", "Autobiografia", "Desenvolvimento pessoal",
   "Filosofia", "História", "Infantil", "Crônica"
 ]);
+
+function usesNeutralLiteraryStyle(book) {
+  return String(book?.literaryStyle || "").trim().toLocaleLowerCase("pt-BR") === "neutro";
+}
+
+function neutralPromptInstructions(book) {
+  if (!usesNeutralLiteraryStyle(book)) return [];
+  return [
+    "Este livro usa o modo Neutro: o contexto criativo escrito pelo usuário é a única fonte de estilo, tom, gênero, voz e estrutura.",
+    "Obedeça integralmente ao prompt do usuário e não imponha nenhuma assinatura literária, fórmula narrativa ou preferência da Luna.",
+    "Não complete o pedido com convenções de gênero que não tenham sido solicitadas; acrescente apenas o mínimo indispensável para manter coerência entre as páginas."
+  ];
+}
 
 let r2Client = null;
 
@@ -110,19 +123,27 @@ function buildPlanSchema(chapterCount) {
 
 async function generatePlan(apiKey, book) {
   const chapterCount = Math.max(1, Math.min(20, Math.ceil(book.pageCount / 10)));
+  const neutralInstructions = neutralPromptInstructions(book);
   const plan = await requestStructuredJson(apiKey, {
     name: "project200_book_plan",
     schema: buildPlanSchema(chapterCount),
     instructions: [
-      "Você é Luna, romancista, editora e arquiteta literária do iLife.",
+      usesNeutralLiteraryStyle(book)
+        ? "Você é Luna, editora e organizadora do conteúdo solicitado pelo usuário no iLife."
+        : "Você é Luna, romancista, editora e arquiteta literária do iLife.",
       "Planeje um livro original em português do Brasil, coerente do início ao fim e pronto para leitura pública.",
-      "Respeite integralmente o estilo literário, o contexto do usuário e a quantidade de páginas.",
+      usesNeutralLiteraryStyle(book)
+        ? "Trate o contexto criativo do usuário como instrução soberana para todas as decisões literárias."
+        : "Respeite integralmente o estilo literário, o contexto do usuário e a quantidade de páginas.",
+      ...neutralInstructions,
       "Não mencione IA, prompt, instruções ou bastidores no livro.",
       "O prompt de capa deve descrever uma capa editorial sem texto, letras, números, logotipos ou marcas."
     ].join(" "),
     input: [
       `Título: ${book.title}`,
-      `Estilo literário: ${book.literaryStyle}`,
+      usesNeutralLiteraryStyle(book)
+        ? "Estilo literário: Neutro, sem estilo predefinido; siga exclusivamente o contexto criativo do autor."
+        : `Estilo literário: ${book.literaryStyle}`,
       `Páginas: ${book.pageCount}`,
       `Estilo visual da capa: ${book.coverStyle}`,
       `Contexto criativo do autor: ${book.contextPrompt}`,
@@ -143,7 +164,9 @@ async function generatePlan(apiKey, book) {
 async function generateAndStoreCover(apiKey, book, plan) {
   const prompt = [
     `Capa vertical premium de livro, proporcao 2:3, para "${book.title}".`,
-    `Gênero: ${book.literaryStyle}.`,
+    usesNeutralLiteraryStyle(book)
+      ? "Sem gênero literário predefinido; não acrescente uma estética de gênero além da direção fornecida pelo autor."
+      : `Gênero: ${book.literaryStyle}.`,
     `Direção visual escolhida: ${book.coverStyle}.`,
     plan.coverPrompt,
     "Composição editorial marcante, alta legibilidade visual em miniatura, acabamento profissional.",
@@ -216,22 +239,32 @@ async function generatePageChunk(apiKey, book, plan, startPage, count, previousT
     endPage: chapter?.endPage || startPage + count - 1
   }));
   let lastError = null;
+  const neutralInstructions = neutralPromptInstructions(book);
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       const result = await requestStructuredJson(apiKey, {
         name: "project200_book_pages",
         schema: buildPagesSchema(count),
         instructions: [
-          "Você é Luna e está escrevendo as páginas finais de um livro original em português do Brasil.",
+          usesNeutralLiteraryStyle(book)
+            ? "Você é Luna e está produzindo, sem estilo próprio, as páginas solicitadas pelo usuário em português do Brasil."
+            : "Você é Luna e está escrevendo as páginas finais de um livro original em português do Brasil.",
           "Cada página deve conter rigorosamente entre 1500 e 1800 caracteres, contando espaços.",
-          "Escreva prosa literária completa, sem notas editoriais, sem markdown e sem citar IA ou prompt.",
+          usesNeutralLiteraryStyle(book)
+            ? "Escreva o conteúdo no formato determinado pelo usuário, sem notas editoriais, sem markdown e sem citar IA ou prompt."
+            : "Escreva prosa literária completa, sem notas editoriais, sem markdown e sem citar IA ou prompt.",
           "Mantenha continuidade exata de personagens, fatos, voz, tempo verbal e atmosfera.",
-          "Não resuma acontecimentos apenas para correr. Faça cada página avançar a narrativa ou argumento.",
-          "O campo pageNumber deve corresponder exatamente à página solicitada."
+          usesNeutralLiteraryStyle(book)
+            ? "Faça cada página avançar exatamente o conteúdo pedido, sem acrescentar floreios ou convenções não solicitadas."
+            : "Não resuma acontecimentos apenas para correr. Faça cada página avançar a narrativa ou argumento.",
+          "O campo pageNumber deve corresponder exatamente à página solicitada.",
+          ...neutralInstructions
         ].join(" "),
         input: [
           `Livro: ${book.title}`,
-          `Estilo: ${book.literaryStyle}`,
+          usesNeutralLiteraryStyle(book)
+            ? `Direção literária: siga exclusivamente este contexto do autor, sem estilo predefinido: ${book.contextPrompt}`
+            : `Estilo: ${book.literaryStyle}`,
           `Sinopse: ${plan.synopsis}`,
           `Voz narrativa: ${plan.narrativeVoice}`,
           `Capítulos ativos: ${JSON.stringify(chapterContext)}`,
