@@ -6373,12 +6373,17 @@ async function apiRequest(path, options = {}) {
     skipGlobalLoading,
     ...fetchOptions
   } = options;
+  const resolvedOfflineInvalidates = offlineInvalidates || (
+    String(options.method || "GET").toUpperCase() !== "GET" && String(path || "").startsWith("/api/200/extra-goals")
+      ? ["/api/200/extra-goals", "/api/actions"]
+      : undefined
+  );
   const offlineOptions = {
     ...options,
     headers,
     offlineQueue,
     offlineResponse,
-    offlineInvalidates,
+    offlineInvalidates: resolvedOfflineInvalidates,
     forceNetwork,
     cacheMaxAgeMs
   };
@@ -13352,7 +13357,7 @@ function cacheLoadedMissionVariants(goals) {
   });
 }
 
-async function loadMissions() {
+async function loadMissions(options = {}) {
   if (!getToken()) {
     state.missions = [];
     renderMissionScopeControls();
@@ -13366,7 +13371,7 @@ async function loadMissions() {
   }
   renderMissionScopeControls();
   try {
-    const payload = await apiRequest(missionsPath);
+    const payload = await apiRequest(missionsPath, { forceNetwork: options.forceNetwork === true });
     state.missions = Array.isArray(payload?.goals) ? payload.goals : [];
     cacheLoadedMissionVariants(state.missions);
     if (missionStatus) {
@@ -13379,7 +13384,7 @@ async function loadMissions() {
       applySelectedProfile(getDefaultProfileName());
       try {
         const retryScope = getMissionHistoryScope();
-        const retryPayload = await apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(getDefaultProfileName())}&scope=${encodeURIComponent(retryScope.key)}`);
+        const retryPayload = await apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(getDefaultProfileName())}&scope=${encodeURIComponent(retryScope.key)}`, { forceNetwork: options.forceNetwork === true });
         state.missions = Array.isArray(retryPayload?.goals) ? retryPayload.goals : [];
         cacheLoadedMissionVariants(state.missions);
         if (missionStatus) {
@@ -13401,7 +13406,7 @@ async function loadMissions() {
   }
 }
 
-async function loadActionMissions() {
+async function loadActionMissions(options = {}) {
   if (!getToken() || state.activeOffset !== 0) {
     state.actionMissions = [];
     renderActionsMissionFilter();
@@ -13409,7 +13414,10 @@ async function loadActionMissions() {
   }
   const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
   try {
-    const payload = await apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(profile)}&scope=today`, { skipGlobalLoading: true });
+    const payload = await apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(profile)}&scope=today`, {
+      skipGlobalLoading: true,
+      forceNetwork: options.forceNetwork === true
+    });
     state.actionMissions = Array.isArray(payload?.goals) ? payload.goals : [];
   } catch {
     state.actionMissions = [];
@@ -19634,7 +19642,7 @@ missionCreateConfirmButton?.addEventListener("click", () => {
     await runMissionActionWithLoading(missionCreateConfirmButton, async () => {
       if (missionCreateStatus) missionCreateStatus.textContent = goalKind === "limit" ? "Criando limite..." : isFolder ? "Criando pasta..." : "Criando missão...";
       try {
-        await apiRequest("/api/200/extra-goals", {
+        const createdPayload = await apiRequest("/api/200/extra-goals", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -19655,9 +19663,14 @@ missionCreateConfirmButton?.addEventListener("click", () => {
             svgIconLabel: ""
           })
         });
+        if (Array.isArray(createdPayload?.goals)) {
+          state.missions = createdPayload.goals;
+          state.actionMissions = createdPayload.goals;
+          cacheLoadedMissionVariants(createdPayload.goals);
+        }
         state.missionKindFilter = goalKind;
         closeModal("missionCreateModal");
-        await Promise.all([loadMissions(), loadActionMissions()]);
+        await Promise.all([loadMissions({ forceNetwork: true }), loadActionMissions({ forceNetwork: true })]);
         renderMissions();
         renderActionsMissionsPanel();
         renderRunningMissionQuickButtons();
@@ -20081,7 +20094,7 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
         })
       });
       closeModal("missionAdjustModal");
-      await Promise.all([loadMissions(), loadActionMissions()]);
+      await Promise.all([loadMissions({ forceNetwork: true }), loadActionMissions({ forceNetwork: true })]);
       renderMissions();
       renderActionsMissionsPanel();
     } catch (error) {
@@ -20193,7 +20206,7 @@ missionAdjustDeleteButton?.addEventListener("click", () => {
         });
         persistMissionQuickSlots();
         closeModal("missionAdjustModal");
-        await Promise.all([loadMissions(), loadActionMissions()]);
+        await Promise.all([loadMissions({ forceNetwork: true }), loadActionMissions({ forceNetwork: true })]);
         renderMissions();
         renderActionsMissionsPanel();
         renderRunningMissionQuickButtons();
@@ -23251,7 +23264,7 @@ window.project200ProjectsContext = {
   }
 
   async function refreshAfterFolderMutation() {
-    await Promise.all([loadMissions(), loadActionMissions()]);
+    await Promise.all([loadMissions({ forceNetwork: true }), loadActionMissions({ forceNetwork: true })]);
     renderMissions();
     renderActionsMissionsPanel();
     renderRunningMissionQuickButtons();
