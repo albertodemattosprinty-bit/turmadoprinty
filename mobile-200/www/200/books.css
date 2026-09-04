@@ -67,6 +67,17 @@
 .book-page-number{display:block;margin-bottom:14px;color:#ff9b57;font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.16em}
 .book-page h3{margin:0 0 22px;font-family:"Sora",sans-serif;font-size:clamp(1.35rem,5vw,2rem)}
 .book-page p{margin:0;color:rgba(255,255,255,.87);font-family:Georgia,"Times New Roman",serif;font-size:clamp(1.08rem,4.25vw,1.32rem);line-height:1.85;white-space:pre-line}
+.bible-book-cover{display:grid;place-items:center;background:linear-gradient(145deg,#24130d,#8e5125 54%,#d59b4d)}
+.bible-book-cross{font-size:3rem;color:#fff;text-shadow:0 8px 24px rgba(0,0,0,.45)}
+.book-reader-compact{min-height:auto;padding:24px 22px 18px}
+.book-reader-chunks{padding-top:20px}
+.book-reading-chunk{display:block;width:100%;border:0;background:transparent;padding:22px 0;text-align:left;color:rgba(255,255,255,.5);font-family:Georgia,"Times New Roman",serif;font-size:clamp(1.08rem,4.25vw,1.32rem);line-height:1.85;transition:opacity .22s,color .22s,transform .22s;cursor:pointer}
+.book-reading-chunk.is-active{color:rgba(255,255,255,1);opacity:1}
+.book-reading-chunk:not(.is-active){opacity:.5}
+.book-reading-chunk+.book-reading-chunk{border-top:1px solid rgba(255,255,255,.08)}
+.bible-nav{position:sticky;top:0;z-index:4;display:flex;gap:7px;padding:10px 14px;background:rgba(10,10,13,.92);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,.1)}
+.bible-nav select{min-width:0;flex:1;border:1px solid rgba(255,255,255,.16);border-radius:999px;background:rgba(255,255,255,.09);color:#fff;padding:8px 10px;font:700 .72rem "Sora",sans-serif;outline:none}
+.bible-nav option{color:#111}
 
 .apps-home-item:nth-child(1){--apps-tile:#159a72;--apps-tile-light:#52c995}.apps-home-item:nth-child(2){--apps-tile:#3974c9;--apps-tile-light:#78a9f5}.apps-home-item:nth-child(3){--apps-tile:#5d6b82;--apps-tile-light:#9eafc7}.apps-home-item:nth-child(4){--apps-tile:#8154d9;--apps-tile-light:#b692f4}.apps-home-item:nth-child(5){--apps-tile:#20a86b;--apps-tile-light:#63d59d}.apps-home-item:nth-child(6){--apps-tile:#ca5d79;--apps-tile-light:#f29db0}.apps-home-item:nth-child(7){--apps-tile:#d96a38;--apps-tile-light:#f4a166}.apps-home-item:nth-child(8){--apps-tile:#3382d0;--apps-tile-light:#78b6f0}.apps-home-item:nth-child(9){--apps-tile:#60a438;--apps-tile-light:#9bd565}.apps-home-item:nth-child(10){--apps-tile:#3d88c9;--apps-tile-light:#79bce9}.apps-home-item:nth-child(11){--apps-tile:#bd5bb3;--apps-tile-light:#eb9be0}.apps-home-item:nth-child(12){--apps-tile:#4f5fc2;--apps-tile-light:#8899eb}
 body[data-background-theme="white"] .apps-home-item{color:#17213a;text-shadow:none}
