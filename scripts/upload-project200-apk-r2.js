@@ -17,7 +17,7 @@ import {
   UploadPartCommand
 } from "@aws-sdk/client-s3";
 
-const appVersion = "1.06";
+const appVersion = "1.11";
 const defaultApkPath = path.resolve("mobile-200/android/app/build/outputs/apk/debug/app-debug.apk");
 const apkPath = path.resolve(process.argv[2] || defaultApkPath);
 const latestKey = "project200/app/latest/iLife-Mindset-debug.apk";
