@@ -111,6 +111,19 @@
     if (changed) writeJson(cacheStorageKey(), records);
   }
 
+  function markStale(prefixes) {
+    const values = (Array.isArray(prefixes) ? prefixes : [prefixes]).map(normalizePath).filter(Boolean);
+    if (!values.length) return;
+    const records = readJson(cacheStorageKey(), {});
+    let changed = false;
+    Object.keys(records).forEach((path) => {
+      if (!values.some((prefix) => path.startsWith(prefix))) return;
+      records[path] = { ...records[path], savedAt: 0 };
+      changed = true;
+    });
+    if (changed) writeJson(cacheStorageKey(), records);
+  }
+
   function ensureFeedback() {
     let feedback = document.getElementById("project200OfflineFeedback");
     if (feedback) return feedback;
@@ -150,7 +163,10 @@
 
   function samePayload(left, right) {
     try {
-      return JSON.stringify(left) === JSON.stringify(right);
+      const ignoreVolatileClock = (key, value) => (
+        ["serverNow", "generatedAt", "fetchedAt", "responseAt"].includes(String(key)) ? undefined : value
+      );
+      return JSON.stringify(left, ignoreVolatileClock) === JSON.stringify(right, ignoreVolatileClock);
     } catch {
       return false;
     }
@@ -241,7 +257,7 @@
           synced += 1;
           (item.invalidates || []).forEach((prefix) => invalidates.add(prefix));
         }
-        if (invalidates.size) invalidate([...invalidates]);
+        if (invalidates.size) markStale([...invalidates]);
         if (synced) emit("project200:offline-sync-complete", { synced, pending: outbox.length, invalidates: [...invalidates] });
         return { synced, pending: outbox.length };
       } finally {
@@ -258,15 +274,22 @@
   }
 
   async function backgroundRefresh(path, options, execute, previousPayload) {
-    beginActivity();
+    let changed = false;
     try {
-      const payload = await execute();
+      const payload = await execute({ background: true });
+      changed = !samePayload(previousPayload, payload);
+      if (!changed) {
+        put(path, payload);
+        return;
+      }
+      beginActivity();
       put(path, payload);
-      if (!samePayload(previousPayload, payload)) emit("project200:offline-data-updated", { path, payload: clone(payload) });
+      emit("project200:offline-data-updated", { path, payload: clone(payload) });
+      await new Promise((resolve) => global.requestAnimationFrame(() => global.requestAnimationFrame(resolve)));
     } catch {
       // O cache continua sendo a fonte segura quando a atualização em segundo plano falha.
     } finally {
-      endActivity();
+      if (changed) endActivity();
     }
   }
 
@@ -285,9 +308,9 @@
     }
 
     try {
-      const payload = await execute();
+      const payload = await execute({ background: false });
       if (cacheable) put(normalized, payload);
-      if (method !== "GET" && requestOptions.offlineInvalidates) invalidate(requestOptions.offlineInvalidates);
+      if (method !== "GET" && requestOptions.offlineInvalidates) markStale(requestOptions.offlineInvalidates);
       return payload;
     } catch (error) {
       if (cacheable && cached) return clone(cached.payload);
@@ -318,6 +341,7 @@
     put,
     hasCached,
     invalidate,
+    markStale,
     isOnline: () => global.navigator?.onLine !== false,
     pendingCount: () => readJson(outboxStorageKey(), []).length,
     activity: async (task) => {

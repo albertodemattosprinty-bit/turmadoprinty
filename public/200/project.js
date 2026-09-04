@@ -6382,7 +6382,7 @@ async function apiRequest(path, options = {}) {
     forceNetwork,
     cacheMaxAgeMs
   };
-  const executeNetworkRequest = () => runWithGlobalLoading(async () => {
+  const executeNetworkRequest = ({ background = false } = {}) => runWithGlobalLoading(async () => {
     const response = await fetch(getApiUrl(path), {
       ...fetchOptions,
       headers
@@ -6404,7 +6404,7 @@ async function apiRequest(path, options = {}) {
   }, {
     path,
     iconSrc: loadingIcon || "",
-    skipGlobalLoading: skipGlobalLoading === true
+    skipGlobalLoading: skipGlobalLoading === true || background === true
   });
   return window.Project200Offline?.request
     ? window.Project200Offline.request(path, offlineOptions, executeNetworkRequest)
