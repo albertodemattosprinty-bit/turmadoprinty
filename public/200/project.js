@@ -6363,9 +6363,28 @@ async function apiRequest(path, options = {}) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  return runWithGlobalLoading(async () => {
+  const {
+    offlineQueue,
+    offlineResponse,
+    offlineInvalidates,
+    forceNetwork,
+    cacheMaxAgeMs,
+    loadingIcon,
+    skipGlobalLoading,
+    ...fetchOptions
+  } = options;
+  const offlineOptions = {
+    ...options,
+    headers,
+    offlineQueue,
+    offlineResponse,
+    offlineInvalidates,
+    forceNetwork,
+    cacheMaxAgeMs
+  };
+  const executeNetworkRequest = () => runWithGlobalLoading(async () => {
     const response = await fetch(getApiUrl(path), {
-      ...options,
+      ...fetchOptions,
       headers
     });
 
@@ -6376,15 +6395,20 @@ async function apiRequest(path, options = {}) {
       requestError.code = String(payload?.code || "").trim();
       requestError.overlaps = Array.isArray(payload?.overlaps) ? payload.overlaps : [];
       requestError.runningAction = payload?.runningAction || null;
+      requestError.httpResponse = true;
+      requestError.status = response.status;
       throw requestError;
     }
 
     return payload;
   }, {
     path,
-    iconSrc: options.loadingIcon || "",
-    skipGlobalLoading: options.skipGlobalLoading === true
+    iconSrc: loadingIcon || "",
+    skipGlobalLoading: skipGlobalLoading === true
   });
+  return window.Project200Offline?.request
+    ? window.Project200Offline.request(path, offlineOptions, executeNetworkRequest)
+    : executeNetworkRequest();
 }
 
 async function apiRequestWithTimeout(path, options = {}, timeoutMs = 12000) {
@@ -7733,11 +7757,14 @@ async function loadFinanceSummary() {
   if (saveFinanceNotesButton) {
     saveFinanceNotesButton.disabled = true;
   }
-  showDbLoadingState(financeStatus, 84);
+  const financePath = `/api/200/finance/personal?period=${encodeURIComponent(selectedPeriod.key)}`;
+  if (!window.Project200Offline?.hasCached?.(financePath)) {
+    showDbLoadingState(financeStatus, 84);
+  }
   setFinanceSalesTitle(selectedPeriod.label);
 
   try {
-    const payload = await apiRequest(`/api/200/finance/personal?period=${encodeURIComponent(selectedPeriod.key)}`);
+    const payload = await apiRequest(financePath);
     const summary = payload.summary || {};
     const periodLabel = String(summary.periodLabel || selectedPeriod.label || "").trim() || "Total";
 
@@ -8208,11 +8235,13 @@ async function loadActions(options = {}) {
 
   const date = dateFromOffset(state.activeOffset);
   const rangeStartDate = projectDateKeyToDate(addDaysToDateKey(getProjectDateKey(date), -(Math.max(1, state.actionPeriodDays) - 1)));
-  if (options.silent !== true) {
+  const actionsPath = `/api/actions?from=${encodeURIComponent(startOfDayIso(rangeStartDate))}&to=${encodeURIComponent(nextDayIso(date))}`;
+  const hasLocalActions = Boolean(window.Project200Offline?.hasCached?.(actionsPath));
+  if (options.silent !== true && !hasLocalActions) {
     showDbLoadingState(actionsList, 220);
   }
   try {
-    const payload = await apiRequestWithTimeout(`/api/actions?from=${encodeURIComponent(startOfDayIso(rangeStartDate))}&to=${encodeURIComponent(nextDayIso(date))}`, {
+    const payload = await apiRequestWithTimeout(actionsPath, {
       skipGlobalLoading: options.silent === true
     }, 7000);
     state.actions = Array.isArray(payload.actions) ? payload.actions : [];
@@ -8234,6 +8263,7 @@ async function loadActions(options = {}) {
       state.homeSnapshotReady = false;
     }
     try {
+      if (hasLocalActions) throw new Error("runtime-local");
       const runtimePayload = await apiRequestWithTimeout(runtimeStateEndpoint, {}, 5000);
       state.runtimeState = runtimePayload?.runtimeState || null;
       const runtimeActionId = String(state.runtimeState?.actionId || "").trim();
@@ -8268,6 +8298,7 @@ async function completeActionImmediately(action, { returnToActions = true, actio
   const previousAction = { ...action };
 
   if (returnToActions && actionListFeedback) {
+    const optimisticAction = buildOptimisticAction(previousAction, actionStatuses.completed);
     setActionOptimisticSync(actionId, true);
     delete state.runningLocalStarts[actionId];
     resetRunningCompletionState();
@@ -8281,14 +8312,16 @@ async function completeActionImmediately(action, { returnToActions = true, actio
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mode: "direct_complete" }),
-      skipGlobalLoading: true
+      skipGlobalLoading: true,
+      offlineQueue: true,
+      offlineResponse: { action: optimisticAction },
+      offlineInvalidates: ["/api/actions", "/api/200/extra-goals"]
     }).then(
       (payload) => ({ payload, error: null }),
       (error) => ({ payload: null, error })
     );
 
     await wait(300);
-    const optimisticAction = buildOptimisticAction(previousAction, actionStatuses.completed);
     updateActionInState(optimisticAction);
     actionCompletionAnimationId = actionId;
     suppressActionsAutoAnchorOnce = true;
@@ -8342,7 +8375,10 @@ async function completeActionImmediately(action, { returnToActions = true, actio
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mode: "direct_complete" }),
-      skipGlobalLoading: true
+      skipGlobalLoading: true,
+      offlineQueue: true,
+      offlineResponse: { action: optimisticAction },
+      offlineInvalidates: ["/api/actions", "/api/200/extra-goals"]
     });
     if (!payload?.action) throw new Error("Nao foi possivel concluir a tarefa.");
     updateActionInState(payload.action);
@@ -8424,10 +8460,13 @@ async function toggleActionStatus(actionId, options = {}) {
   }
 
   const startingOptimistically = [actionStatuses.pending, actionStatuses.paused].includes(currentStatus);
+  const optimisticStatusAction = buildOptimisticAction(
+    targetAction,
+    startingOptimistically ? actionStatuses.inProgress : actionStatuses.completed
+  );
   if (startingOptimistically) {
-    const optimisticAction = buildOptimisticAction(targetAction, actionStatuses.inProgress);
     setActionOptimisticSync(targetId, true);
-    updateActionInState(optimisticAction);
+    updateActionInState(optimisticStatusAction);
     resetRunningCompletionState();
     state.runningLocalStarts[targetId] = getServerNowMs();
     startRunningTaskTicker();
@@ -8435,13 +8474,16 @@ async function toggleActionStatus(actionId, options = {}) {
     renderHomeRunningTask();
     openPrimaryRunningSurface({ overview: false });
     closeActionsModalWithFade();
-    void autoPlayRunningTaskDefaultPreference(optimisticAction);
+    void autoPlayRunningTaskDefaultPreference(optimisticStatusAction);
   }
 
   try {
     const payload = await apiRequest(`/api/actions/${encodeURIComponent(targetId)}/status`, {
       method: "PATCH",
-      skipGlobalLoading: true
+      skipGlobalLoading: true,
+      offlineQueue: true,
+      offlineResponse: { action: optimisticStatusAction },
+      offlineInvalidates: ["/api/actions", "/api/200/extra-goals"]
     });
     const updated = payload?.action || null;
 
@@ -8450,6 +8492,7 @@ async function toggleActionStatus(actionId, options = {}) {
     }
 
     state.actions = state.actions.map((item) => (item.id === targetId ? updated : item));
+    cacheCurrentActionsState();
     registerSystemEventFromActionTransition(targetAction, updated);
     const nextStatus = normalizeActionStatus(updated?.status);
     if ([actionStatuses.pending, actionStatuses.paused].includes(currentStatus) && nextStatus === actionStatuses.inProgress) {
@@ -10319,6 +10362,16 @@ function updateActionInState(nextAction) {
       ? { ...action, ...nextAction }
       : action
   ));
+  cacheCurrentActionsState();
+}
+
+function cacheCurrentActionsState() {
+  if (!window.Project200Offline?.put) return;
+  const date = dateFromOffset(state.activeOffset);
+  const rangeStartDate = projectDateKeyToDate(addDaysToDateKey(getProjectDateKey(date), -(Math.max(1, state.actionPeriodDays) - 1)));
+  const path = `/api/actions?from=${encodeURIComponent(startOfDayIso(rangeStartDate))}&to=${encodeURIComponent(nextDayIso(date))}`;
+  const cached = window.Project200Offline.peek(path) || {};
+  window.Project200Offline.put(path, { ...cached, actions: state.actions, serverNow: new Date(getServerNowMs()).toISOString() });
 }
 
 function updateMissionInState(nextGoal) {
@@ -11531,19 +11584,28 @@ function requestPartialTaskPercent(action) {
 }
 
 async function pauseActionPartially(actionId, completionPercent) {
+  const current = state.actions.find((item) => String(item?.id || "") === String(actionId || ""));
+  const optimistic = current ? {
+    ...buildOptimisticAction(current, actionStatuses.paused),
+    completionPercent: normalizePartialTaskPercent(completionPercent)
+  } : null;
   const payload = await apiRequest(`/api/actions/${encodeURIComponent(actionId)}/status/manual`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       mode: "pause",
       completionPercent: normalizePartialTaskPercent(completionPercent)
-    })
+    }),
+    offlineQueue: true,
+    offlineResponse: { action: optimistic },
+    offlineInvalidates: ["/api/actions", "/api/200/extra-goals"]
   });
   const updated = payload?.action || null;
   if (!updated) {
     throw new Error("Nao foi possivel pausar a tarefa.");
   }
   state.actions = state.actions.map((item) => (String(item.id) === String(actionId) ? updated : item));
+  cacheCurrentActionsState();
   delete state.runningLocalStarts[String(actionId || "")];
   renderActions();
   renderHomeRunningTask();
@@ -11559,14 +11621,20 @@ async function pauseActionWithSelectedProgress(action) {
 }
 
 async function restoreActionToPending(actionId) {
+  const current = state.actions.find((item) => String(item?.id || "") === String(actionId || ""));
+  const optimistic = current ? buildOptimisticAction(current, actionStatuses.pending) : null;
   const payload = await apiRequest(`/api/actions/${encodeURIComponent(actionId)}/status/manual`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode: "restore" })
+    body: JSON.stringify({ mode: "restore" }),
+    offlineQueue: true,
+    offlineResponse: { action: optimistic },
+    offlineInvalidates: ["/api/actions", "/api/200/extra-goals"]
   });
   const updated = payload?.action;
   if (updated) {
     state.actions = state.actions.map((item) => (item.id === actionId ? updated : item));
+    cacheCurrentActionsState();
   }
   const targetDay = toLocalDateKey(updated?.startAt || new Date().toISOString());
   const target = state.historySystem.find((item) => item.type === "start"
@@ -11600,11 +11668,15 @@ async function manualFinishAction(actionId) {
   const payload = await apiRequest(`/api/actions/${encodeURIComponent(actionId)}/status/manual`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode: "manual_complete", startedAt, completedAt })
+    body: JSON.stringify({ mode: "manual_complete", startedAt, completedAt }),
+    offlineQueue: true,
+    offlineResponse: { action: { ...buildOptimisticAction(target, actionStatuses.completed), startedAt, completedAt } },
+    offlineInvalidates: ["/api/actions", "/api/200/extra-goals"]
   });
   const updated = payload?.action;
   if (updated) {
     state.actions = state.actions.map((item) => (item.id === actionId ? updated : item));
+    cacheCurrentActionsState();
   }
   enqueueActionPointsUpdateFeedback(payload?.pointsUpdate, 250);
   renderActions();
@@ -11782,13 +11854,18 @@ async function loadPlatformFinance() {
   }
 
   const date = dateFromOffset(state.platformOffset);
-  showDbLoadingState(platformEntriesList, 220);
+  const entriesPath = `/api/platform/entries?from=${encodeURIComponent(startOfDayIso(date))}&to=${encodeURIComponent(nextDayIso(date))}`;
+  const monthPath = `/api/platform/summary?date=${encodeURIComponent(getPlatformMonthReferenceDate())}`;
+  const totalFinancePath = "/api/200/finance/personal?period=total";
+  if (![entriesPath, monthPath, totalFinancePath].every((path) => window.Project200Offline?.hasCached?.(path))) {
+    showDbLoadingState(platformEntriesList, 220);
+  }
 
   try {
     const [entriesPayload, monthPayload, platformPayload] = await Promise.all([
-      apiRequest(`/api/platform/entries?from=${encodeURIComponent(startOfDayIso(date))}&to=${encodeURIComponent(nextDayIso(date))}`),
-      apiRequest(`/api/platform/summary?date=${encodeURIComponent(getPlatformMonthReferenceDate())}`),
-      apiRequest("/api/200/finance/personal?period=total")
+      apiRequest(entriesPath),
+      apiRequest(monthPath),
+      apiRequest(totalFinancePath)
     ]);
 
     state.platformEntries = entriesPayload.entries || [];
@@ -12866,7 +12943,10 @@ async function saveStatsAspectLinksDraft() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ profile, delta }),
-        skipGlobalLoading: true
+        skipGlobalLoading: true,
+        offlineQueue: true,
+        offlineResponse: { goals: state.missions },
+        offlineInvalidates: ["/api/200/extra-goals", "/api/actions"]
       });
       absorbPointsUpdate(payload?.pointsUpdate);
       if (Array.isArray(payload?.goals)) {
@@ -12891,7 +12971,10 @@ async function saveStatsAspectLinksDraft() {
         body: JSON.stringify(completing
           ? { mode: "manual_complete", startedAt: new Date(startedAtMs).toISOString(), completedAt: new Date(completedAtMs).toISOString() }
           : { mode: "restore" }),
-        skipGlobalLoading: true
+        skipGlobalLoading: true,
+        offlineQueue: true,
+        offlineResponse: { action: state.actions.find((item) => String(item?.id || "") === String(action.id || "")) },
+        offlineInvalidates: ["/api/actions", "/api/200/extra-goals"]
       });
       absorbPointsUpdate(payload?.pointsUpdate);
       if (payload?.action) {
@@ -12901,6 +12984,7 @@ async function saveStatsAspectLinksDraft() {
       }
     }
 
+    cacheCurrentActionsState();
     refreshStatsMissionsFromLocalState();
     renderActions();
     renderMissions();
@@ -13274,12 +13358,15 @@ async function loadMissions() {
     renderMissionScopeControls();
     return;
   }
-  showDbLoadingState(missionList || missionsEmpty || missionStatus, 220);
   const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
   const scope = getMissionHistoryScope();
+  const missionsPath = `/api/200/extra-goals?profile=${encodeURIComponent(profile)}&scope=${encodeURIComponent(scope.key)}`;
+  if (!window.Project200Offline?.hasCached?.(missionsPath)) {
+    showDbLoadingState(missionList || missionsEmpty || missionStatus, 220);
+  }
   renderMissionScopeControls();
   try {
-    const payload = await apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(profile)}&scope=${encodeURIComponent(scope.key)}`);
+    const payload = await apiRequest(missionsPath);
     state.missions = Array.isArray(payload?.goals) ? payload.goals : [];
     cacheLoadedMissionVariants(state.missions);
     if (missionStatus) {
@@ -14734,6 +14821,14 @@ function applyMissionProgressLocally(goalId, delta) {
   if (state.statsAspectLinks) {
     state.statsAspectLinks.missions = updateMissionProgressCollection(state.statsAspectLinks.missions, goalId, delta);
   }
+  if (window.Project200Offline?.put) {
+    const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
+    const scope = getMissionHistoryScope();
+    const scopePath = `/api/200/extra-goals?profile=${encodeURIComponent(profile)}&scope=${encodeURIComponent(scope.key)}`;
+    window.Project200Offline.put(scopePath, { ...(window.Project200Offline.peek(scopePath) || {}), goals: state.missions });
+    const todayPath = `/api/200/extra-goals?profile=${encodeURIComponent(profile)}&scope=today`;
+    window.Project200Offline.put(todayPath, { ...(window.Project200Offline.peek(todayPath) || {}), goals: state.actionMissions });
+  }
   refreshStatsMissionsFromLocalState();
 }
 
@@ -14759,6 +14854,7 @@ function applyStatsActionProgressLocally(action, delta) {
     Number(summary.byCategory[categoryId] || 0) + (completing ? durationMinutes : -durationMinutes)
   );
   state.statsSummary = summary;
+  cacheCurrentActionsState();
   refreshStatsMissionsFromLocalState();
 }
 
@@ -14774,7 +14870,10 @@ function queueRunningMissionQuickIncrement(goal) {
           body: JSON.stringify({
             profile,
             delta: 1
-          })
+          }),
+          offlineQueue: true,
+          offlineResponse: { goals: state.missions },
+          offlineInvalidates: ["/api/200/extra-goals", "/api/actions"]
         });
         if (Array.isArray(payload?.goals)) {
           state.missions = payload.goals;
@@ -16680,7 +16779,10 @@ async function finalizeMissionRun(triggerButton = null) {
         variantIds: selectedVariantIds,
         pointsSnapshotPrepared: Boolean(preloadedDailyRanking)
       }),
-      skipGlobalLoading: true
+      skipGlobalLoading: true,
+      offlineQueue: true,
+      offlineResponse: { goals: state.missions },
+      offlineInvalidates: ["/api/200/extra-goals", "/api/actions"]
     });
     if (Array.isArray(payload?.goals)) {
       state.missions = payload.goals;
@@ -20030,7 +20132,10 @@ missionProgressConfirmButton?.addEventListener("click", () => {
       profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
       delta: deltaValue
     }),
-    skipGlobalLoading: true
+    skipGlobalLoading: true,
+    offlineQueue: true,
+    offlineResponse: { goals: state.missions },
+    offlineInvalidates: ["/api/200/extra-goals", "/api/actions"]
   }).then(async (payload) => {
     if (Array.isArray(payload?.goals)) {
       state.missions = payload.goals;
@@ -21627,6 +21732,41 @@ void (async () => {
   await loadOptionsConfig();
   project200TutorsUi?.refreshNotificationPreferences();
   await bootstrapProject200App();
+})();
+
+(function installProject200OfflineRefreshBridge() {
+  if (window.__project200OfflineRefreshBridgeInstalled) return;
+  window.__project200OfflineRefreshBridgeInstalled = true;
+
+  window.addEventListener("project200:offline-queued", () => {
+    if (typeof showFloatingNotice === "function") {
+      showFloatingNotice("Alteração salva offline. Vamos sincronizar ao voltar a internet.");
+    }
+  });
+
+  window.addEventListener("project200:offline-data-updated", (event) => {
+    const path = String(event?.detail?.path || "");
+    if (path.startsWith("/api/actions?")) void loadActions({ silent: true });
+    if (path.startsWith("/api/200/extra-goals?")) {
+      void Promise.all([loadMissions(), loadActionMissions()]).then(() => {
+        renderMissions();
+        renderActionsMissionsPanel();
+      });
+    }
+    if (path.startsWith("/api/200/finance/personal?") && document.getElementById("financeModal")?.classList.contains("active")) {
+      void loadFinanceSummary();
+    }
+    if ((path.startsWith("/api/platform/entries?") || path.startsWith("/api/platform/summary?")) && document.getElementById("platformModal")?.classList.contains("active")) {
+      void loadPlatformFinance();
+    }
+  });
+
+  window.addEventListener("project200:offline-sync-complete", () => {
+    if (actionsModal?.classList.contains("active")) void loadActions({ silent: true });
+    if (document.getElementById("historyModal")?.classList.contains("active")) void loadMissions().then(renderMissions);
+    if (document.getElementById("financeModal")?.classList.contains("active")) void loadFinanceSummary();
+    if (document.getElementById("platformModal")?.classList.contains("active")) void loadPlatformFinance();
+  });
 })();
 
 profileFooter?.addEventListener("contextmenu", (event) => {
