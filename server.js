@@ -86,6 +86,7 @@ import { listProject200FrontTexts, saveProject200FrontText } from "./src/project
 import { addProject200Tutor, appendProject200TutorMessage, claimProject200TutorProposal, failProject200TutorProposal, finishProject200TutorProposal, listProject200TutorInbox, listProject200TutorMessages, listProject200Tutors, markProject200TutorMessagesRead } from "./src/project200-tutors.js";
 import { completeProject200Onboarding, ensureProject200OnboardingSchema, getProject200Onboarding, initializeProject200Onboarding, markProject200OnboardingAvatarComplete, restartProject200Onboarding, saveProject200OnboardingProgress } from "./src/project200-onboarding.js";
 import { createProject200BooksRuntime } from "./src/project200-books-runtime.js";
+import { completeProject200BibleChapter, getProject200Reading, recordProject200ReadingBlocks, saveProject200BiblePlan } from "./src/project200-reading.js";
 import { getProject201AppUpdateConfig, saveProject201AppUpdateConfig } from "./src/project201-app-update.js";
 import { decryptUserBuffer, encryptUserBuffer } from "./src/privacy-crypto.js";
 
@@ -5427,6 +5428,7 @@ async function handleExtraGoalProgressRequest(request, response, goalId) {
   try {
     const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
     const currentGoal = await getExtraGoalById(user.id, selectedProfile, goalId);
+    if (currentGoal?.scheduleConfig?.nativeType === "bible_reading") throw new Error("O progresso desta missão é atualizado somente pela leitura da Bíblia.");
     const isLimit = String(currentGoal?.goalKind || "goal").trim().toLowerCase() === "limit";
     const shouldTrackPointsUpdate = !isLimit && Math.trunc(Number(body?.delta || 0) || 0) !== 0;
     const pointsSnapshotPrepared = body?.pointsSnapshotPrepared === true;
@@ -5608,6 +5610,8 @@ async function handleExtraGoalUpdateRequest(request, response, goalId) {
 
   try {
     const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
+    const currentGoal = await getExtraGoalById(user.id, selectedProfile, goalId);
+    if (currentGoal?.scheduleConfig?.nativeType === "bible_reading") throw new Error("Edite o plano de leitura dentro de Livros.");
     const goals = await updateExtraGoal(user.id, selectedProfile, goalId, body);
     const summary = summarizeExtraGoals(goals);
     sendJson(response, 200, { ok: true, profile: selectedProfile, goals, summary });
@@ -5627,6 +5631,8 @@ async function handleExtraGoalDeleteRequest(request, response, goalId) {
   try {
     const requestUrl = new URL(request.url || "/api/200/extra-goals", `http://${request.headers.host || "localhost"}`);
     const selectedProfile = await resolveProject200ProfileName(user.id, requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
+    const currentGoal = await getExtraGoalById(user.id, selectedProfile, goalId);
+    if (currentGoal?.scheduleConfig?.nativeType === "bible_reading") throw new Error("O plano de leitura só pode ser removido dentro de Livros.");
     const goals = await deleteExtraGoal(user.id, selectedProfile, goalId);
     const summary = summarizeExtraGoals(goals);
     sendJson(response, 200, { ok: true, profile: selectedProfile, goals, summary });
@@ -14129,6 +14135,28 @@ const server = http.createServer(async (request, response) => {
 
   if ((request.method === "GET" || request.method === "PUT") && pathname === "/api/200/mission-order") {
     await handleProject200MissionOrderRequest(request, response);
+    return;
+  }
+  if (["GET", "POST", "PUT"].includes(request.method) && pathname.startsWith("/api/200/reading")) {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      if (request.method === "GET" && pathname === "/api/200/reading") {
+        sendJson(response, 200, { ok: true, reading: await getProject200Reading(user.id) });
+      } else if (request.method === "POST" && pathname === "/api/200/reading/blocks") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, { ok: true, reading: await recordProject200ReadingBlocks(user.id, body?.blocks) });
+      } else if (request.method === "POST" && pathname === "/api/200/reading/bible-chapter") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, { ok: true, reading: await completeProject200BibleChapter(user.id, body?.bookKey, body?.chapterNumber, body?.expectedBlocks) });
+      } else if (request.method === "PUT" && pathname === "/api/200/reading/bible-plan") {
+        const body = await readJsonBody(request);
+        const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
+        sendJson(response, 200, { ok: true, reading: await saveProject200BiblePlan(user.id, body, selectedProfile) });
+      } else sendJson(response, 404, { error: "Recurso de leitura nao encontrado." });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel atualizar a leitura." });
+    }
     return;
   }
   if (request.method === "POST" && pathname === "/api/200/extra-goals") {

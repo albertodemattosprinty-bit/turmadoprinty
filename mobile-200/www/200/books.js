@@ -1,7 +1,8 @@
 (function initProject200Books() {
   const TOKEN_KEY = "turma_do_printy_token";
   const byId = (id) => document.getElementById(id);
-  const state = { books: [], loading: false, pollTimer: 0, literaryStyle: "Romance", bible: null, bibleLoading: null, bibleBook: 0, bibleChapter: 0, bibleVerse: 0, activeChunk: 0 };
+  const state = { books: [], loading: false, pollTimer: 0, literaryStyle: "Romance", bible: null, bibleLoading: null, bibleBook: 0, bibleChapter: 0, bibleVerse: 0, activeChunk: 0, reading: null, pendingBlocks: [], queuedBlockKeys: new Set(), currentChunks: [], currentContext: null, chunkStartedAt: 0, planStep: 0, planStartedAt: 0, planLetters: 0, plan: { lettersPerSecond: 14.7, durationMonths: 12, durationDays: 0, repeatDays: [0,1,2,3,4,5,6], scheduleConfig: null, scheduleLabel: "Todos os dias" } };
+  const BIBLE_TOTAL_CHARACTERS = 3809122;
 
   function getToken() {
     try {
@@ -48,10 +49,6 @@
   function renderLibrary() {
     const grid = byId("booksGrid");
     if (!grid) return;
-    if (!state.books.length) {
-      grid.innerHTML = '<div class="books-empty">A biblioteca está pronta para o primeiro livro. Toque em + para criar com Luna.</div>';
-      return;
-    }
     const bibleCard = `<button class="book-card bible-book-card" type="button" data-open-bible>
       <span class="book-card-cover bible-book-cover"><span class="bible-book-cross">✦</span><span class="book-card-progress">66 livros</span></span>
       <strong>Bíblia Sagrada</strong><small>Antigo e Novo Testamento</small>
@@ -65,7 +62,77 @@
         <strong>${escapeHtml(book.title)}</strong>
         <small>${escapeHtml(book.authorName)} · ${escapeHtml(book.literaryStyle)}</small>
       </button>
-    `).join("");
+    `).join("") + (!state.books.length ? '<div class="books-empty">A Bíblia já está disponível. Toque em + para criar o primeiro livro com Luna.</div>' : "");
+  }
+
+  async function loadReadingProgress() {
+    if (!getToken()) return null;
+    try { const payload = await apiFetch("/api/200/reading"); state.reading = payload?.reading || null; return state.reading; } catch { return null; }
+  }
+
+  async function flushReadingBlocks({ showFeedback = true } = {}) {
+    if (!getToken() || !state.pendingBlocks.length) return null;
+    const blocks = state.pendingBlocks.splice(0, 5);
+    try {
+      const payload = await apiFetch("/api/200/reading/blocks", { method: "POST", body: JSON.stringify({ blocks }) });
+      state.reading = payload?.reading || state.reading;
+      window.dispatchEvent(new CustomEvent("project200:reading-updated"));
+      if (showFeedback && blocks.length === 5) showPointsUpdate(state.reading);
+      return state.reading;
+    } catch { state.pendingBlocks.unshift(...blocks); return null; }
+  }
+
+  function showPointsUpdate(reading) {
+    const modal = ensureBooksOverlay("readingPointsOverlay");
+    modal.innerHTML = `<div class="reading-feedback-card"><span>PONTOS DE LEITURA</span><strong>${Math.floor(Number(reading?.exactPoints || 0))}</strong><p>${Number(reading?.totalCharacters || 0).toLocaleString("pt-BR")} letras lidas</p></div>`;
+    modal.hidden = false; window.setTimeout(() => { modal.hidden = true; }, 1700);
+  }
+
+  function ensureBooksOverlay(id) {
+    let overlay = byId(id); if (overlay) return overlay;
+    overlay = document.createElement("section"); overlay.id = id; overlay.className = "books-fullscreen-overlay"; overlay.hidden = true; document.body.appendChild(overlay); return overlay;
+  }
+
+  function showRhythmControl(remainingMs) {
+    const modal = ensureBooksOverlay("readingRhythmOverlay"); const seconds = Math.max(1, Math.ceil(remainingMs / 1000));
+    modal.innerHTML = `<div class="reading-feedback-card"><span>CONTROLE DE RITMO</span><div class="reading-clock">◷</div><strong>${seconds}s</strong><p>Ajuste o ritmo da leitura...</p><div class="reading-wait-track"><i style="animation-duration:${Math.max(1, remainingMs)}ms"></i></div></div>`;
+    modal.hidden = false; window.setTimeout(() => { modal.hidden = true; }, 1000);
+  }
+
+  function selectReadingChunk(index, { scroll = true } = {}) {
+    const chunks = [...document.querySelectorAll("[data-reading-chunk]")]; if (!chunks.length) return;
+    const next = Math.max(0, Math.min(chunks.length - 1, index)); state.activeChunk = next; state.chunkStartedAt = Date.now();
+    chunks.forEach((item, itemIndex) => item.classList.toggle("is-active", itemIndex === next));
+    if (scroll) chunks[next]?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+
+  async function finishCurrentChunkAndAdvance(chunk) {
+    const characters = String(chunk.textContent || "").trim().length; const minimumMs = (characters / 25) * 1000; const elapsed = Date.now() - state.chunkStartedAt;
+    const index = Number(chunk.dataset.readingChunk || 0);
+    if (index !== state.activeChunk) { selectReadingChunk(index); return; }
+    if (elapsed < minimumMs) { showRhythmControl(minimumMs - elapsed); return; }
+    const context = state.currentContext || {};
+    const key = `${context.type || "book"}:${context.bookKey || "unknown"}:${context.chapterNumber || 0}:${index}`;
+    if (!state.queuedBlockKeys.has(key)) {
+      state.queuedBlockKeys.add(key);
+      state.pendingBlocks.push({ key, characters, readingType: context.type || "book", bookKey: context.bookKey, chapterNumber: context.chapterNumber });
+    }
+    if (state.pendingBlocks.length >= 5) await flushReadingBlocks();
+    if (context.type === "bible" && index === state.currentChunks.length - 1) {
+      while (state.pendingBlocks.length) {
+        const saved = await flushReadingBlocks({ showFeedback: false });
+        if (!saved) return;
+      }
+      try {
+        const payload = await apiFetch("/api/200/reading/bible-chapter", { method: "POST", body: JSON.stringify({ bookKey: context.bookKey, chapterNumber: context.chapterNumber, expectedBlocks: state.currentChunks.length }) });
+        state.reading = payload?.reading || state.reading;
+        renderBibleReader();
+      } catch (error) {
+        const status = byId("booksStatus"); if (status) status.textContent = error.message;
+        return;
+      }
+    }
+    selectReadingChunk(index + 1);
   }
 
   function splitReadingParagraphs(text) {
@@ -81,15 +148,26 @@
         const candidate = `${current}${current ? " " : ""}${remaining}`.trim();
         if (candidate.length <= 400) { current = candidate; if (current.length >= 150 && /[.!?]$/.test(remaining)) commit(); break; }
         if (current.length >= 150) { commit(); continue; }
-        const cutCandidates = [...remaining.matchAll(/[,.;!?]/g)].map((match) => match.index + 1).filter((index) => index >= Math.max(1, 400 - current.length));
-        const cutAt = cutCandidates[0] || Math.max(1, 400 - current.length);
+        const available = Math.max(1, 400 - current.length - (current ? 1 : 0));
+        const minimumCut = Math.max(1, 150 - current.length - (current ? 1 : 0));
+        const cutCandidates = [...remaining.matchAll(/[,.;!?]/g)].map((match) => match.index + 1).filter((index) => index >= minimumCut && index <= available);
+        const cutAt = cutCandidates[cutCandidates.length - 1] || available;
         current = `${current}${current ? " " : ""}${remaining.slice(0, cutAt)}`.trim();
         commit();
         remaining = remaining.slice(cutAt).trim();
       }
     });
     commit();
-    if (chunks.length > 1 && chunks[chunks.length - 1].length < 150) chunks[chunks.length - 2] += ` ${chunks.pop()}`;
+    if (chunks.length > 1 && chunks[chunks.length - 1].length < 150) {
+      const last = chunks[chunks.length - 1]; const previous = chunks[chunks.length - 2]; const combined = `${previous} ${last}`;
+      if (combined.length <= 400) { chunks[chunks.length - 2] = combined; chunks.pop(); }
+      else if (combined.length >= 300) {
+        const lower = Math.max(150, combined.length - 400); const upper = Math.min(400, combined.length - 151);
+        const boundaries = [...combined.matchAll(/[,.;!?]\s+/g)].map((match) => match.index + match[0].trimEnd().length).filter((index) => index >= lower && index <= upper);
+        const splitAt = boundaries[boundaries.length - 1] || upper;
+        chunks[chunks.length - 2] = combined.slice(0, splitAt).trim(); chunks[chunks.length - 1] = combined.slice(splitAt).trim();
+      }
+    }
     return chunks;
   }
 
@@ -121,10 +199,11 @@
     return state.bibleLoading;
   }
 
-  function renderSelectableReader({ title, subtitle, chunks, selected = 0, chapterLabel = "" }) {
+  function renderSelectableReader({ title, subtitle, chunks, selected = 0, chapterLabel = "", context = null }) {
     const scroll = byId("bookReaderScroll");
     if (!scroll) return;
     scroll.innerHTML = `<section class="book-reader-hero book-reader-compact"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(subtitle)}</p></section><section class="book-reader-pages book-reader-chunks">${chapterLabel ? `<span class="book-page-number">${escapeHtml(chapterLabel)}</span>` : ""}${chunks.map((chunk, index) => `<button type="button" class="book-reading-chunk${index === selected ? " is-active" : ""}" data-reading-chunk="${index}">${escapeHtml(chunk)}</button>`).join("")}</section>`;
+    state.currentChunks = chunks; state.currentContext = context; state.chunkStartedAt = Date.now();
     setReaderOpen(true);
     window.requestAnimationFrame(() => scroll.querySelector(".is-active")?.scrollIntoView({ block: "center", behavior: "smooth" }));
   }
@@ -133,22 +212,107 @@
     const book = state.bible?.[state.bibleBook]; const chapter = book?.chapters?.[state.bibleChapter];
     if (!book || !chapter) return;
     const paragraphs = splitReadingParagraphs(chapter.verses.map((verse) => verse.text).join(" "));
-    const verse = chapter.verses[state.bibleVerse] || chapter.verses[0];
-    const selected = Math.max(0, paragraphs.findIndex((paragraph) => paragraph.includes(verse?.text || "")));
+    const verseOffset = chapter.verses.slice(0, state.bibleVerse).reduce((sum, verse) => sum + verse.text.length + 1, 0);
+    let coveredCharacters = 0;
+    const selected = Math.max(0, paragraphs.findIndex((paragraph) => { const includesOffset = verseOffset < coveredCharacters + paragraph.length + 1; coveredCharacters += paragraph.length + 1; return includesOffset; }));
     state.activeChunk = selected;
-    const selector = `<div class="bible-nav"><select id="bibleBookSelect">${state.bible.map((item, index) => `<option value="${index}">${escapeHtml(item.name)}</option>`).join("")}</select><select id="bibleChapterSelect">${book.chapters.map((item, index) => `<option value="${index}">Cap. ${item.number}</option>`).join("")}</select><select id="bibleVerseSelect">${chapter.verses.map((item, index) => `<option value="${index}">V. ${item.number}</option>`).join("")}</select></div>`;
-    renderSelectableReader({ title: "Bíblia Sagrada", subtitle: `${book.name} · capítulo ${chapter.number}`, chunks: paragraphs, selected, chapterLabel: `${book.name} ${chapter.number}` });
+    const completed = new Set(state.reading?.completedBibleChapters || []);
+    const selector = `<div class="bible-nav"><select id="bibleBookSelect">${state.bible.map((item, index) => `<option value="${index}" ${item.chapters.every((part) => completed.has(`${item.key}:${part.number}`)) ? "class=\"is-complete\"" : ""}>${escapeHtml(item.name)}</option>`).join("")}</select><select id="bibleChapterSelect">${book.chapters.map((item, index) => `<option value="${index}" ${completed.has(`${book.key}:${item.number}`) ? "class=\"is-complete\"" : ""}>Cap. ${item.number}</option>`).join("")}</select><select id="bibleVerseSelect">${chapter.verses.map((item, index) => `<option value="${index}">V. ${item.number}</option>`).join("")}</select></div>`;
+    const percent = Math.min(100, Number(state.reading?.bibleCharacters || 0) * 100 / BIBLE_TOTAL_CHARACTERS);
+    renderSelectableReader({ title: `${book.name} | Capítulo ${chapter.number}`, subtitle: `${percent.toFixed(2)}% completo`, chunks: paragraphs, selected, chapterLabel: `${book.name} ${chapter.number}`, context: { type: "bible", bookKey: book.key, chapterNumber: chapter.number } });
     const scroll = byId("bookReaderScroll");
     scroll.insertAdjacentHTML("afterbegin", selector);
     byId("bibleBookSelect").value = String(state.bibleBook); byId("bibleChapterSelect").value = String(state.bibleChapter); byId("bibleVerseSelect").value = String(state.bibleVerse);
+    byId("bibleBookSelect").classList.toggle("is-complete", book.chapters.every((part) => completed.has(`${book.key}:${part.number}`)));
+    byId("bibleChapterSelect").classList.toggle("is-complete", completed.has(`${book.key}:${chapter.number}`));
     byId("bibleBookSelect").onchange = (event) => { state.bibleBook = Number(event.target.value); state.bibleChapter = 0; state.bibleVerse = 0; renderBibleReader(); };
     byId("bibleChapterSelect").onchange = (event) => { state.bibleChapter = Number(event.target.value); state.bibleVerse = 0; renderBibleReader(); };
     byId("bibleVerseSelect").onchange = (event) => { state.bibleVerse = Number(event.target.value); renderBibleReader(); };
   }
 
-  async function openBible() {
+  async function enterBibleReader() {
     const status = byId("booksStatus"); if (status) status.textContent = "Abrindo Bíblia Sagrada...";
-    try { await loadBible(); renderBibleReader(); if (status) status.textContent = ""; } catch (error) { if (status) status.textContent = error.message; }
+    try { await Promise.all([loadBible(), loadReadingProgress()]); renderBibleReader(); if (status) status.textContent = ""; } catch (error) { if (status) status.textContent = error.message; }
+  }
+
+  function ensureBooksWorkspaceOpen() {
+    const booksModal = byId("booksModal");
+    if (booksModal?.classList.contains("active")) return;
+    const opener = document.querySelector('[data-open-modal="booksModal"]');
+    if (opener) opener.click();
+    else if (booksModal) { booksModal.classList.add("active"); booksModal.setAttribute("aria-hidden", "false"); document.body.classList.add("modal-open"); void loadLibrary({ quiet: true }); void loadReadingProgress(); }
+  }
+
+  function openBible() {
+    ensureBooksWorkspaceOpen();
+    const modal = ensureBooksOverlay("bibleWelcomeOverlay");
+    modal.innerHTML = `<div class="bible-welcome-card"><span>BÍBLIA SAGRADA</span><h2>Continue sua leitura</h2><p>Leia no seu ritmo, acompanhe capítulos e transforme letras em progresso.</p><button type="button" data-bible-read>Iniciar leitura</button><button type="button" class="is-secondary" data-bible-plan>Plano de leitura</button><button type="button" class="is-ghost" data-bible-close>Agora não</button></div>`;
+    modal.hidden = false;
+  }
+
+  const planSample = "No princípio criou Deus os céus e a terra. A terra era sem forma e vazia; havia trevas sobre a face do abismo, mas o Espírito de Deus pairava sobre as águas. Então Deus disse: haja luz. E houve luz. Deus viu que a luz era boa e separou a luz das trevas.";
+  const planDurations = [{ days: 7, label: "7 dias" }, { days: 15, label: "15 dias" }, ...Array.from({ length: 36 }, (_, index) => ({ months: index + 1, label: index < 11 ? `${index + 1} ${index ? "meses" : "mês"}` : `${Math.floor((index + 1) / 12)} ano${index + 1 >= 24 ? "s" : ""}${(index + 1) % 12 ? ` e ${(index + 1) % 12} mês${(index + 1) % 12 > 1 ? "es" : ""}` : ""}` }))];
+  function defaultBibleSchedule() {
+    const today = new Date(); const startsOn = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    return { frequency: "daily", interval: 1, intervalUnit: "day", weekDays: [0,1,2,3,4,5,6], avoidDays: [], monthlyMode: "weekday", monthDay: today.getDate(), monthlyOrdinalIndex: 0, monthlyWeekdayIndex: today.getDay(), startsOn, endMode: "never", endsOn: "", count: 10, notification: { mode: "at_time", customAmount: 10, customUnit: "minutes" } };
+  }
+  function repeatDaysFromSchedule(config) {
+    const cfg = config || {};
+    if (cfg.frequency === "none") return [];
+    if (cfg.intervalUnit === "week") return [...new Set(Array.isArray(cfg.weekDays) ? cfg.weekDays : [])].filter((day) => day >= 0 && day <= 6).sort();
+    if (cfg.intervalUnit === "day") {
+      const avoided = new Set(cfg.frequency === "periodic" && Array.isArray(cfg.avoidDays) ? cfg.avoidDays : []);
+      return [0,1,2,3,4,5,6].filter((day) => !avoided.has(day));
+    }
+    return [Math.max(0, Math.min(6, Number(cfg.monthlyWeekdayIndex ?? new Date().getDay())))];
+  }
+  function hydrateBiblePlan() {
+    const saved = state.reading?.biblePlan;
+    if (!saved) return;
+    state.plan = { ...state.plan, ...saved, repeatDays: Array.isArray(saved.repeatDays) ? saved.repeatDays : state.plan.repeatDays, scheduleConfig: saved.scheduleConfig || state.plan.scheduleConfig };
+    const durationIndex = planDurations.findIndex((item) => Number(item.days || 0) === Number(saved.durationDays || 0) && Number(item.months || 0) === Number(saved.durationMonths || 0));
+    if (durationIndex >= 0) state.plan.durationIndex = durationIndex;
+    const modalApi = window.project200DailyRepetitionModal;
+    if (state.plan.scheduleConfig && typeof modalApi?.label === "function") state.plan.scheduleLabel = modalApi.label(state.plan.scheduleConfig, { fallback: "Definir repetição", maxLength: 34 });
+  }
+  function openBiblePlan(step = 1) {
+    state.planStep = step; const modal = ensureBooksOverlay("biblePlanOverlay"); modal.hidden = false;
+    if (step === 1) modal.innerHTML = `<div class="bible-plan-card"><span>1 DE 4 · TEMPO DE LEITURA</span><h2>Vamos definir seu tempo de leitura</h2><p>Toque e leia o trecho no seu ritmo natural.</p><button data-plan-read>Ler texto</button><button class="is-ghost" data-plan-close>Cancelar</button></div>`;
+    if (step === 2) { modal.innerHTML = `<div class="bible-plan-card plan-reading"><span>O texto vai aparecer na tela<br>Leia no seu ritmo natural</span><strong id="planCountdown">Começa em 5...</strong><p id="planSample" hidden>${escapeHtml(planSample)}</p><button id="planFinish" hidden data-plan-finish>Finalizar leitura</button></div>`; let count = 5; const timer = window.setInterval(() => { count -= 1; const label = byId("planCountdown"); if (count > 0 && label) label.textContent = `Começa em ${count}...`; else { window.clearInterval(timer); if (label) label.hidden = true; byId("planSample").hidden = false; byId("planFinish").hidden = false; state.planStartedAt = Date.now(); } }, 1000); }
+    if (step === 3) modal.innerHTML = `<div class="bible-plan-card"><span>2 DE 4 · SEU RITMO</span><h2>${state.plan.lettersPerSecond.toFixed(1)} letras por segundo</h2><p>Usaremos esse ritmo para calcular sua leitura diária.</p><button data-plan-next>Continuar</button></div>`;
+    if (step === 4) renderBiblePlanDuration(modal);
+    if (step === 5) renderBiblePlanSchedule(modal);
+  }
+  function calculateBibleDailyMinutes() {
+    const duration = planDurations[Math.max(0, Number(state.plan.durationIndex ?? 13))];
+    const days = duration.days || duration.months * 30;
+    const activeDays = Math.max(1, state.plan.repeatDays.length);
+    return Math.max(1, Math.ceil(BIBLE_TOTAL_CHARACTERS / Math.max(1, state.plan.lettersPerSecond) / ((days / 7) * activeDays) / 60));
+  }
+  function renderBiblePlanDuration(modal = byId("biblePlanOverlay")) {
+    const index = Math.max(0, Number(state.plan.durationIndex ?? 13)); state.plan.durationIndex = index; const duration = planDurations[index];
+    const dailyMinutes = calculateBibleDailyMinutes(); state.plan.dailyMinutes = dailyMinutes;
+    const time = dailyMinutes >= 60 ? `${Math.floor(dailyMinutes / 60)}h ${dailyMinutes % 60}min` : `${dailyMinutes} minutos`;
+    modal.innerHTML = `<div class="bible-plan-card"><span>3 DE 4 · PRAZO</span><h2>Quer ler em quanto tempo?</h2><div class="plan-duration"><button data-plan-prev>‹</button><strong>${duration.label}</strong><button data-plan-next-duration>›</button></div><div class="plan-daily"><small>Você vai ler</small><strong>${time}</strong><small>Por dia</small></div><button data-plan-schedule>Continuar</button></div>`;
+  }
+  function renderBiblePlanSchedule(modal = byId("biblePlanOverlay")) {
+    const modalApi = window.project200DailyRepetitionModal;
+    const label = typeof modalApi?.label === "function" ? modalApi.label(state.plan.scheduleConfig || defaultBibleSchedule(), { fallback: "Definir repetição", maxLength: 34 }) : (state.plan.scheduleLabel || "Todos os dias");
+    state.plan.scheduleLabel = label;
+    modal.innerHTML = `<div class="bible-plan-card"><span>4 DE 4 · REPETIÇÃO</span><h2>Quando você quer ler?</h2><button type="button" class="plan-repeat-choice" data-plan-open-repetition><span><small>Repetição</small><strong>${escapeHtml(label)}</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16.5-.5 4 4-.5L19 8.5 15.5 5 4 16.5Zm12-13 3.5 3.5 1.2-1.2a1.4 1.4 0 0 0 0-2l-.5-.5a1.4 1.4 0 0 0-2 0L16 3.5Z" fill="currentColor"/></svg></button><p class="plan-save-status" id="biblePlanStatus"></p><button data-plan-save>Criar plano de leitura</button></div>`;
+  }
+  async function saveBiblePlan() {
+    const status = byId("biblePlanStatus"); const button = byId("biblePlanOverlay")?.querySelector("[data-plan-save]");
+    if (!state.plan.repeatDays.length) { if (status) status.textContent = "Escolha pelo menos um dia de leitura."; return; }
+    if (button) button.disabled = true; if (status) status.textContent = "Criando sua missão de leitura...";
+    state.plan.dailyMinutes = calculateBibleDailyMinutes();
+    const duration = planDurations[state.plan.durationIndex]; const modalApi = window.project200DailyRepetitionModal; const payload = { profile: typeof modalApi?.getProfileName === "function" ? modalApi.getProfileName() : "Usuario", lettersPerSecond: state.plan.lettersPerSecond, durationDays: duration.days || 0, durationMonths: duration.months || 0, dailyMinutes: state.plan.dailyMinutes, repeatDays: state.plan.repeatDays, scheduleConfig: state.plan.scheduleConfig || defaultBibleSchedule() };
+    try {
+      const result = await apiFetch("/api/200/reading/bible-plan", { method: "PUT", body: JSON.stringify(payload) }); state.reading = result?.reading || state.reading; window.dispatchEvent(new CustomEvent("project200:reading-updated")); byId("biblePlanOverlay").hidden = true; byId("bibleWelcomeOverlay").hidden = true; void enterBibleReader();
+    } catch (error) {
+      if (status) status.textContent = error instanceof Error ? error.message : "Não foi possível criar o plano.";
+      if (button) button.disabled = false;
+    }
   }
 
   function schedulePoll() {
@@ -204,8 +368,9 @@
       const book = payload?.book;
       const scroll = byId("bookReaderScroll");
       if (!book || !scroll) throw new Error("Livro indisponível.");
+      let bookChunkIndex = 0;
       const pages = (Array.isArray(book.pages) ? book.pages : []).map((page) => `
-        <article class="book-page"><span class="book-page-number">Página ${Number(page.pageNumber || 0)}</span><h3>${escapeHtml(page.title)}</h3>${splitReadingParagraphs(page.content).map((chunk, index) => `<button type="button" class="book-reading-chunk${index === 0 ? " is-active" : ""}" data-reading-chunk="${index}">${escapeHtml(chunk)}</button>`).join("")}</article>`).join("");
+        <article class="book-page"><span class="book-page-number">Página ${Number(page.pageNumber || 0)}</span><h3>${escapeHtml(page.title)}</h3>${splitReadingParagraphs(page.content).map((chunk) => { const index = bookChunkIndex++; return `<button type="button" class="book-reading-chunk${index === 0 ? " is-active" : ""}" data-reading-chunk="${index}">${escapeHtml(chunk)}</button>`; }).join("")}</article>`).join("");
       scroll.innerHTML = `
         <section class="book-reader-hero">
           ${book.coverImageUrl ? `<img class="book-reader-cover" src="${escapeHtml(book.coverImageUrl)}" alt="Capa de ${escapeHtml(book.title)}" />` : ""}
@@ -216,6 +381,9 @@
           ${pages}
         </section>`;
       scroll.scrollTop = 0;
+      state.currentChunks = [...scroll.querySelectorAll("[data-reading-chunk]")].map((item) => item.textContent || "");
+      state.currentContext = { type: "book", bookKey: book.id, chapterNumber: 0 };
+      state.chunkStartedAt = Date.now();
       setReaderOpen(true);
       if (status) status.textContent = "";
     } catch (error) {
@@ -253,17 +421,36 @@
 
   document.addEventListener("click", (event) => {
     const openButton = event.target.closest('[data-open-modal="booksModal"]');
-    if (openButton) window.setTimeout(() => void loadLibrary(), 0);
+    if (openButton) window.setTimeout(() => { void loadLibrary(); void loadReadingProgress(); }, 0);
     if (event.target.closest("#openBookCreate")) setCreateOpen(true);
     if (event.target.closest("#closeBookCreate")) setCreateOpen(false);
-    if (event.target.closest("#closeBookReader")) setReaderOpen(false);
-    if (event.target.closest("[data-open-bible]")) void openBible();
+    if (event.target.closest("#closeBookReader")) { void flushReadingBlocks({ showFeedback: false }); setReaderOpen(false); }
+    if (event.target.closest("[data-open-bible]")) openBible();
+    if (event.target.closest("[data-bible-close]")) byId("bibleWelcomeOverlay").hidden = true;
+    if (event.target.closest("[data-bible-read]")) { byId("bibleWelcomeOverlay").hidden = true; void enterBibleReader(); }
+    if (event.target.closest("[data-bible-plan]")) void loadReadingProgress().then(() => { byId("bibleWelcomeOverlay").hidden = true; hydrateBiblePlan(); openBiblePlan(1); });
+    if (event.target.closest("[data-plan-close]")) byId("biblePlanOverlay").hidden = true;
+    if (event.target.closest("[data-plan-read]")) openBiblePlan(2);
+    if (event.target.closest("[data-plan-finish]")) { state.plan.lettersPerSecond = planSample.length / Math.max(1, (Date.now() - state.planStartedAt) / 1000); openBiblePlan(3); }
+    if (event.target.closest("[data-plan-next]")) openBiblePlan(4);
+    if (event.target.closest("[data-plan-prev]")) { state.plan.durationIndex = Math.max(0, state.plan.durationIndex - 1); renderBiblePlanDuration(); }
+    if (event.target.closest("[data-plan-next-duration]")) { state.plan.durationIndex = Math.min(planDurations.length - 1, state.plan.durationIndex + 1); renderBiblePlanDuration(); }
+    if (event.target.closest("[data-plan-schedule]")) openBiblePlan(5);
+    if (event.target.closest("[data-plan-open-repetition]")) {
+      const modalApi = window.project200DailyRepetitionModal;
+      if (typeof modalApi?.open === "function") modalApi.open("bible-plan", (config) => {
+        state.plan.scheduleConfig = config;
+        state.plan.repeatDays = repeatDaysFromSchedule(config);
+        state.plan.scheduleLabel = typeof modalApi.label === "function" ? modalApi.label(config, { fallback: "Definir repetição", maxLength: 34 }) : "Personalizado";
+        renderBiblePlanSchedule();
+      }, state.plan.scheduleConfig || defaultBibleSchedule());
+    }
+    const planDay = event.target.closest("[data-plan-day]");
+    if (planDay) { const day = Number(planDay.dataset.planDay); state.plan.repeatDays = state.plan.repeatDays.includes(day) ? state.plan.repeatDays.filter((item) => item !== day) : [...state.plan.repeatDays, day].sort(); if (!state.plan.repeatDays.length) state.plan.repeatDays = [day]; renderBiblePlanSchedule(); }
+    if (event.target.closest("[data-plan-save]")) void saveBiblePlan();
     const chunk = event.target.closest("[data-reading-chunk]");
     if (chunk) {
-      const chunks = [...document.querySelectorAll("[data-reading-chunk]")];
-      const next = Math.min(chunks.length - 1, chunks.indexOf(chunk) + 1);
-      chunks.forEach((item, index) => item.classList.toggle("is-active", index === next));
-      chunks[next]?.scrollIntoView({ block: "center", behavior: "smooth" });
+      void finishCurrentChunkAndAdvance(chunk);
       return;
     }
     const style = event.target.closest("[data-book-style]");
@@ -276,6 +463,8 @@
   });
   byId("bookCreateForm")?.addEventListener("submit", submitBook);
   document.addEventListener("visibilitychange", () => {
+    if (document.hidden) void flushReadingBlocks({ showFeedback: false });
     if (!document.hidden && byId("booksModal")?.classList.contains("active")) void loadLibrary({ quiet: true });
   });
+  window.Project200Books = { openBible };
 })();

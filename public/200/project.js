@@ -16848,6 +16848,10 @@ async function openMissionFolderModal(goalId, mode = "edit") {
 
 function openMissionEditorModal(goalId) {
   const goal = getAvailableMissionById(goalId);
+  if (goal?.scheduleConfig?.nativeType === "bible_reading") {
+    window.Project200Books?.openBible?.();
+    return;
+  }
   if (isMissionFolder(goal)) {
     void openMissionFolderModal(goalId, "edit");
     return;
@@ -16858,6 +16862,11 @@ function openMissionEditorModal(goalId) {
 function openMissionEntryModal(goalId) {
   const goal = getAvailableMissionById(goalId);
   if (!goal) return;
+  if (goal?.scheduleConfig?.nativeType === "bible_reading") {
+    closeModal("historyModal");
+    window.Project200Books?.openBible?.();
+    return;
+  }
   if (isMissionFolder(goal)) {
     void openMissionFolderModal(goalId, "choose");
     return;
@@ -17343,6 +17352,7 @@ function formatMissionRangeProgress(progress, days) {
 
 function createMissionCard(goal, initialPercent = null) {
   const goalIcon = getMissionDisplayIcon(goal);
+  const nativeBibleReading = goal?.scheduleConfig?.nativeType === "bible_reading";
   const historyRangeActive = isMissionHistoryRangeActive();
   const limit = isLimitGoal(goal);
   const variants = Array.isArray(goal?.variants) ? goal.variants : [];
@@ -17364,7 +17374,7 @@ function createMissionCard(goal, initialPercent = null) {
         ? "Clique para criar uma tarefa"
         : limit
         ? (showLimitRatio ? `${limitVisual.ratio.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% do esperado` : formatLimitLastProgress(goal))
-        : `${Math.max(0, Math.trunc(progress))} de ${Math.max(1, Math.trunc(target))}`;
+        : `${Math.max(0, Math.trunc(progress))} de ${Math.max(1, Math.trunc(target))}${nativeBibleReading ? " minutos" : ""}`;
   const card = document.createElement("article");
   const hasInitialPercent = initialPercent !== null && initialPercent !== undefined && Number.isFinite(Number(initialPercent));
   const safeInitialPercent = hasInitialPercent ? Number(initialPercent) : percent;
@@ -21780,6 +21790,13 @@ void (async () => {
     if (document.getElementById("financeModal")?.classList.contains("active")) void loadFinanceSummary();
     if (document.getElementById("platformModal")?.classList.contains("active")) void loadPlatformFinance();
   });
+
+  window.addEventListener("project200:reading-updated", () => {
+    void Promise.all([loadMissions({ forceNetwork: true }), loadActionMissions({ forceNetwork: true })]).then(() => {
+      renderMissions();
+      renderActionsMissionsPanel();
+    });
+  });
 })();
 
 profileFooter?.addEventListener("contextmenu", (event) => {
@@ -22658,6 +22675,7 @@ window.project200ProjectsContext = {
   }
   let bridgeTarget = "mission-create";
   let bridgeApplyCallback = null;
+  let bridgeExternalSchedule = null;
   const cleanDays = (days, fallback = []) => normalizeMissionRepeatDays(Array.isArray(days) ? days : fallback, fallback);
   function baseSchedule(days = [getMissionLocalWeekday()]) {
     const today = getProjectDateKey(new Date(getServerNowMs()));
@@ -22689,6 +22707,7 @@ window.project200ProjectsContext = {
     if (target === "mission-create") return normalizeSchedule(state.missionCreate?.scheduleConfig || state.missionCreate?.repeatConfig, state.missionCreate?.repeatDays);
     if (target === "mission-adjust") return normalizeSchedule(state.missionAdjust?.scheduleConfig || state.missionAdjust?.repeatConfig, state.missionAdjust?.repeatDays);
     if (target === "microtask") return normalizeSchedule(state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig, state.missionVariants?.repeatDays);
+    if (target === "bible-plan") return normalizeSchedule(bridgeExternalSchedule, ALL_MISSION_REPEAT_DAYS);
     return normalizeSchedule();
   }
   function derivedRepeatDays(schedule) {
@@ -22719,6 +22738,8 @@ window.project200ProjectsContext = {
       state.missionVariants.avoidDays = cfg.frequency === "periodic" ? normalizeAvoidDays(cfg.avoidDays, [0, 6]) : [];
       const start = projectDateKeyToDate(cfg.startsOn, 12);
       state.missionVariants.nextDueOffsetDays = Math.max(0, Math.round((start.getTime() - todayStart().getTime()) / 86400000));
+    } else if (target === "bible-plan") {
+      bridgeExternalSchedule = cfg;
     }
     renderBridgeButtons();
   }
@@ -22788,9 +22809,11 @@ window.project200ProjectsContext = {
     return modal;
   }
   function renderBridgeModal() { const modal=ensureModal(); const cfg=readTargetSchedule(); const active=cfg.frequency === "periodic" ? "periodic" : cfg.intervalUnit === "year" ? "yearly" : cfg.frequency; const custom=active === "periodic"; modal.querySelectorAll("[data-usb-repeat]").forEach((button)=>button.classList.toggle("active",button.dataset.usbRepeat === active)); modal.querySelector("[data-usb-details]").hidden=!custom; modal.querySelector("[data-usb-custom]").hidden=!custom; modal.querySelector("#usbEndCard").hidden=cfg.frequency === "none"; modal.querySelector("#usbEndButtonText").textContent=formatEndSummary(cfg); modal.querySelector("#usbInterval").value=cfg.interval; updateIntervalLabels(modal,cfg.intervalUnit,cfg.interval); const avoid=modal.querySelector("#usbAvoidDays"); if (avoid) avoid.innerHTML=weekdays.map((label,day)=>'<button type="button" data-usb-avoid-day="'+day+'" class="'+(normalizeAvoidDays(cfg.avoidDays,[0,6]).includes(day)?"active":"")+'">'+label+"</button>").join(""); modal.querySelector("#usbAvoidFeedback").textContent=formatAvoidFeedback(cfg.avoidDays); modal.querySelector("#usbStart").value=cfg.startsOn; modal.querySelector("#usbRepeatFeedback").textContent=formatRepeatFeedback(cfg); modal.querySelector("#usbMonthlyPositionLabel").textContent=getMonthlyPositionLabel(cfg); modal.querySelectorAll("[name='usbMonthlyMode']").forEach((input)=>input.checked=input.value === cfg.monthlyMode); modal.querySelector("#usbNotification").value=cfg.notification.mode; modal.querySelector("#usbNotificationAmount").value=cfg.notification.customAmount; modal.querySelector("#usbNotificationUnit").value=cfg.notification.customUnit; modal.querySelector("#usbNotificationCustom").hidden=cfg.notification.mode !== "custom"; const week=modal.querySelector("[data-usb-week-only]"); if (week) week.hidden=!custom || cfg.intervalUnit !== "week"; modal.querySelector("#usbWeekdays").innerHTML=weekdays.map((label,day)=>'<button type="button" data-usb-weekday="'+day+'" class="'+(cfg.weekDays.includes(day)?"active":"")+'">'+label+"</button>").join(""); modal.querySelector("#usbMonthly").hidden=!custom || cfg.intervalUnit !== "month"; modal.querySelectorAll("[data-usb-day-only]").forEach((element)=>element.hidden=!custom || cfg.intervalUnit !== "day"); }
-  function applyBridgeModal() { const modal=ensureModal(); const cfg=readTargetSchedule(); const mode=modal.querySelector("[data-usb-repeat].active")?.dataset.usbRepeat || cfg.frequency || "daily"; if (mode === "none") { cfg.frequency="none"; saveTargetSchedule(cfg); if (typeof bridgeApplyCallback === "function") bridgeApplyCallback(cfg); closeBridgeModal(); return; } if (["daily","weekly","monthly_custom","yearly"].includes(mode)) { cfg.frequency=mode; cfg.interval=1; cfg.intervalUnit=mode === "weekly" ? "week" : mode === "monthly_custom" ? "month" : mode === "yearly" ? "year" : "day"; cfg.weekDays=mode === "weekly" ? [getDateSelectWeekday(cfg.startsOn)] : []; cfg.avoidDays=[]; syncSimpleScheduleFromStartDate(cfg); saveTargetSchedule(cfg); if (typeof bridgeApplyCallback === "function") bridgeApplyCallback(cfg); closeBridgeModal(); return; } cfg.interval=Math.max(1,Math.min(999,Math.trunc(Number(modal.querySelector("#usbInterval").value || 1) || 1))); cfg.intervalUnit=modal.querySelector("#usbUnit")?.value || cfg.intervalUnit || "day"; cfg.monthlyMode=modal.querySelector("[name='usbMonthlyMode']:checked")?.value === "day" ? "day" : "weekday"; const parts=getScheduleDateParts(cfg); cfg.monthDay=parts.day; cfg.monthlyOrdinalIndex=parts.ordinal; cfg.monthlyWeekdayIndex=parts.weekday; cfg.avoidDays=cfg.intervalUnit === "day" ? normalizeAvoidDays(cfg.avoidDays,[0,6]) : []; cfg.notification={ mode:modal.querySelector("#usbNotification").value || "at_time", customAmount:Math.max(1,Math.min(999,Math.trunc(Number(modal.querySelector("#usbNotificationAmount").value || 10) || 10))), customUnit:modal.querySelector("#usbNotificationUnit").value || "minutes" }; cfg.frequency="periodic"; saveTargetSchedule(cfg); if (typeof bridgeApplyCallback === "function") bridgeApplyCallback(cfg); closeBridgeModal(); }  function openDailyRepetitionModal(target, callback = null) {
+  function applyBridgeModal() { const modal=ensureModal(); const cfg=readTargetSchedule(); const mode=modal.querySelector("[data-usb-repeat].active")?.dataset.usbRepeat || cfg.frequency || "daily"; if (mode === "none") { cfg.frequency="none"; saveTargetSchedule(cfg); if (typeof bridgeApplyCallback === "function") bridgeApplyCallback(cfg); closeBridgeModal(); return; } if (["daily","weekly","monthly_custom","yearly"].includes(mode)) { cfg.frequency=mode; cfg.interval=1; cfg.intervalUnit=mode === "weekly" ? "week" : mode === "monthly_custom" ? "month" : mode === "yearly" ? "year" : "day"; cfg.weekDays=mode === "weekly" ? [getDateSelectWeekday(cfg.startsOn)] : []; cfg.avoidDays=[]; syncSimpleScheduleFromStartDate(cfg); saveTargetSchedule(cfg); if (typeof bridgeApplyCallback === "function") bridgeApplyCallback(cfg); closeBridgeModal(); return; } cfg.interval=Math.max(1,Math.min(999,Math.trunc(Number(modal.querySelector("#usbInterval").value || 1) || 1))); cfg.intervalUnit=modal.querySelector("#usbUnit")?.value || cfg.intervalUnit || "day"; cfg.monthlyMode=modal.querySelector("[name='usbMonthlyMode']:checked")?.value === "day" ? "day" : "weekday"; const parts=getScheduleDateParts(cfg); cfg.monthDay=parts.day; cfg.monthlyOrdinalIndex=parts.ordinal; cfg.monthlyWeekdayIndex=parts.weekday; cfg.avoidDays=cfg.intervalUnit === "day" ? normalizeAvoidDays(cfg.avoidDays,[0,6]) : []; cfg.notification={ mode:modal.querySelector("#usbNotification").value || "at_time", customAmount:Math.max(1,Math.min(999,Math.trunc(Number(modal.querySelector("#usbNotificationAmount").value || 10) || 10))), customUnit:modal.querySelector("#usbNotificationUnit").value || "minutes" }; cfg.frequency="periodic"; saveTargetSchedule(cfg); if (typeof bridgeApplyCallback === "function") bridgeApplyCallback(cfg); closeBridgeModal(); }
+  function openDailyRepetitionModal(target, callback = null, initialSchedule = null) {
     bridgeTarget = target;
     bridgeApplyCallback = callback;
+    if (target === "bible-plan") bridgeExternalSchedule = normalizeSchedule(initialSchedule, ALL_MISSION_REPEAT_DAYS);
     const modal = ensureModal();
     renderBridgeModal();
     modal.classList.add("active");
@@ -22986,7 +23009,9 @@ window.project200ProjectsContext = {
   };
   window.project200DailyRepetitionModal = {
     open: openDailyRepetitionModal,
-    close: closeBridgeModal
+    close: closeBridgeModal,
+    label: labelForSchedule,
+    getProfileName: () => String(state.selectedProfile || getDefaultProfileName()).trim()
   };
   ensureBridgeButtons();
 })();
