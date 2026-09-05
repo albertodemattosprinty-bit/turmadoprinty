@@ -1,7 +1,7 @@
 (function initProject200Books() {
   const TOKEN_KEY = "turma_do_printy_token";
   const byId = (id) => document.getElementById(id);
-  const state = { books: [], loading: false, pollTimer: 0, literaryStyle: "Romance", bible: null, bibleLoading: null, bibleBook: 0, bibleChapter: 0, bibleVerse: 0, activeChunk: 0, reading: null, pendingBlocks: [], queuedBlockKeys: new Set(), currentChunks: [], currentContext: null, chunkStartedAt: 0, planStep: 0, planStartedAt: 0, planLetters: 0, plan: { lettersPerSecond: 14.7, durationMonths: 12, durationDays: 0, repeatDays: [0,1,2,3,4,5,6], scheduleConfig: null, scheduleLabel: "Todos os dias" } };
+  const state = { books: [], loading: false, pollTimer: 0, literaryStyle: "Romance", bible: null, bibleLoading: null, bibleBook: 0, bibleChapter: 0, bibleVerse: 0, activeChunk: 0, reading: null, pendingBlocks: [], queuedBlockKeys: new Set(), currentChunks: [], currentContext: null, chunkStartedAt: 0, readerTouch: null, planStep: 0, planStartedAt: 0, planLetters: 0, plan: { lettersPerSecond: 14.7, durationMonths: 12, durationDays: 0, repeatDays: [0,1,2,3,4,5,6], scheduleConfig: null, scheduleLabel: "Todos os dias" } };
   const BIBLE_TOTAL_CHARACTERS = 3809122;
 
   function getToken() {
@@ -99,20 +99,34 @@
     modal.hidden = false; window.setTimeout(() => { modal.hidden = true; }, 1000);
   }
 
+  function getReadingBlockKey(index = state.activeChunk) {
+    const context = state.currentContext || {};
+    return `${context.type || "book"}:${context.bookKey || "unknown"}:${context.chapterNumber || 0}:${Number(index || 0)}`;
+  }
+
+  function anchorActiveChunk({ smooth = true } = {}) {
+    const scroll = byId("bookReaderScroll"); const active = scroll?.querySelector("[data-reading-chunk].is-active");
+    if (!scroll || !active) return;
+    const targetTop = Math.max(0, active.offsetTop - ((scroll.clientHeight - active.offsetHeight) / 2));
+    scroll.scrollTo({ top: targetTop, behavior: smooth ? "smooth" : "auto" });
+  }
+
   function selectReadingChunk(index, { scroll = true } = {}) {
     const chunks = [...document.querySelectorAll("[data-reading-chunk]")]; if (!chunks.length) return;
-    const next = Math.max(0, Math.min(chunks.length - 1, index)); state.activeChunk = next; state.chunkStartedAt = Date.now();
+    const next = Math.max(0, Math.min(chunks.length - 1, index)); state.activeChunk = next;
+    if (!state.queuedBlockKeys.has(getReadingBlockKey(next))) state.chunkStartedAt = Date.now();
     chunks.forEach((item, itemIndex) => item.classList.toggle("is-active", itemIndex === next));
-    if (scroll) chunks[next]?.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (scroll) anchorActiveChunk({ smooth: true });
   }
 
   async function finishCurrentChunkAndAdvance(chunk) {
-    const characters = String(chunk.textContent || "").trim().length; const minimumMs = (characters / 25) * 1000; const elapsed = Date.now() - state.chunkStartedAt;
     const index = Number(chunk.dataset.readingChunk || 0);
     if (index !== state.activeChunk) { selectReadingChunk(index); return; }
-    if (elapsed < minimumMs) { showRhythmControl(minimumMs - elapsed); return; }
     const context = state.currentContext || {};
-    const key = `${context.type || "book"}:${context.bookKey || "unknown"}:${context.chapterNumber || 0}:${index}`;
+    const key = getReadingBlockKey(index);
+    if (state.queuedBlockKeys.has(key)) { selectReadingChunk(index + 1); return; }
+    const characters = String(chunk.textContent || "").trim().length; const minimumMs = (characters / 25) * 1000; const elapsed = Date.now() - state.chunkStartedAt;
+    if (elapsed < minimumMs) { showRhythmControl(minimumMs - elapsed); return; }
     if (!state.queuedBlockKeys.has(key)) {
       state.queuedBlockKeys.add(key);
       state.pendingBlocks.push({ key, characters, readingType: context.type || "book", bookKey: context.bookKey, chapterNumber: context.chapterNumber });
@@ -202,10 +216,10 @@
   function renderSelectableReader({ title, subtitle, chunks, selected = 0, chapterLabel = "", context = null }) {
     const scroll = byId("bookReaderScroll");
     if (!scroll) return;
-    scroll.innerHTML = `<section class="book-reader-hero book-reader-compact"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(subtitle)}</p></section><section class="book-reader-pages book-reader-chunks">${chapterLabel ? `<span class="book-page-number">${escapeHtml(chapterLabel)}</span>` : ""}${chunks.map((chunk, index) => `<button type="button" class="book-reading-chunk${index === selected ? " is-active" : ""}" data-reading-chunk="${index}">${escapeHtml(chunk)}</button>`).join("")}</section>`;
-    state.currentChunks = chunks; state.currentContext = context; state.chunkStartedAt = Date.now();
+    scroll.innerHTML = `<section class="book-reader-hero book-reader-compact"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(subtitle)}</p><small class="book-reader-gesture-hint">Deslize para cima ou para baixo para trocar de trecho</small></section><section class="book-reader-pages book-reader-chunks">${chapterLabel ? `<span class="book-page-number">${escapeHtml(chapterLabel)}</span>` : ""}${chunks.map((chunk, index) => `<button type="button" class="book-reading-chunk${index === selected ? " is-active" : ""}" data-reading-chunk="${index}">${escapeHtml(chunk)}</button>`).join("")}</section>`;
+    state.currentChunks = chunks; state.currentContext = context; state.activeChunk = selected; state.chunkStartedAt = Date.now();
     setReaderOpen(true);
-    window.requestAnimationFrame(() => scroll.querySelector(".is-active")?.scrollIntoView({ block: "center", behavior: "smooth" }));
+    window.requestAnimationFrame(() => anchorActiveChunk({ smooth: false }));
   }
 
   function renderBibleReader() {
@@ -383,8 +397,9 @@
       scroll.scrollTop = 0;
       state.currentChunks = [...scroll.querySelectorAll("[data-reading-chunk]")].map((item) => item.textContent || "");
       state.currentContext = { type: "book", bookKey: book.id, chapterNumber: 0 };
-      state.chunkStartedAt = Date.now();
+      state.activeChunk = 0; state.chunkStartedAt = Date.now();
       setReaderOpen(true);
+      window.requestAnimationFrame(() => anchorActiveChunk({ smooth: false }));
       if (status) status.textContent = "";
     } catch (error) {
       if (status) status.textContent = error instanceof Error ? error.message : "Não foi possível abrir o livro.";
@@ -448,11 +463,7 @@
     const planDay = event.target.closest("[data-plan-day]");
     if (planDay) { const day = Number(planDay.dataset.planDay); state.plan.repeatDays = state.plan.repeatDays.includes(day) ? state.plan.repeatDays.filter((item) => item !== day) : [...state.plan.repeatDays, day].sort(); if (!state.plan.repeatDays.length) state.plan.repeatDays = [day]; renderBiblePlanSchedule(); }
     if (event.target.closest("[data-plan-save]")) void saveBiblePlan();
-    const chunk = event.target.closest("[data-reading-chunk]");
-    if (chunk) {
-      void finishCurrentChunkAndAdvance(chunk);
-      return;
-    }
+    if (event.target.closest("[data-reading-chunk]")) return;
     const style = event.target.closest("[data-book-style]");
     if (style) {
       state.literaryStyle = String(style.dataset.bookStyle || "Romance");
@@ -462,6 +473,40 @@
     if (card) void openBook(String(card.dataset.bookId || ""));
   });
   byId("bookCreateForm")?.addEventListener("submit", submitBook);
+  const readerScroll = byId("bookReaderScroll");
+  function navigateReader(direction) {
+    const chunks = [...document.querySelectorAll("[data-reading-chunk]")];
+    if (!chunks.length) return;
+    if (direction < 0) { selectReadingChunk(state.activeChunk - 1); return; }
+    const active = chunks[state.activeChunk];
+    if (active) void finishCurrentChunkAndAdvance(active);
+  }
+  readerScroll?.addEventListener("wheel", (event) => {
+    if (!byId("bookReaderLayer")?.hidden) event.preventDefault();
+  }, { passive: false });
+  readerScroll?.addEventListener("touchstart", (event) => {
+    if (event.target.closest(".bible-nav")) { state.readerTouch = null; return; }
+    const touch = event.changedTouches?.[0];
+    state.readerTouch = touch ? { x: touch.clientX, y: touch.clientY } : null;
+  }, { passive: true });
+  readerScroll?.addEventListener("touchmove", (event) => {
+    if (state.readerTouch) event.preventDefault();
+  }, { passive: false });
+  readerScroll?.addEventListener("touchend", (event) => {
+    const start = state.readerTouch; state.readerTouch = null;
+    const touch = event.changedTouches?.[0];
+    if (!start || !touch) return;
+    const vertical = touch.clientY - start.y; const horizontal = touch.clientX - start.x;
+    if (Math.abs(vertical) < 36 || Math.abs(vertical) < Math.abs(horizontal)) return;
+    navigateReader(vertical < 0 ? 1 : -1);
+  }, { passive: true });
+  readerScroll?.addEventListener("touchcancel", () => { state.readerTouch = null; }, { passive: true });
+  document.addEventListener("keydown", (event) => {
+    if (!['ArrowUp', 'ArrowDown'].includes(event.key) || byId("bookReaderLayer")?.hidden) return;
+    if (event.target?.closest?.("input, textarea, select, [contenteditable='true']")) return;
+    event.preventDefault();
+    navigateReader(event.key === "ArrowDown" ? 1 : -1);
+  });
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) void flushReadingBlocks({ showFeedback: false });
     if (!document.hidden && byId("booksModal")?.classList.contains("active")) void loadLibrary({ quiet: true });

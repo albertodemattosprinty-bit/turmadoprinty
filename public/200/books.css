@@ -57,7 +57,7 @@
 
 .book-reader-layer{padding-inline:0;padding-bottom:0}
 .book-reader-layer .books-header{padding-inline:max(14px,env(safe-area-inset-left,0px)) max(14px,env(safe-area-inset-right,0px))}
-.book-reader-scroll{flex:1;min-height:0;overflow:auto;scroll-behavior:smooth;scrollbar-width:none}
+.book-reader-scroll{flex:1;min-height:0;overflow:hidden;scroll-behavior:auto;scrollbar-width:none;overscroll-behavior:none;touch-action:none}
 .book-reader-hero{min-height:82dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 22px 54px;text-align:center;background:radial-gradient(circle at 50% 34%,rgba(255,116,35,.2),transparent 48%)}
 .book-reader-cover{width:min(62vw,300px);aspect-ratio:2/3;border-radius:26px;object-fit:cover;box-shadow:0 36px 80px rgba(0,0,0,.56)}
 .book-reader-hero h2{margin:26px 0 6px;font-family:"Sora",sans-serif;font-size:clamp(1.7rem,7vw,3.1rem);line-height:1.06}
@@ -70,12 +70,13 @@
 .bible-book-cover{display:grid;place-items:center;background:linear-gradient(145deg,#24130d,#8e5125 54%,#d59b4d)}
 .bible-book-cross{font-size:3rem;color:#fff;text-shadow:0 8px 24px rgba(0,0,0,.45)}
 .book-reader-compact{min-height:auto;padding:24px 22px 18px}
-.book-reader-chunks{padding-top:20px}
-.book-reading-chunk{display:block;width:100%;border:0;background:transparent;padding:22px 0;text-align:left;color:rgba(255,255,255,.5);font-family:Georgia,"Times New Roman",serif;font-size:clamp(1.08rem,4.25vw,1.32rem);line-height:1.85;transition:opacity .22s,color .22s,transform .22s;cursor:pointer}
+.book-reader-gesture-hint{display:block;margin-top:20px;color:rgba(255,255,255,.38);font:700 .68rem "Sora",sans-serif;letter-spacing:.03em}
+.book-reader-chunks{min-height:100%;padding-top:20px}
+.book-reading-chunk{display:block;width:100%;border:0;background:transparent;padding:22px 0;text-align:left;color:rgba(255,255,255,.5);font-family:Georgia,"Times New Roman",serif;font-size:clamp(1.08rem,4.25vw,1.32rem);line-height:1.85;transition:opacity .22s,color .22s,transform .22s;pointer-events:none;user-select:none}
 .book-reading-chunk.is-active{color:rgba(255,255,255,1);opacity:1}
 .book-reading-chunk:not(.is-active){opacity:.5}
 .book-reading-chunk+.book-reading-chunk{border-top:1px solid rgba(255,255,255,.08)}
-.bible-nav{position:sticky;top:0;z-index:4;display:flex;gap:7px;padding:10px 14px;background:rgba(10,10,13,.92);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,.1)}
+.bible-nav{position:sticky;top:0;z-index:4;display:flex;gap:7px;padding:10px 14px;background:rgba(10,10,13,.92);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,.1);pointer-events:auto;touch-action:manipulation}
 .bible-nav select{min-width:0;flex:1;border:1px solid rgba(255,255,255,.16);border-radius:999px;background:rgba(255,255,255,.09);color:#fff;padding:8px 10px;font:700 .72rem "Sora",sans-serif;outline:none}
 .bible-nav option{color:#111}
 .bible-nav option.is-complete,.bible-nav select.is-complete{color:#ffd84d;font-weight:900}
