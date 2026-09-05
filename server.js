@@ -2336,7 +2336,7 @@ async function readJsonBody(request) {
   }
 }
 
-const project200BooksRuntime = createProject200BooksRuntime({ requireAuth, readJsonBody, sendJson });
+const project200BooksRuntime = createProject200BooksRuntime({ requireAuth, requireAdmin, readJsonBody, sendJson });
 
 function sanitizeUser(user) {
   if (!user) {
@@ -13779,6 +13779,12 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/200/books") {
     await project200BooksRuntime.handleCreate(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/200\/books\/[^/]+\/cover$/)) {
+    const bookId = decodeURIComponent(pathname.replace(/^\/api\/200\/books\/([^/]+)\/cover$/, "$1"));
+    await project200BooksRuntime.handleRegenerateCover(request, response, bookId);
     return;
   }
 

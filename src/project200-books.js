@@ -136,6 +136,34 @@ export async function getProject200Book(userId, bookId) {
   return result.rows[0] ? normalizeBookRow(result.rows[0], { includePages: true }) : null;
 }
 
+export async function getProject200BookForAdmin(bookId) {
+  await ensureProject200BooksSchema();
+  const result = await query(
+    `select b.*, coalesce(nullif(trim(u.name), ''), nullif(trim(u.username), ''), 'Autor iLife') as author_name
+       from project200_books b
+       join users u on u.id = b.author_user_id
+      where b.id = $1
+      limit 1`,
+    [bookId]
+  );
+  return result.rows[0] ? normalizeBookRow(result.rows[0]) : null;
+}
+
+export async function updateProject200BookCover(bookId, { coverImageUrl = "", coverStyle = "" } = {}) {
+  await ensureProject200BooksSchema();
+  const result = await query(
+    `update project200_books
+        set cover_image_url = $2,
+            cover_style = case when $3 <> '' then $3 else cover_style end,
+            feedback = 'Capa atualizada pela administração.',
+            updated_at = now()
+      where id = $1
+      returning *`,
+    [bookId, String(coverImageUrl || "").trim().slice(0, 2000), String(coverStyle || "").replace(/\s+/gu, " ").trim().slice(0, 120)]
+  );
+  return result.rows[0] ? normalizeBookRow(result.rows[0]) : null;
+}
+
 export async function resetGeneratingProject200Books() {
   await ensureProject200BooksSchema();
   await query(`update project200_books set status = 'queued', feedback = 'Retomando a escrita com Luna.', updated_at = now() where status = 'generating'`);

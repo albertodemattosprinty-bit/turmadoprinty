@@ -1,8 +1,9 @@
 (function initProject200Books() {
   const TOKEN_KEY = "turma_do_printy_token";
   const byId = (id) => document.getElementById(id);
-  const state = { books: [], loading: false, pollTimer: 0, literaryStyle: "Romance", bible: null, bibleLoading: null, bibleBook: 0, bibleChapter: 0, bibleVerse: 0, activeChunk: 0, reading: null, pendingBlocks: [], queuedBlockKeys: new Set(), currentChunks: [], currentContext: null, chunkStartedAt: 0, readerTouch: null, planStep: 0, planStartedAt: 0, planLetters: 0, plan: { lettersPerSecond: 14.7, durationMonths: 12, durationDays: 0, repeatDays: [0,1,2,3,4,5,6], scheduleConfig: null, scheduleLabel: "Todos os dias" } };
+  const state = { books: [], loading: false, pollTimer: 0, literaryStyle: "Romance", isAdmin: false, coverEditorBook: null, bible: null, bibleLoading: null, bibleBook: 0, bibleChapter: 0, bibleVerse: 0, activeChunk: 0, reading: null, pendingBlocks: [], readingBlocksSinceFeedback: 0, queuedBlockKeys: new Set(), currentChunks: [], currentContext: null, chunkStartedAt: 0, readerTouch: null, planStep: 0, planStartedAt: 0, planLetters: 0, plan: { lettersPerSecond: 14.7, durationMonths: 12, durationDays: 0, repeatDays: [0,1,2,3,4,5,6], scheduleConfig: null, scheduleLabel: "Todos os dias" } };
   const BIBLE_TOTAL_CHARACTERS = 3809122;
+  const COVER_STYLES = ["Editorial cinematográfica", "Minimalista premium", "Ilustração 3D", "Aquarela artística", "Fantasia épica", "Fotográfica realista", "Vintage clássica", "Anime contemporâneo", "Infantil colorida", "Sombria e misteriosa"];
 
   function getToken() {
     try {
@@ -46,28 +47,34 @@
     return `${book.generatedPageCount || 0} de ${book.pageCount} páginas`;
   }
 
+  function bookCoverMarkup(book, className = "book-card-cover", progress = "") {
+    const title = escapeHtml(book?.title || "Livro iLife"); const author = escapeHtml(book?.authorName || "Autor iLife");
+    const image = book?.coverImageUrl ? `<img src="${escapeHtml(book.coverImageUrl)}" alt="" loading="lazy" />` : '<span class="book-cover-fallback" aria-hidden="true"></span>';
+    return `<span class="${className} book-cover-composed">${image}<span class="book-cover-tint" aria-hidden="true"></span><span class="book-cover-type"><strong>${title}</strong><small>Um livro de ${author}</small></span>${progress ? `<span class="book-card-progress">${escapeHtml(progress)}</span>` : ""}</span>`;
+  }
+
+  function renderReadingPointsSummary() {
+    const summary = byId("booksReadingPointsSummary");
+    if (summary) summary.textContent = `Você tem ${Math.floor(Number(state.reading?.exactPoints || 0))} pontos de leitura totais`;
+  }
+
   function renderLibrary() {
     const grid = byId("booksGrid");
     if (!grid) return;
-    const bibleCard = `<button class="book-card bible-book-card" type="button" data-open-bible>
-      <span class="book-card-cover bible-book-cover"><span class="bible-book-cross">✦</span><span class="book-card-progress">66 livros</span></span>
-      <strong>Bíblia Sagrada</strong><small>Antigo e Novo Testamento</small>
+    renderReadingPointsSummary();
+    const bibleCard = `<button class="book-card bible-book-card" type="button" data-open-bible aria-label="Bíblia Sagrada">
+      <span class="book-card-cover bible-book-cover"><span class="bible-book-cross">✦</span><span class="book-cover-type"><strong>Bíblia Sagrada</strong><small>Antigo e Novo Testamento</small></span><span class="book-card-progress">66 livros</span></span>
     </button>`;
     grid.innerHTML = bibleCard + state.books.map((book) => `
-      <button class="book-card" type="button" data-book-id="${escapeHtml(book.id)}" ${book.status === "ready" ? "" : "data-book-pending=\"true\""}>
-        <span class="book-card-cover">
-          ${book.coverImageUrl ? `<img src="${escapeHtml(book.coverImageUrl)}" alt="Capa de ${escapeHtml(book.title)}" loading="lazy" />` : ""}
-          <span class="book-card-progress">${escapeHtml(statusLabel(book))}</span>
-        </span>
-        <strong>${escapeHtml(book.title)}</strong>
-        <small>${escapeHtml(book.authorName)} · ${escapeHtml(book.literaryStyle)}</small>
+      <button class="book-card" type="button" data-book-id="${escapeHtml(book.id)}" aria-label="${escapeHtml(book.title)}, um livro de ${escapeHtml(book.authorName)}" ${book.status === "ready" ? "" : "data-book-pending=\"true\""}>
+        ${bookCoverMarkup(book, "book-card-cover", statusLabel(book))}
       </button>
     `).join("") + (!state.books.length ? '<div class="books-empty">A Bíblia já está disponível. Toque em + para criar o primeiro livro com Luna.</div>' : "");
   }
 
   async function loadReadingProgress() {
     if (!getToken()) return null;
-    try { const payload = await apiFetch("/api/200/reading"); state.reading = payload?.reading || null; return state.reading; } catch { return null; }
+    try { const payload = await apiFetch("/api/200/reading"); state.reading = payload?.reading || null; renderReadingPointsSummary(); return state.reading; } catch { return null; }
   }
 
   async function flushReadingBlocks({ showFeedback = true } = {}) {
@@ -84,8 +91,9 @@
 
   function showPointsUpdate(reading) {
     const modal = ensureBooksOverlay("readingPointsOverlay");
+    state.reading = reading || state.reading; renderReadingPointsSummary();
     modal.innerHTML = `<div class="reading-feedback-card"><span>PONTOS DE LEITURA</span><strong>${Math.floor(Number(reading?.exactPoints || 0))}</strong><p>${Number(reading?.totalCharacters || 0).toLocaleString("pt-BR")} letras lidas</p></div>`;
-    modal.hidden = false; window.setTimeout(() => { modal.hidden = true; }, 1700);
+    modal.hidden = false; window.setTimeout(() => { modal.hidden = true; }, 1000);
   }
 
   function ensureBooksOverlay(id) {
@@ -131,7 +139,13 @@
       state.queuedBlockKeys.add(key);
       state.pendingBlocks.push({ key, characters, readingType: context.type || "book", bookKey: context.bookKey, chapterNumber: context.chapterNumber });
     }
-    if (state.pendingBlocks.length >= 5) await flushReadingBlocks();
+    state.readingBlocksSinceFeedback += 1;
+    if (state.readingBlocksSinceFeedback >= 5) {
+      const saved = await flushReadingBlocks({ showFeedback: false });
+      if (saved) { state.readingBlocksSinceFeedback = 0; showPointsUpdate(saved); }
+    } else if (state.pendingBlocks.length >= 5) {
+      await flushReadingBlocks({ showFeedback: false });
+    }
     if (context.type === "bible" && index === state.currentChunks.length - 1) {
       while (state.pendingBlocks.length) {
         const saved = await flushReadingBlocks({ showFeedback: false });
@@ -342,6 +356,7 @@
     try {
       const payload = await apiFetch("/api/200/books");
       state.books = Array.isArray(payload?.books) ? payload.books : [];
+      state.isAdmin = Boolean(payload?.isAdmin);
       renderLibrary();
       if (byId("booksStatus")) byId("booksStatus").textContent = state.books.some((book) => ["queued", "generating"].includes(book.status))
         ? "Luna está escrevendo. Você pode sair: o livro continua sendo criado no servidor."
@@ -387,7 +402,7 @@
         <article class="book-page"><span class="book-page-number">Página ${Number(page.pageNumber || 0)}</span><h3>${escapeHtml(page.title)}</h3>${splitReadingParagraphs(page.content).map((chunk) => { const index = bookChunkIndex++; return `<button type="button" class="book-reading-chunk${index === 0 ? " is-active" : ""}" data-reading-chunk="${index}">${escapeHtml(chunk)}</button>`; }).join("")}</article>`).join("");
       scroll.innerHTML = `
         <section class="book-reader-hero">
-          ${book.coverImageUrl ? `<img class="book-reader-cover" src="${escapeHtml(book.coverImageUrl)}" alt="Capa de ${escapeHtml(book.title)}" />` : ""}
+          ${bookCoverMarkup(book, "book-reader-cover")}
           <h2>${escapeHtml(book.title)}</h2>
           <p>${escapeHtml(book.authorName)} · ${escapeHtml(book.literaryStyle)} · ${Number(book.pageCount || 0)} páginas</p>
         </section>
@@ -434,6 +449,33 @@
     }
   }
 
+  function openCoverEditor(book) {
+    if (!state.isAdmin || !book) return;
+    state.coverEditorBook = book;
+    const modal = ensureBooksOverlay("bookCoverEditorOverlay");
+    modal.innerHTML = `<form class="book-cover-editor" id="bookCoverRegenerateForm"><span>CAPA DO LIVRO</span><h2>${escapeHtml(book.title)}</h2><p>Gere uma nova arte. O título e o crédito do autor são compostos com tipografia editorial pela biblioteca.</p><label><small>Estilo da capa</small><select id="bookCoverRegenerateStyle">${COVER_STYLES.map((style) => `<option ${style === book.coverStyle ? "selected" : ""}>${escapeHtml(style)}</option>`).join("")}</select></label><label><small>Prompt adicional</small><textarea id="bookCoverRegeneratePrompt" maxlength="1800" placeholder="Ex.: uma cena noturna com contraste dourado, sem pessoas..."></textarea></label><p class="book-cover-editor-status" id="bookCoverEditorStatus"></p><button type="submit" class="is-primary" id="bookCoverRegenerateSubmit">Gerar nova capa</button><button type="button" class="is-ghost" data-cover-editor-close>Cancelar</button></form>`;
+    modal.hidden = false;
+  }
+
+  async function regenerateCover(event) {
+    event.preventDefault();
+    const book = state.coverEditorBook; if (!state.isAdmin || !book) return;
+    const submit = byId("bookCoverRegenerateSubmit"); const status = byId("bookCoverEditorStatus");
+    if (submit) submit.disabled = true;
+    if (status) status.textContent = "Gerando a nova arte da capa...";
+    try {
+      const payload = await apiFetch(`/api/200/books/${encodeURIComponent(book.id)}/cover`, { method: "POST", body: JSON.stringify({ coverStyle: byId("bookCoverRegenerateStyle")?.value || book.coverStyle, coverPrompt: byId("bookCoverRegeneratePrompt")?.value || "" }) });
+      const updated = payload?.book;
+      if (updated) state.books = state.books.map((item) => item.id === updated.id ? { ...item, ...updated, authorName: item.authorName } : item);
+      renderLibrary();
+      byId("bookCoverEditorOverlay").hidden = true;
+    } catch (error) {
+      if (status) status.textContent = error instanceof Error ? error.message : "Não foi possível gerar a nova capa.";
+    } finally {
+      if (submit) submit.disabled = false;
+    }
+  }
+
   document.addEventListener("click", (event) => {
     const openButton = event.target.closest('[data-open-modal="booksModal"]');
     if (openButton) window.setTimeout(() => { void loadLibrary(); void loadReadingProgress(); }, 0);
@@ -463,6 +505,7 @@
     const planDay = event.target.closest("[data-plan-day]");
     if (planDay) { const day = Number(planDay.dataset.planDay); state.plan.repeatDays = state.plan.repeatDays.includes(day) ? state.plan.repeatDays.filter((item) => item !== day) : [...state.plan.repeatDays, day].sort(); if (!state.plan.repeatDays.length) state.plan.repeatDays = [day]; renderBiblePlanSchedule(); }
     if (event.target.closest("[data-plan-save]")) void saveBiblePlan();
+    if (event.target.closest("[data-cover-editor-close]")) byId("bookCoverEditorOverlay").hidden = true;
     if (event.target.closest("[data-reading-chunk]")) return;
     const style = event.target.closest("[data-book-style]");
     if (style) {
@@ -473,6 +516,17 @@
     if (card) void openBook(String(card.dataset.bookId || ""));
   });
   byId("bookCreateForm")?.addEventListener("submit", submitBook);
+  document.addEventListener("submit", (event) => {
+    if (event.target?.id === "bookCoverRegenerateForm") void regenerateCover(event);
+  });
+  document.addEventListener("contextmenu", (event) => {
+    const card = event.target.closest("[data-book-id]");
+    if (!state.isAdmin || !card) return;
+    const book = state.books.find((item) => item.id === String(card.dataset.bookId || ""));
+    if (!book) return;
+    event.preventDefault();
+    openCoverEditor(book);
+  });
   const readerScroll = byId("bookReaderScroll");
   function navigateReader(direction) {
     const chunks = [...document.querySelectorAll("[data-reading-chunk]")];

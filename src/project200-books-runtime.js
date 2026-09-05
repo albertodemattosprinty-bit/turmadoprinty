@@ -8,8 +8,10 @@ import {
   ensureProject200BooksSchema,
   failProject200Book,
   getProject200Book,
+  getProject200BookForAdmin,
   listProject200Books,
   resetGeneratingProject200Books,
+  updateProject200BookCover,
   updateProject200BookGeneration
 } from "./project200-books.js";
 
@@ -161,17 +163,21 @@ async function generatePlan(apiKey, book) {
   return plan;
 }
 
-async function generateAndStoreCover(apiKey, book, plan) {
+async function generateAndStoreCover(apiKey, book, plan = {}, options = {}) {
+  const coverStyle = String(options.coverStyle || book.coverStyle || "Editorial cinematográfica").replace(/\s+/gu, " ").trim().slice(0, 120);
+  const extraPrompt = String(options.extraPrompt || "").trim().slice(0, 1800);
   const prompt = [
     `Capa vertical premium de livro, proporcao 2:3, para "${book.title}".`,
     usesNeutralLiteraryStyle(book)
       ? "Sem gênero literário predefinido; não acrescente uma estética de gênero além da direção fornecida pelo autor."
       : `Gênero: ${book.literaryStyle}.`,
-    `Direção visual escolhida: ${book.coverStyle}.`,
-    plan.coverPrompt,
+    `Direção visual escolhida: ${coverStyle}.`,
+    String(plan?.coverPrompt || book.contextPrompt || "").trim(),
+    extraPrompt ? `Direção adicional aprovada pela administração: ${extraPrompt}.` : "",
     "Composição editorial marcante, alta legibilidade visual em miniatura, acabamento profissional.",
-    "Não inclua texto, letras, números, logotipos, marcas d'água ou molduras."
-  ].join(" ");
+    "Reserve uma área visual de respiro para o título editorial que o aplicativo aplicará por cima.",
+    "Não inclua texto, letras, números, logotipos, marcas d'água ou molduras: a tipografia será composta pelo aplicativo."
+  ].filter(Boolean).join(" ");
   const response = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -182,7 +188,7 @@ async function generateAndStoreCover(apiKey, book, plan) {
   const base64 = String(payload?.data?.[0]?.b64_json || "").trim();
   if (!base64) throw new Error("A OpenAI não devolveu os dados da capa.");
   const buffer = Buffer.from(base64, "base64");
-  const key = `${COVER_PREFIX}/${book.id}.png`;
+  const key = `${COVER_PREFIX}/${book.id}-${Date.now()}.png`;
   const { client, bucket } = getR2Client();
   await client.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: buffer, ContentType: "image/png", CacheControl: "public, max-age=31536000, immutable" }));
   return buildPublicUrl(key);
@@ -314,7 +320,7 @@ async function generateBook(apiKey, book) {
   return completeProject200Book(book.id, pages);
 }
 
-export function createProject200BooksRuntime({ requireAuth, readJsonBody, sendJson }) {
+export function createProject200BooksRuntime({ requireAuth, requireAdmin, readJsonBody, sendJson }) {
   let processing = false;
   let bootstrapped = false;
 
@@ -357,7 +363,7 @@ export function createProject200BooksRuntime({ requireAuth, readJsonBody, sendJs
     if (!user) return;
     try {
       const books = await listProject200Books(user.id);
-      sendJson(response, 200, { books, literaryStyles: LITERARY_STYLES, model: BOOK_MODEL, imageModel: IMAGE_MODEL });
+      sendJson(response, 200, { books, literaryStyles: LITERARY_STYLES, model: BOOK_MODEL, imageModel: IMAGE_MODEL, isAdmin: String(user?.role || "").trim().toUpperCase() === "ADMIN" });
     } catch (error) {
       sendJson(response, 500, { error: error instanceof Error ? error.message : "Não foi possível abrir a biblioteca." });
     }
@@ -390,5 +396,24 @@ export function createProject200BooksRuntime({ requireAuth, readJsonBody, sendJs
     }
   }
 
-  return { bootstrap, handleCreate, handleGet, handleList, processQueue };
+  async function handleRegenerateCover(request, response, bookId) {
+    const admin = await requireAdmin(request, response);
+    if (!admin) return;
+    if (!String(process.env.OPENAI_API_KEY || "").trim()) return sendJson(response, 503, { error: "OPENAI_API_KEY não configurada." });
+    try {
+      getR2Client();
+      const book = await getProject200BookForAdmin(bookId);
+      if (!book) return sendJson(response, 404, { error: "Livro não encontrado." });
+      const body = await readJsonBody(request);
+      const coverStyle = String(body?.coverStyle || book.coverStyle || "Editorial cinematográfica").replace(/\s+/gu, " ").trim().slice(0, 120);
+      const extraPrompt = String(body?.coverPrompt || "").trim().slice(0, 1800);
+      const coverImageUrl = await generateAndStoreCover(String(process.env.OPENAI_API_KEY || "").trim(), book, book.outline || {}, { coverStyle, extraPrompt });
+      const updated = await updateProject200BookCover(book.id, { coverImageUrl, coverStyle });
+      sendJson(response, 200, { ok: true, book: updated, imageModel: IMAGE_MODEL });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível gerar a nova capa." });
+    }
+  }
+
+  return { bootstrap, handleCreate, handleGet, handleList, handleRegenerateCover, processQueue };
 }
