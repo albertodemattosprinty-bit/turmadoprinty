@@ -139,7 +139,7 @@ async function generatePlan(apiKey, book) {
         : "Respeite integralmente o estilo literário, o contexto do usuário e a quantidade de páginas.",
       ...neutralInstructions,
       "Não mencione IA, prompt, instruções ou bastidores no livro.",
-      "O prompt de capa deve descrever uma capa editorial sem texto, letras, números, logotipos ou marcas."
+      "O prompt de capa deve descrever somente a direção visual e a composição da capa; a tipografia obrigatória será aplicada na geração final da imagem."
     ].join(" "),
     input: [
       `Título: ${book.title}`,
@@ -166,8 +166,10 @@ async function generatePlan(apiKey, book) {
 async function generateAndStoreCover(apiKey, book, plan = {}, options = {}) {
   const coverStyle = String(options.coverStyle || book.coverStyle || "Editorial cinematográfica").replace(/\s+/gu, " ").trim().slice(0, 120);
   const extraPrompt = String(options.extraPrompt || "").trim().slice(0, 1800);
+  const titleText = String(book.title || "Livro iLife").replace(/\s+/gu, " ").trim().slice(0, 140);
+  const authorText = `Um livro de ${String(book.authorName || "Autor iLife").replace(/\s+/gu, " ").trim().slice(0, 120)}`;
   const prompt = [
-    `Capa vertical premium de livro, proporcao 2:3, para "${book.title}".`,
+    `Capa vertical premium de livro, proporcao 2:3, para "${titleText}".`,
     usesNeutralLiteraryStyle(book)
       ? "Sem gênero literário predefinido; não acrescente uma estética de gênero além da direção fornecida pelo autor."
       : `Gênero: ${book.literaryStyle}.`,
@@ -175,8 +177,9 @@ async function generateAndStoreCover(apiKey, book, plan = {}, options = {}) {
     String(plan?.coverPrompt || book.contextPrompt || "").trim(),
     extraPrompt ? `Direção adicional aprovada pela administração: ${extraPrompt}.` : "",
     "Composição editorial marcante, alta legibilidade visual em miniatura, acabamento profissional.",
-    "Reserve uma área visual de respiro para o título editorial que o aplicativo aplicará por cima.",
-    "Não inclua texto, letras, números, logotipos, marcas d'água ou molduras: a tipografia será composta pelo aplicativo."
+    `TIPOGRAFIA OBRIGATÓRIA DENTRO DA PRÓPRIA IMAGEM: desenhe exatamente o título "${titleText}" como o texto principal da capa, grande, artístico e perfeitamente legível.`,
+    `No rodapé da mesma imagem, desenhe exatamente "${authorText}" em tipografia editorial menor e legível.`,
+    "Não escreva nenhum outro texto legível, números, logotipos, marcas d'água ou molduras. Os dois textos obrigatórios devem fazer parte do PNG final, não podem ser deixados para interface externa."
   ].filter(Boolean).join(" ");
   const response = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",

@@ -48,9 +48,8 @@
   }
 
   function bookCoverMarkup(book, className = "book-card-cover", progress = "") {
-    const title = escapeHtml(book?.title || "Livro iLife"); const author = escapeHtml(book?.authorName || "Autor iLife");
     const image = book?.coverImageUrl ? `<img src="${escapeHtml(book.coverImageUrl)}" alt="" loading="lazy" />` : '<span class="book-cover-fallback" aria-hidden="true"></span>';
-    return `<span class="${className} book-cover-composed">${image}<span class="book-cover-tint" aria-hidden="true"></span><span class="book-cover-type"><strong>${title}</strong><small>Um livro de ${author}</small></span>${progress ? `<span class="book-card-progress">${escapeHtml(progress)}</span>` : ""}</span>`;
+    return `<span class="${className} book-cover-composed">${image}${progress ? `<span class="book-card-progress">${escapeHtml(progress)}</span>` : ""}</span>`;
   }
 
   function renderReadingPointsSummary() {
@@ -63,7 +62,7 @@
     if (!grid) return;
     renderReadingPointsSummary();
     const bibleCard = `<button class="book-card bible-book-card" type="button" data-open-bible aria-label="Bíblia Sagrada">
-      <span class="book-card-cover bible-book-cover"><span class="bible-book-cross">✦</span><span class="book-cover-type"><strong>Bíblia Sagrada</strong><small>Antigo e Novo Testamento</small></span><span class="book-card-progress">66 livros</span></span>
+      <span class="book-card-cover bible-book-cover"><span class="bible-book-cross">✦</span><span class="book-card-progress">66 livros</span></span>
     </button>`;
     grid.innerHTML = bibleCard + state.books.map((book) => `
       <button class="book-card" type="button" data-book-id="${escapeHtml(book.id)}" aria-label="${escapeHtml(book.title)}, um livro de ${escapeHtml(book.authorName)}" ${book.status === "ready" ? "" : "data-book-pending=\"true\""}>
@@ -403,8 +402,6 @@
       scroll.innerHTML = `
         <section class="book-reader-hero">
           ${bookCoverMarkup(book, "book-reader-cover")}
-          <h2>${escapeHtml(book.title)}</h2>
-          <p>${escapeHtml(book.authorName)} · ${escapeHtml(book.literaryStyle)} · ${Number(book.pageCount || 0)} páginas</p>
         </section>
         <section class="book-reader-pages">
           ${pages}
@@ -453,7 +450,7 @@
     if (!state.isAdmin || !book) return;
     state.coverEditorBook = book;
     const modal = ensureBooksOverlay("bookCoverEditorOverlay");
-    modal.innerHTML = `<form class="book-cover-editor" id="bookCoverRegenerateForm"><span>CAPA DO LIVRO</span><h2>${escapeHtml(book.title)}</h2><p>Gere uma nova arte. O título e o crédito do autor são compostos com tipografia editorial pela biblioteca.</p><label><small>Estilo da capa</small><select id="bookCoverRegenerateStyle">${COVER_STYLES.map((style) => `<option ${style === book.coverStyle ? "selected" : ""}>${escapeHtml(style)}</option>`).join("")}</select></label><label><small>Prompt adicional</small><textarea id="bookCoverRegeneratePrompt" maxlength="1800" placeholder="Ex.: uma cena noturna com contraste dourado, sem pessoas..."></textarea></label><p class="book-cover-editor-status" id="bookCoverEditorStatus"></p><button type="submit" class="is-primary" id="bookCoverRegenerateSubmit">Gerar nova capa</button><button type="button" class="is-ghost" data-cover-editor-close>Cancelar</button></form>`;
+    modal.innerHTML = `<form class="book-cover-editor" id="bookCoverRegenerateForm"><span>CAPA DO LIVRO</span><h2>${escapeHtml(book.title)}</h2><p>A IA vai desenhar o título e “Um livro de ${escapeHtml(book.authorName)}” diretamente na nova imagem.</p><label><small>Estilo da capa</small><select id="bookCoverRegenerateStyle">${COVER_STYLES.map((style) => `<option ${style === book.coverStyle ? "selected" : ""}>${escapeHtml(style)}</option>`).join("")}</select></label><label><small>Prompt adicional</small><textarea id="bookCoverRegeneratePrompt" maxlength="1800" placeholder="Ex.: uma cena noturna com contraste dourado, sem pessoas..."></textarea></label><p class="book-cover-editor-status" id="bookCoverEditorStatus"></p><button type="submit" class="is-primary" id="bookCoverRegenerateSubmit">Gerar nova capa</button><button type="button" class="is-ghost" data-cover-editor-close>Cancelar</button></form>`;
     modal.hidden = false;
   }
 

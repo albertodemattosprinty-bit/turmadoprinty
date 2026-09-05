@@ -174,12 +174,16 @@ export async function claimNextProject200Book() {
   const result = await query(`
     with next_book as (
       select id from project200_books where status = 'queued' order by created_at asc limit 1 for update skip locked
+    ), claimed_book as (
+      update project200_books b
+         set status = 'generating', feedback = 'Luna está planejando o livro.', error_message = '', started_at = coalesce(started_at, now()), updated_at = now()
+        from next_book
+       where b.id = next_book.id
+      returning b.*
     )
-    update project200_books b
-       set status = 'generating', feedback = 'Luna está planejando o livro.', error_message = '', started_at = coalesce(started_at, now()), updated_at = now()
-      from next_book
-     where b.id = next_book.id
-    returning b.*
+    select b.*, coalesce(nullif(trim(u.name), ''), nullif(trim(u.username), ''), 'Autor iLife') as author_name
+      from claimed_book b
+      join users u on u.id = b.author_user_id
   `);
   return result.rows[0] ? normalizeBookRow(result.rows[0]) : null;
 }
