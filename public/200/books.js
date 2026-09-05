@@ -1,7 +1,7 @@
 (function initProject200Books() {
   const TOKEN_KEY = "turma_do_printy_token";
   const byId = (id) => document.getElementById(id);
-  const state = { books: [], loading: false, pollTimer: 0, literaryStyle: "Romance", isAdmin: false, coverEditorBook: null, bible: null, bibleLoading: null, bibleBook: 0, bibleChapter: 0, bibleVerse: 0, activeChunk: 0, reading: null, pendingBlocks: [], readingBlocksSinceFeedback: 0, queuedBlockKeys: new Set(), currentChunks: [], currentContext: null, chunkStartedAt: 0, readerTouch: null, planStep: 0, planStartedAt: 0, planLetters: 0, plan: { lettersPerSecond: 14.7, durationMonths: 12, durationDays: 0, repeatDays: [0,1,2,3,4,5,6], scheduleConfig: null, scheduleLabel: "Todos os dias" } };
+  const state = { books: [], loading: false, pollTimer: 0, literaryStyle: "Romance", isAdmin: false, coverEditorBook: null, bible: null, bibleLoading: null, bibleBook: 0, bibleChapter: 0, bibleVerse: 0, activeChunk: 0, reading: null, pendingBlocks: [], savingBlocks: [], readingSavePromise: null, readingBlocksSinceFeedback: 0, queuedBlockKeys: new Set(), currentChunks: [], currentContext: null, chunkStartedAt: 0, readerTouch: null, planStep: 0, planStartedAt: 0, planLetters: 0, plan: { lettersPerSecond: 14.7, durationMonths: 12, durationDays: 0, repeatDays: [0,1,2,3,4,5,6], scheduleConfig: null, scheduleLabel: "Todos os dias" } };
   const BIBLE_TOTAL_CHARACTERS = 3809122;
   const COVER_STYLES = ["Editorial cinematográfica", "Minimalista premium", "Ilustração 3D", "Aquarela artística", "Fantasia épica", "Fotográfica realista", "Vintage clássica", "Anime contemporâneo", "Infantil colorida", "Sombria e misteriosa"];
 
@@ -52,9 +52,19 @@
     return `<span class="${className} book-cover-composed">${image}${progress ? `<span class="book-card-progress">${escapeHtml(progress)}</span>` : ""}</span>`;
   }
 
+  function readingWithQueuedBlocks() {
+    const confirmed = state.reading || {};
+    const queued = [...state.savingBlocks, ...state.pendingBlocks];
+    const queuedCharacters = queued.reduce((total, block) => total + Math.max(0, Number(block?.characters || 0)), 0);
+    const queuedBibleCharacters = queued.filter((block) => block?.readingType === "bible").reduce((total, block) => total + Math.max(0, Number(block?.characters || 0)), 0);
+    const totalCharacters = Math.max(0, Number(confirmed.totalCharacters || 0)) + queuedCharacters;
+    return { ...confirmed, totalCharacters, bibleCharacters: Math.max(0, Number(confirmed.bibleCharacters || 0)) + queuedBibleCharacters, exactPoints: totalCharacters / 50, visiblePoints: Math.floor(totalCharacters / 50) };
+  }
+
   function renderReadingPointsSummary() {
     const summary = byId("booksReadingPointsSummary");
-    if (summary) summary.textContent = `Você tem ${Math.floor(Number(state.reading?.exactPoints || 0))} pontos de leitura totais`;
+    const reading = readingWithQueuedBlocks();
+    if (summary) summary.textContent = `Você tem ${Math.floor(Number(reading.exactPoints || 0))} pontos de leitura totais`;
   }
 
   function renderLibrary() {
@@ -76,21 +86,42 @@
     try { const payload = await apiFetch("/api/200/reading"); state.reading = payload?.reading || null; renderReadingPointsSummary(); return state.reading; } catch { return null; }
   }
 
-  async function flushReadingBlocks({ showFeedback = true } = {}) {
-    if (!getToken() || !state.pendingBlocks.length) return null;
+  async function flushReadingBlocks({ force = false } = {}) {
+    if (state.readingSavePromise) return state.readingSavePromise;
+    if (!getToken() || !state.pendingBlocks.length || (!force && state.pendingBlocks.length < 5)) return null;
     const blocks = state.pendingBlocks.splice(0, 5);
+    state.savingBlocks = blocks;
+    let persisted = false;
+    const save = (async () => {
     try {
       const payload = await apiFetch("/api/200/reading/blocks", { method: "POST", body: JSON.stringify({ blocks }) });
       state.reading = payload?.reading || state.reading;
+      persisted = true;
       window.dispatchEvent(new CustomEvent("project200:reading-updated"));
-      if (showFeedback && blocks.length === 5) showPointsUpdate(state.reading);
       return state.reading;
     } catch { state.pendingBlocks.unshift(...blocks); return null; }
+    finally {
+      state.savingBlocks = [];
+      state.readingSavePromise = null;
+      renderReadingPointsSummary();
+      if (persisted && state.pendingBlocks.length >= 5) void flushReadingBlocks();
+    }
+    })();
+    state.readingSavePromise = save;
+    return save;
   }
 
-  function showPointsUpdate(reading) {
+  async function flushAllReadingBlocks() {
+    while (state.pendingBlocks.length || state.savingBlocks.length) {
+      const saved = await flushReadingBlocks({ force: true });
+      if (!saved) return null;
+    }
+    return state.reading;
+  }
+
+  function showPointsUpdate(reading = readingWithQueuedBlocks()) {
     const modal = ensureBooksOverlay("readingPointsOverlay");
-    state.reading = reading || state.reading; renderReadingPointsSummary();
+    renderReadingPointsSummary();
     modal.innerHTML = `<div class="reading-feedback-card"><span>PONTOS DE LEITURA</span><strong>${Math.floor(Number(reading?.exactPoints || 0))}</strong><p>${Number(reading?.totalCharacters || 0).toLocaleString("pt-BR")} letras lidas</p></div>`;
     modal.hidden = false; window.setTimeout(() => { modal.hidden = true; }, 1000);
   }
@@ -140,16 +171,13 @@
     }
     state.readingBlocksSinceFeedback += 1;
     if (state.readingBlocksSinceFeedback >= 5) {
-      const saved = await flushReadingBlocks({ showFeedback: false });
-      if (saved) { state.readingBlocksSinceFeedback = 0; showPointsUpdate(saved); }
-    } else if (state.pendingBlocks.length >= 5) {
-      await flushReadingBlocks({ showFeedback: false });
+      state.readingBlocksSinceFeedback = 0;
+      showPointsUpdate();
+      void flushReadingBlocks();
     }
     if (context.type === "bible" && index === state.currentChunks.length - 1) {
-      while (state.pendingBlocks.length) {
-        const saved = await flushReadingBlocks({ showFeedback: false });
-        if (!saved) return;
-      }
+      const saved = await flushAllReadingBlocks();
+      if (!saved) return;
       try {
         const payload = await apiFetch("/api/200/reading/bible-chapter", { method: "POST", body: JSON.stringify({ bookKey: context.bookKey, chapterNumber: context.chapterNumber, expectedBlocks: state.currentChunks.length }) });
         state.reading = payload?.reading || state.reading;
@@ -478,7 +506,7 @@
     if (openButton) window.setTimeout(() => { void loadLibrary(); void loadReadingProgress(); }, 0);
     if (event.target.closest("#openBookCreate")) setCreateOpen(true);
     if (event.target.closest("#closeBookCreate")) setCreateOpen(false);
-    if (event.target.closest("#closeBookReader")) { void flushReadingBlocks({ showFeedback: false }); setReaderOpen(false); }
+    if (event.target.closest("#closeBookReader")) { void flushReadingBlocks({ force: true }); setReaderOpen(false); }
     if (event.target.closest("[data-open-bible]")) openBible();
     if (event.target.closest("[data-bible-close]")) byId("bibleWelcomeOverlay").hidden = true;
     if (event.target.closest("[data-bible-read]")) { byId("bibleWelcomeOverlay").hidden = true; void enterBibleReader(); }
@@ -559,7 +587,7 @@
     navigateReader(event.key === "ArrowDown" ? 1 : -1);
   });
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) void flushReadingBlocks({ showFeedback: false });
+    if (document.hidden) void flushReadingBlocks({ force: true });
     if (!document.hidden && byId("booksModal")?.classList.contains("active")) void loadLibrary({ quiet: true });
   });
   window.Project200Books = { openBible };
