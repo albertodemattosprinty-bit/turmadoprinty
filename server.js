@@ -85,6 +85,7 @@ import { canViewProject200LifeCapture, deleteProject200LifeCapture, getProject20
 import { listProject200FrontTexts, saveProject200FrontText } from "./src/project200-front-texts.js";
 import { addProject200Tutor, appendProject200TutorMessage, claimProject200TutorProposal, failProject200TutorProposal, finishProject200TutorProposal, listProject200TutorInbox, listProject200TutorMessages, listProject200Tutors, markProject200TutorMessagesRead } from "./src/project200-tutors.js";
 import { completeProject200Onboarding, ensureProject200OnboardingSchema, getProject200Onboarding, initializeProject200Onboarding, markProject200OnboardingAvatarComplete, restartProject200Onboarding, saveProject200OnboardingProgress } from "./src/project200-onboarding.js";
+import { getQualityAssessment, saveQualityAssessment } from "./src/project200-quality.js";
 import { createProject200BooksRuntime } from "./src/project200-books-runtime.js";
 import { completeProject200BibleChapter, getProject200Reading, recordProject200ReadingBlocks, saveProject200BiblePlan } from "./src/project200-reading.js";
 import { getProject201AppUpdateConfig, saveProject201AppUpdateConfig } from "./src/project201-app-update.js";
@@ -14758,6 +14759,8 @@ const server = http.createServer(async (request, response) => {
         const profileName = await resolveProject200ProfileName(authUser.id, body.profile, {
           fallbackToDefault: true
         });
+        const quality = await getQualityAssessment(authUser.id, profileName);
+        if (!quality.completed) throw new Error("Defina seu nível nos 12 aspectos antes de concluir.");
         await setProject200MarinPersona(authUser.id, profileName, onboarding.selectedPersona);
         onboarding = await completeProject200Onboarding(authUser.id);
       }
@@ -15746,6 +15749,22 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel atualizar metas."
       });
+    }
+    return;
+  }
+
+  if (["GET", "PUT"].includes(request.method) && pathname === "/api/200/quality-assessment") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = request.method === "PUT" ? await readJsonBody(request) : {};
+      const profile = await resolveProject200ProfileName(user.id, body.profile || requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
+      const assessment = request.method === "PUT"
+        ? await saveQualityAssessment(user.id, profile, body.values)
+        : await getQualityAssessment(user.id, profile);
+      sendJson(response, 200, { ok: true, assessment });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível salvar a avaliação." });
     }
     return;
   }

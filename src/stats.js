@@ -282,7 +282,7 @@ function normalizeProject200StatsAspectRow(row) {
     aspectId: aspect?.aspectId || "",
     categoryId,
     targetMinutes: Math.max(1, Math.trunc(Number(row?.target_minutes || (categoryId === PROJECT200_SLEEP_CATEGORY_ID ? PROJECT200_SLEEP_DEFAULT_TARGET_MINUTES : 1)) || 1)),
-    missionGoalIds: categoryId === PROJECT200_SLEEP_CATEGORY_ID ? [] : missionGoalIds,
+    missionGoalIds,
     useManualTarget: Boolean(row?.use_manual_target)
   };
 }
@@ -330,7 +330,7 @@ export async function updateProject200StatsAspectConfig(userId, profileName = PR
   }
   const normalizedCategoryId = aspect.categoryId;
   const targetMinutes = Math.max(1, Math.trunc(Number(payload?.targetMinutes || (normalizedCategoryId === PROJECT200_SLEEP_CATEGORY_ID ? PROJECT200_SLEEP_DEFAULT_TARGET_MINUTES : 1)) || 1));
-  const missionGoalIds = normalizedCategoryId === PROJECT200_SLEEP_CATEGORY_ID ? [] : normalizeProject200MissionGoalIds(payload?.missionGoalIds);
+  const missionGoalIds = normalizeProject200MissionGoalIds(payload?.missionGoalIds);
   const useManualTarget = normalizedCategoryId === PROJECT200_SLEEP_CATEGORY_ID ? true : Boolean(payload?.useManualTarget);
   await query(
     `

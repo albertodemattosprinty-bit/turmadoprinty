@@ -1,7 +1,8 @@
 import { getApiUrl } from "../api.js";
 import { initializeProject200MarinUi } from "./marin.js?v=0.83-chat-history-v1";
 import { initializeProject200TutorsUi } from "./tutors-ui.js?v=0.83-chat-history-v1";
-import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260722-onboarding-finish-v1";
+import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260906-quality-v1";
+import { assessQuality } from "./quality-onboarding.js";
 
 import {
   MINUTE_CUE_INTERVALS,
@@ -7230,6 +7231,7 @@ function openModal(id) {
 
   if (id === "statsModal") {
     void loadStatsSummary();
+    void loadQualityMenu();
   }
 
   if (id === "sleepModal") {
@@ -12272,12 +12274,14 @@ function mixPointColor(start, end, ratio) {
 function getPointProgressColor(percent) {
   const safePercent = Math.max(0, Math.min(100, Number(percent || 0)));
   const stops = [
-    { percent: 0, color: "#dc2626" },
-    { percent: 25, color: "#f97316" },
-    { percent: 45, color: "#facc15" },
-    { percent: 60, color: "#f59e0b" },
-    { percent: 80, color: "#2dd4bf" },
-    { percent: 100, color: "#16a34a" }
+    { percent: 0, color: "#ff2424" },
+    { percent: 25, color: "#ff850a" },
+    { percent: 40, color: "#ffd000" },
+    { percent: 65, color: "#57bf45" },
+    { percent: 75, color: "#16ab73" },
+    { percent: 80, color: "#2589ff" },
+    { percent: 92, color: "#377fff" },
+    { percent: 100, color: "#b69aff" }
   ];
   for (let index = 1; index < stops.length; index += 1) {
     const previous = stops[index - 1];
@@ -12314,9 +12318,7 @@ function getStatsAspectConfigEntry(categoryId) {
   return {
     aspectId: fallback?.aspectId || String(config.aspectId || "").trim(),
     targetMinutes: Math.max(1, Math.trunc(Number(config.targetMinutes || fallback?.targetPoints || 1) || 1)),
-    missionGoalIds: isSleepStatsCategory(normalized)
-      ? []
-      : Array.isArray(config.missionGoalIds)
+    missionGoalIds: Array.isArray(config.missionGoalIds)
       ? [...new Set(config.missionGoalIds.map((item) => String(item || "").trim()).filter(Boolean))]
       : (String(config.missionGoalId || "").trim() ? [String(config.missionGoalId || "").trim()] : []),
     useManualTarget: isSleepStatsCategory(normalized) ? true : Boolean(config.useManualTarget)
@@ -12641,6 +12643,7 @@ function openStatsAspectModal(categoryId) {
     statsAspectStatus.textContent = "";
   }
   renderStatsAspectModalState();
+  renderQualityAspectDetail(category);
   openModal("statsAspectModal");
 }
 
@@ -13024,12 +13027,114 @@ async function saveStatsAspectLinksDraft() {
   }
 }
 
+const qualityByProfile = new Map();
+let qualityPromptOpen = false;
+let qualityInvestTimer = 0;
+function qualityProfileKey() { return `${state.authUser?.id || ''}:${state.selectedProfile || getDefaultProfileName()}`; }
+function getCurrentQualityAssessment() { return qualityByProfile.get(qualityProfileKey()); }
+function qualityLinkedTasks(categoryId) {
+  const tasks = getCurrentQualityAssessment()?.linkedTasks || getVisibleActions();
+  return tasks.filter(action => normalizeTaskCategoryId(action.categoryId) === categoryId);
+}
+function hasQualityLinks(categoryId) {
+  return qualityLinkedTasks(categoryId).length > 0 || getStatsAspectLinkedMissions(categoryId).length > 0;
+}
+async function beginQualityAssessment(required = false) {
+  if (qualityPromptOpen) return;
+  qualityPromptOpen = true;
+  const key = qualityProfileKey();
+  try {
+    return await assessQuality({ request: apiRequest, profile: state.selectedProfile || getDefaultProfileName(), required,
+      onSaved: result => {
+        qualityByProfile.set(key, result.assessment);
+        if (qualityProfileKey() === key) renderStatsMissions();
+      }
+    });
+  } finally { qualityPromptOpen = false; }
+}
+async function loadQualityMenu() {
+  const key = qualityProfileKey();
+  try {
+    const result = await apiRequest(`/api/200/quality-assessment?profile=${encodeURIComponent(state.selectedProfile || getDefaultProfileName())}`, { skipGlobalLoading: true, forceNetwork: true });
+    qualityByProfile.set(key, result.assessment);
+    if (key !== qualityProfileKey()) return;
+    renderStatsMissions();
+    if (!result.assessment?.completed && document.getElementById('statsModal')?.classList.contains('active')) await beginQualityAssessment();
+  } catch (error) {
+    const status = document.querySelector('.quality-menu-status');
+    if (status) status.textContent = error.message || 'Não foi possível carregar sua avaliação. Tente novamente.';
+  }
+}
+function renderQualityMenuHeading() {
+  const periodLabel = document.getElementById('statsScopeLabel');
+  const periodButton = document.getElementById('statsPeriodButton');
+  if (periodLabel) periodLabel.textContent = '90 dias';
+  if (periodButton) {
+    periodButton.disabled = true;
+    periodButton.setAttribute('aria-label', 'Média dos últimos 90 dias');
+  }
+  const heading = document.createElement('div');
+  heading.className = 'quality-menu-heading';
+  heading.innerHTML = '<h2>Qualidade de vida em 12 aspectos</h2><p>Invista minutos diários no seu futuro. Conecte tarefas e missões aos aspectos que você quer cuidar.</p><p class="quality-menu-status">Média de 90 dias: sua avaliação inicial e a execução diária registrada. Dias sem registros mantêm sua estimativa.</p><button type="button">Definir meu ponto de partida</button>';
+  heading.querySelector('button').textContent = getCurrentQualityAssessment()?.completed ? 'Revisar minha avaliação' : 'Definir meu ponto de partida';
+  heading.querySelector('button').addEventListener('click', () => void beginQualityAssessment());
+  statsMissionsList.append(heading);
+  clearInterval(qualityInvestTimer);
+  const hint = document.createElement('p');
+  hint.className = 'quality-invest';
+  heading.append(hint);
+  let index = 0;
+  const rotate = () => {
+    const missing = statsPointCategories.filter(category => !hasQualityLinks(category.id));
+    hint.textContent = missing.length ? `Invista agora em ${missing[index++ % missing.length].name}` : 'Continue investindo na sua qualidade de vida';
+    hint.getAnimations().forEach(animation => animation.cancel());
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) hint.animate([{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 500 });
+  };
+  rotate();
+  qualityInvestTimer = setInterval(() => {
+    if (!hint.isConnected || document.hidden || !document.getElementById('statsModal')?.classList.contains('active')) return;
+    rotate();
+  }, 2000);
+}
+function renderQualityAspectDetail(category) {
+  if (!category) return;
+  const panel = document.querySelector('#statsAspectModal .stats-aspect-modal-content');
+  panel.classList.add('quality-detail');
+  panel.querySelectorAll('[data-quality-detail]').forEach(element => element.remove());
+  const detail = document.createElement('div');
+  detail.dataset.qualityDetail = '';
+  detail.className = 'quality-aspect-tasks';
+  const value = getCurrentQualityAssessment()?.values?.[category.id];
+  const tasks = qualityLinkedTasks(category.id);
+  const missions = getStatsAspectLinkedMissions(category.id);
+  detail.innerHTML = `<div class="quality-aspect-heading"><div><h2>${escapeHtml(category.name)}</h2><p>${value == null ? 'Defina seu ponto de partida' : `${value}% · média percebida em 90 dias`}</p></div><button type="button" class="quality-add" aria-label="Adicionar tarefas ou missões a ${escapeHtml(category.name)}">+</button></div><p>Minutos dedicados a este aspecto se tornam cuidado com seu futuro.</p>${[...tasks.map(task => ({ title: task.title, label: 'Tarefa' })), ...missions.map(goal => ({ title: goal.title, label: 'Missão' }))].map(item => `<article><strong>${escapeHtml(item.title || item.label)}</strong><small>${item.label}</small></article>`).join('') || '<p>Ainda não há tarefas ou missões vinculadas. Toque em + para começar.</p>'}${category.id === 'sono' ? '<button type="button" class="quality-sleep-tools">Registrar meu sono</button>' : ''}`;
+  detail.querySelector('.quality-add').addEventListener('click', async () => {
+    try {
+      await loadMissions();
+      renderStatsAspectMissionOptions();
+      openModal('statsAspectMissionAssignModal');
+    } catch (error) { statsAspectStatus.textContent = error.message; }
+  });
+  detail.querySelector('.quality-sleep-tools')?.addEventListener('click', () => void openSleepModal());
+  panel.prepend(detail);
+  const percentageCopy = detail.querySelector('.quality-aspect-heading p');
+  if (value != null) percentageCopy.textContent = `${value}% · média de 90 dias`;
+}
+
 function createStatsPointRow(entry) {
   const row = document.createElement("article");
-  const progressPercent = Math.max(0, Math.min(100, Number(entry.percent || 0)));
+  const assessment = getCurrentQualityAssessment();
+  const progressPercent = assessment?.values?.[entry.id] ?? 0;
   const progressColor = getPointProgressColor(progressPercent);
   const iconPath = getTaskCategoryIconPath(entry.id) || "/200/icons/agenda.svg";
   row.className = "task-row stats-point-row";
+  row.classList.toggle("quality-unlinked", !hasQualityLinks(entry.id));
+  row.tabIndex = 0;
+  row.setAttribute("role", "button");
+  row.setAttribute("aria-label", `${entry.name}: ${assessment?.completed ? `${progressPercent}%` : 'não avaliado'}. Ver tarefas e missões`);
+  row.addEventListener("keydown", event => {
+    if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openStatsAspectModal(entry.id); }
+  });
   row.dataset.statsAspectId = String(entry.id || "");
   row.innerHTML = `
     <div class="stats-point-layout">
@@ -13039,11 +13144,11 @@ function createStatsPointRow(entry) {
       <div class="task-main">
         <div class="stats-point-title-row">
           <div class="task-title">${escapeHtml(entry.name)}</div>
-          <div class="stats-point-percent">${progressPercent}%</div>
+          <div class="stats-point-percent">${assessment?.completed ? `${progressPercent}%` : '—'}</div>
         </div>
       </div>
       <div class="stats-point-progress" aria-hidden="true">
-        <div class="stats-point-progress-fill" style="width:${progressPercent}%; background:linear-gradient(90deg, rgba(255,255,255,0.16) 0%, ${progressColor} 100%);"></div>
+        <div class="stats-point-progress-fill" style="width:${progressPercent}%; background:${progressPercent > 92 ? `linear-gradient(90deg,#2589ff,${progressColor})` : progressColor};"></div>
       </div>
     </div>
   `;
@@ -13079,7 +13184,8 @@ function renderStatsMissions() {
   }
 
   statsMissionsList.innerHTML = "";
-  const entries = Array.isArray(state.statsMissions) ? state.statsMissions : [];
+  renderQualityMenuHeading();
+  const entries = statsPointCategories.map(category => (state.statsMissions || []).find(entry => entry.id === category.id) || category);
   if (!entries.length) {
     statsMissionsList.innerHTML = '<div class="empty-state">Sem pontos por categoria ainda.</div>';
     return;
@@ -13486,7 +13592,7 @@ function buildDefaultStatsAspectConfig() {
   return Object.fromEntries(statsPointCategories.map((category) => [category.id, {
     aspectId: category.aspectId,
     targetMinutes: Math.max(1, Number(category.targetPoints || 1)),
-    missionGoalIds: isSleepStatsCategory(category.id) ? [] : [],
+    missionGoalIds: [],
     useManualTarget: isSleepStatsCategory(category.id)
   }]));
 }
@@ -13507,7 +13613,7 @@ function normalizeStatsAspectConfigMap(rawConfig = {}) {
     return [category.id, {
       aspectId: category.aspectId,
       targetMinutes: Math.max(1, Math.trunc(Number(entry.targetMinutes || category.targetPoints || 1) || 1)),
-      missionGoalIds: isSleepStatsCategory(category.id) ? [] : missionGoalIds,
+      missionGoalIds,
       useManualTarget: isSleepStatsCategory(category.id) ? true : Boolean(entry.useManualTarget)
     }];
   }));
@@ -13519,9 +13625,7 @@ function buildStatsAspectConfigPayload(categoryId) {
   return {
     aspectId: category?.aspectId || String(entry.aspectId || "").trim(),
     targetMinutes: Math.max(1, Math.trunc(Number(entry.targetMinutes || 1) || 1)),
-    missionGoalIds: isSleepStatsCategory(categoryId)
-      ? []
-      : Array.isArray(entry.missionGoalIds)
+    missionGoalIds: Array.isArray(entry.missionGoalIds)
       ? [...new Set(entry.missionGoalIds.map((item) => String(item || "").trim()).filter(Boolean))]
       : [],
     useManualTarget: isSleepStatsCategory(categoryId) ? true : Boolean(entry.useManualTarget)
@@ -19729,9 +19833,7 @@ statsAspectSaveButton?.addEventListener("click", () => {
     state.statsAspectConfig[categoryId] = {
       ...getStatsAspectConfigEntry(categoryId),
       targetMinutes: Math.max(1, Math.trunc(Number(state.statsAspectModal.targetMinutes || 1) || 1)),
-      missionGoalIds: isSleepStatsCategory(categoryId)
-        ? []
-        : Array.isArray(state.statsAspectModal.missionGoalIds)
+      missionGoalIds: Array.isArray(state.statsAspectModal.missionGoalIds)
         ? [...new Set(state.statsAspectModal.missionGoalIds.map((item) => String(item || "").trim()).filter(Boolean))]
         : [],
       useManualTarget: isSleepStatsCategory(categoryId) ? true : Boolean(state.statsAspectModal.useManualTarget)
@@ -19743,6 +19845,7 @@ statsAspectSaveButton?.addEventListener("click", () => {
       }
       await loadStatsSummary();
       renderStatsAspectModalState();
+      if (document.querySelector("#statsAspectModal.active")) renderQualityAspectDetail(statsPointCategories.find(item => item.id === state.statsAspectModal.categoryId));
     } catch (error) {
       if (statsAspectStatus) {
         statsAspectStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar a meta.";
@@ -19795,9 +19898,7 @@ statsAspectMissionSaveButton?.addEventListener("click", () => {
     state.statsAspectConfig[categoryId] = {
       ...getStatsAspectConfigEntry(categoryId),
       targetMinutes: Math.max(1, Math.trunc(Number(state.statsAspectModal.targetMinutes || 1) || 1)),
-      missionGoalIds: isSleepStatsCategory(categoryId)
-        ? []
-        : Array.isArray(state.statsAspectModal.missionGoalIds)
+      missionGoalIds: Array.isArray(state.statsAspectModal.missionGoalIds)
         ? [...new Set(state.statsAspectModal.missionGoalIds.map((item) => String(item || "").trim()).filter(Boolean))]
         : [],
       useManualTarget: isSleepStatsCategory(categoryId) ? true : Boolean(state.statsAspectModal.useManualTarget)
@@ -19807,6 +19908,7 @@ statsAspectMissionSaveButton?.addEventListener("click", () => {
       closeModal("statsAspectMissionAssignModal");
       await loadStatsSummary();
       renderStatsAspectModalState();
+      if (document.querySelector("#statsAspectModal.active")) renderQualityAspectDetail(statsPointCategories.find(item => item.id === state.statsAspectModal.categoryId));
     } catch (error) {
       if (statsAspectMissionStatus) {
         statsAspectMissionStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar a atribuição.";
@@ -19833,6 +19935,7 @@ statsAspectMissionClearButton?.addEventListener("click", () => {
       closeModal("statsAspectMissionAssignModal");
       await loadStatsSummary();
       renderStatsAspectModalState();
+      if (document.querySelector("#statsAspectModal.active")) renderQualityAspectDetail(statsPointCategories.find(item => item.id === state.statsAspectModal.categoryId));
     } catch (error) {
       if (statsAspectMissionStatus) {
         statsAspectMissionStatus.textContent = error instanceof Error ? error.message : "Falha ao limpar as missões.";
@@ -21663,6 +21766,11 @@ initializeProjectNativeMissionKeyboard();
 applyProjectKeyboardPreference();
 const project200OnboardingUi = initializeProject200OnboardingUi({
   getToken,
+  assessQuality: async () => {
+    const profile = state.selectedProfile || getDefaultProfileName();
+    const result = await apiRequest(`/api/200/quality-assessment?profile=${encodeURIComponent(profile)}`, { skipGlobalLoading: true, forceNetwork: true });
+    if (!result.assessment?.completed) await beginQualityAssessment(true);
+  },
   getUser: () => state.authUser,
   getSelectedProfile: () => getProfileByName(state.selectedProfile) || getDefaultProfile(),
   loadProfiles: loadProject200Profiles,

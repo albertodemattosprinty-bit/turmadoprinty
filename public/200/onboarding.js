@@ -451,6 +451,7 @@ export function initializeProject200OnboardingUi(config) {
     setBusy(true);
     setStatus("Preparando sua home...");
     try {
+      if (typeof options.assessQuality === "function") await options.assessQuality();
       const completed = await patchProgress({
         currentStep: 4,
         educationPage: EDUCATION.length - 1,
