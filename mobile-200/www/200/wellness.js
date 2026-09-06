@@ -205,6 +205,19 @@ function renderExerciseGrid(){
   if(!visible.length){ elements.exerciseGrid.innerHTML='<button class="wellness-exercise-empty" type="button" data-open-catalog><strong>Adicione seu primeiro exercício</strong><span>Escolha no acervo sem poluir sua tela inicial.</span></button>'; return; }
   elements.exerciseGrid.innerHTML=visible.map((exercise,index)=>{ const item=exercise.library, progress=exerciseProgress(item), type=exercise.tracking==="series"?"Séries e movimentos":exercise.tracking==="gps"?"GPS · metros e km":"Minutos"; return `<button class="wellness-exercise-item" type="button" data-exercise-id="${exercise.id}"><span class="wellness-exercise-number">${String(index+1).padStart(2,"0")}</span><span class="wellness-exercise-copy"><strong>${exercise.name}</strong><small>${exercise.equipment} · ${type}</small></span><span class="wellness-exercise-chevron">›</span><span class="wellness-exercise-progress-mini"><span><b>${progress.percent}% hoje</b><small>${formatExerciseTotal(item,progress.value)}</small></span><i><em style="width:${progress.width}%"></em></i></span></button>`; }).join("");
 }
+function refreshExerciseProgress(){
+  elements.exerciseGrid?.querySelectorAll("[data-exercise-id]").forEach((row)=>{
+    const item=libraryItem(row.dataset.exerciseId);
+    if(!item)return;
+    const progress=exerciseProgress(item);
+    const percent=row.querySelector(".wellness-exercise-progress-mini b");
+    const total=row.querySelector(".wellness-exercise-progress-mini small");
+    const fill=row.querySelector(".wellness-exercise-progress-mini em");
+    if(percent)percent.textContent=`${progress.percent}% hoje`;
+    if(total)total.textContent=formatExerciseTotal(item,progress.value);
+    if(fill)fill.style.width=`${progress.width}%`;
+  });
+}
 function renderCatalog(){
   const category=currentExerciseCategory(), selectedIds=new Set(exerciseLibrary().map((item)=>item.exerciseId));
   const visible=EXERCISES.filter((item)=>item.category===category.id&&!selectedIds.has(item.id));
@@ -346,7 +359,12 @@ elements.weightCard?.addEventListener("click",()=>{ renderWeight(); showLayer(el
 byId("wellnessWeightClose")?.addEventListener("click",hideLayers);
 elements.weightForm?.addEventListener("submit",saveWeight);
 elements.foodForm?.addEventListener("submit",submitFood);
-state.ticker=window.setInterval(()=>{ if(state.workout)renderWorkout(); renderExerciseGrid(); if(!elements.detail?.hidden&&state.detailMode==="selected")updateExerciseProgressDetail(); },2000);
+state.ticker=window.setInterval(()=>{
+  if(document.hidden||!modal?.classList.contains("active")||!state.workout)return;
+  renderWorkout();
+  refreshExerciseProgress();
+  if(!elements.detail?.hidden&&state.detailMode==="selected")updateExerciseProgressDetail();
+},2000);
 window.addEventListener("pagehide",()=>{ if(state.workout)void saveWorkoutProgress().catch(()=>{}); });
 window.addEventListener("online",()=>void syncOfflineWorkouts());
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&navigator.onLine!==false)void syncOfflineWorkouts(); });

@@ -1,0 +1,26 @@
+/* Rendering leve para listas e paineis de tela cheia. */
+.actions-list,
+.history-missions-list,
+.mission-variants-list,
+.wellness-pane,
+.wellness-detail-card,
+.wellness-reps-card {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Blur em camadas rolaveis provoca recomposicao cara no Android WebView. */
+.workspace-modal.active,
+.workspace-modal.active * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Sombras grandes em dezenas de cards tambem aumentam o custo de pintura. */
+#actionsModal .task-row,
+#historyModal .history-mission-card,
+.mission-variants-list .mission-variant-card,
+.wellness-exercise-item,
+.wellness-catalog-item {
+  box-shadow: none !important;
+}

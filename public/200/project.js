@@ -1165,6 +1165,7 @@ let platformLongPressTimer = null;
 let platformLongPressHandledOccurrenceId = "";
 let actionsDelayTicker = null;
 let missionHealthTicker = null;
+let missionListLastScrollAt = 0;
 let limitHistoryInsightTicker = null;
 let limitHistoryRecordsTicker = null;
 let historyDeleteHoldTimer = null;
@@ -1312,6 +1313,7 @@ let runningMissionQuickSpotlightTimer = null;
 let missionRunTicker = null;
 let missionRunAlarmTicker = null;
 let missionVariantsTicker = null;
+let missionVariantsLastScrollAt = 0;
 let missionRunCueAudio = null;
 let missionRunCycleAudio = null;
 let missionRunCycleAudioQueue = Promise.resolve();
@@ -6029,9 +6031,13 @@ function startRunningTaskTicker() {
     window.clearTimeout(runningTaskTicker);
   }
   runningTaskTicker = window.setTimeout(function tickRunningTask() {
-    renderHomeRunningTask();
-    runningTaskTicker = window.setTimeout(tickRunningTask, 250);
-  }, 250);
+    const runningSurfaceVisible = runningTaskModal?.classList.contains("active")
+      || !document.querySelector(".workspace-modal.active");
+    if (!document.hidden && runningSurfaceVisible) {
+      renderHomeRunningTask();
+    }
+    runningTaskTicker = window.setTimeout(tickRunningTask, 1000);
+  }, 1000);
 }
 
 function formatMoney(cents) {
@@ -7272,7 +7278,12 @@ function openModal(id) {
   if (id === "historyModal") {
     if (missionHealthTicker) window.clearInterval(missionHealthTicker);
     void (async () => { await loadMissions(); renderMissions(); })();
-    missionHealthTicker = window.setInterval(() => renderMissions(), 2000);
+    missionHealthTicker = window.setInterval(() => {
+      if (document.hidden || !historyModal?.classList.contains("active")) return;
+      if (state.missionKindFilter !== "limit") return;
+      if ((Date.now() - missionListLastScrollAt) < 400) return;
+      renderMissions();
+    }, 2000);
   }
 
   if (id === "limitHistoryModal") {
@@ -16684,7 +16695,11 @@ async function openMissionVariantsModal(goalId, mode = "edit", options = {}) {
   }
   renderMissionVariants();
   if (missionVariantsTicker) window.clearInterval(missionVariantsTicker);
-  missionVariantsTicker = window.setInterval(renderMissionVariants, 1000);
+  missionVariantsTicker = window.setInterval(() => {
+    if (document.hidden || !missionVariantsModal?.classList.contains("active")) return;
+    if ((Date.now() - missionVariantsLastScrollAt) < 400) return;
+    renderMissionVariants();
+  }, 1000);
 }
 
 const missionCurrentTaskStateEndpoint = "/api/200/current-task-state";
@@ -18038,11 +18053,35 @@ function preventEdgeSwipeNavigation() {
   let fromEdge = false;
   let shouldGoHome = false;
   let activeTouchId = null;
+  let touchMoveListening = false;
+
+  const handleEdgeTouchMove = (event) => {
+    if (!fromEdge) return;
+    const touch = getActiveTouch(event.touches);
+    if (!touch) {
+      resetEdgeSwipe();
+      return;
+    }
+    const deltaX = Number(touch.clientX) - startX;
+    const deltaY = Number(touch.clientY) - startY;
+    if (Math.abs(deltaY) > 24 && Math.abs(deltaY) >= deltaX) {
+      resetEdgeSwipe();
+      return;
+    }
+    if (deltaX >= 36 && deltaX >= Math.abs(deltaY) * 1.5) {
+      shouldGoHome = true;
+      event.preventDefault();
+    }
+  };
 
   const resetEdgeSwipe = () => {
     fromEdge = false;
     shouldGoHome = false;
     activeTouchId = null;
+    if (touchMoveListening) {
+      document.removeEventListener("touchmove", handleEdgeTouchMove);
+      touchMoveListening = false;
+    }
   };
 
   const getActiveTouch = (touchList) => {
@@ -18062,28 +18101,11 @@ function preventEdgeSwipeNavigation() {
     activeTouchId = touch.identifier;
     fromEdge = Number.isFinite(startX) && startX >= 0 && startX <= 20;
     shouldGoHome = false;
+    if (fromEdge && !touchMoveListening) {
+      document.addEventListener("touchmove", handleEdgeTouchMove, { passive: false });
+      touchMoveListening = true;
+    }
   }, { passive: true });
-
-  document.addEventListener("touchmove", (event) => {
-    if (!fromEdge) {
-      return;
-    }
-    const touch = getActiveTouch(event.touches);
-    if (!touch) {
-      resetEdgeSwipe();
-      return;
-    }
-    const deltaX = Number(touch.clientX) - startX;
-    const deltaY = Number(touch.clientY) - startY;
-    if (Math.abs(deltaY) > 24 && Math.abs(deltaY) >= deltaX) {
-      resetEdgeSwipe();
-      return;
-    }
-    if (deltaX >= 36 && deltaX >= Math.abs(deltaY) * 1.5) {
-      shouldGoHome = true;
-      event.preventDefault();
-    }
-  }, { passive: false });
 
   document.addEventListener("touchend", (event) => {
     const touch = getActiveTouch(event.changedTouches);
@@ -19558,6 +19580,10 @@ constitutionAvatars?.addEventListener("click", (event) => {
   void approveConstitution(button.dataset.constitutionApprover || "");
 });
 
+missionList?.addEventListener("scroll", () => {
+  missionListLastScrollAt = Date.now();
+}, { passive: true });
+
 missionList?.addEventListener("click", (event) => {
   const avatar = event.target.closest(".task-avatar");
   const missionCard = event.target.closest("[data-goal-id]");
@@ -20609,6 +20635,10 @@ missionVariantEditorSave?.addEventListener("click", async () => {
     finishLoading();
   }
 });
+missionVariantsList?.addEventListener("scroll", () => {
+  missionVariantsLastScrollAt = Date.now();
+}, { passive: true });
+
 missionVariantsList?.addEventListener("click", async (event) => {
   const deleteButton = event.target.closest("[data-mission-variant-delete]");
   const shareButton = event.target.closest("[data-mission-variant-share]");
