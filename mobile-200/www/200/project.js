@@ -1321,7 +1321,6 @@ let postponeNavLongPressHandled = false;
 let postponeFeedbackCarouselTimer = null;
 let runningMissionQuickFeedbackTimer = null;
 let runningMissionQuickFocusTimer = null;
-let runningMissionQuickRequestChain = Promise.resolve();
 let pointsUpdateFeedbackQueue = Promise.resolve();
 let runningMissionQuickSpotlightTimer = null;
 let missionRunTicker = null;
@@ -1344,6 +1343,10 @@ let partialTaskHoldInterval = null;
 const modalNavigationStack = [];
 let modalBackNavigationActive = false;
 const missionVariantsCache = new Map();
+const MISSION_PROGRESS_QUEUE_DELAY_MS = 30000;
+const MISSION_PROGRESS_QUEUE_STORAGE_PREFIX = "project200.mission-progress-queue.v1";
+let missionProgressFlushTimer = null;
+let missionProgressFlushPromise = null;
 const missionRunAlarmNodes = new Set();
 // Minute announcements use the shared Portuguese R2 catalog. Keep only the
 // sub-minute mission cues here so the 1/3/5/10-minute schedule never overlaps.
@@ -7373,8 +7376,6 @@ function openModal(id) {
       renderDateHeader();
       renderMissionScopeControls();
       renderStatsScopeControls();
-      if (id === "actionsModal" && !state.optimisticActionIds.length) void loadActions({ silent: true });
-      if (id === "historyModal") void loadMissions().then(() => renderMissions());
       if (id === "statsModal") void loadStatsSummary();
     });
   }
@@ -7383,14 +7384,14 @@ function openModal(id) {
     if (!wasAlreadyActive) {
       state.uiAnchors.actionsCurrentCentered = false;
     }
-    void window.project200Projects?.load();
+    window.setTimeout(() => void window.project200Projects?.load(), 0);
     const runningAction = getRunningActionForSelectedProfile();
     const latestDone = getLatestCompletedActionForSelectedProfile();
     pendingActionsAnchorId = runningAction?.id || latestDone?.id || "";
     state.actionsMissionOnly = false;
     renderActions();
-    if (!state.optimisticActionIds.length) void loadActions();
-    void loadActionMissions();
+    if (!state.optimisticActionIds.length) window.setTimeout(() => void loadActions({ silent: true }), 0);
+    window.setTimeout(() => void loadActionMissions(), 0);
     window.setTimeout(() => {
       anchorToCurrentActionOnce();
     }, 1000);
@@ -7451,7 +7452,10 @@ function openModal(id) {
 
   if (id === "historyModal") {
     if (missionHealthTicker) window.clearInterval(missionHealthTicker);
-    void (async () => { await loadMissions(); renderMissions(); })();
+    renderMissions();
+    window.setTimeout(() => void loadMissions().then(() => {
+      if (historyModal?.classList.contains("active")) renderMissions();
+    }), 0);
     missionHealthTicker = window.setInterval(() => {
       if (document.hidden || !historyModal?.classList.contains("active")) return;
       if (state.missionKindFilter !== "limit") return;
@@ -7561,6 +7565,7 @@ function closeModal(modal) {
       missionHealthTicker = null;
     }
     closeHistoryTextComposer();
+    void flushMissionProgressQueue({ keepalive: true }).catch(() => {});
   }
 
   if (modal.id === "limitHistoryModal") {
@@ -10494,6 +10499,7 @@ async function ensureProject200Session() {
     }
     state.project200Onboarding = payload?.onboarding || null;
     state.authUser = payload?.user || null;
+    scheduleMissionProgressFlush();
     refreshProfileLockFromAuth(payload?.user || null);
     project200LoginOverlay?.classList.remove("active");
     project200LoginOverlay?.setAttribute("aria-hidden", "true");
@@ -13673,7 +13679,7 @@ async function loadMissions(options = {}) {
   renderMissionScopeControls();
   try {
     const payload = await apiRequest(missionsPath, { forceNetwork: options.forceNetwork === true });
-    state.missions = Array.isArray(payload?.goals) ? payload.goals : [];
+    state.missions = applyPendingMissionQueueToCollection(Array.isArray(payload?.goals) ? payload.goals : [], profile);
     cacheLoadedMissionVariants(state.missions);
     if (missionStatus) {
       missionStatus.textContent = "";
@@ -13686,7 +13692,7 @@ async function loadMissions(options = {}) {
       try {
         const retryScope = getMissionHistoryScope();
         const retryPayload = await apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(getDefaultProfileName())}&scope=${encodeURIComponent(retryScope.key)}`, { forceNetwork: options.forceNetwork === true });
-        state.missions = Array.isArray(retryPayload?.goals) ? retryPayload.goals : [];
+        state.missions = applyPendingMissionQueueToCollection(Array.isArray(retryPayload?.goals) ? retryPayload.goals : [], getDefaultProfileName());
         cacheLoadedMissionVariants(state.missions);
         if (missionStatus) {
           missionStatus.textContent = "";
@@ -13719,7 +13725,7 @@ async function loadActionMissions(options = {}) {
       skipGlobalLoading: true,
       forceNetwork: options.forceNetwork === true
     });
-    state.actionMissions = Array.isArray(payload?.goals) ? payload.goals : [];
+    state.actionMissions = applyPendingMissionQueueToCollection(Array.isArray(payload?.goals) ? payload.goals : [], profile);
   } catch {
     state.actionMissions = [];
   }
@@ -15114,6 +15120,34 @@ function updateMissionProgressCollection(collection, goalId, delta) {
   });
 }
 
+function updateMissionDefinitionCollection(collection, goalId, patch) {
+  return (Array.isArray(collection) ? collection : []).map((goal) => {
+    if (String(goal?.id || "") !== String(goalId || "")) return goal;
+    const updated = { ...goal, ...(patch || {}) };
+    const targetValue = Math.max(1, Number(updated.targetValue || 1));
+    const progressValue = Math.max(0, Number(updated.progressValue || 0));
+    return {
+      ...updated,
+      remainingValue: Math.max(0, targetValue - progressValue),
+      percent: Math.max(0, Math.min(100, Math.round((progressValue / targetValue) * 100)))
+    };
+  });
+}
+
+function applyMissionDefinitionLocally(goalId, patch) {
+  state.missions = updateMissionDefinitionCollection(state.missions, goalId, patch);
+  state.actionMissions = updateMissionDefinitionCollection(state.actionMissions, goalId, patch);
+  state.statsScopeMissions = updateMissionDefinitionCollection(state.statsScopeMissions, goalId, patch);
+  if (state.statsAspectLinks) state.statsAspectLinks.missions = updateMissionDefinitionCollection(state.statsAspectLinks.missions, goalId, patch);
+  const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
+  const scope = getMissionHistoryScope();
+  const scopePath = `/api/200/extra-goals?profile=${encodeURIComponent(profile)}&scope=${encodeURIComponent(scope.key)}`;
+  const todayPath = `/api/200/extra-goals?profile=${encodeURIComponent(profile)}&scope=today`;
+  window.Project200Offline?.put?.(scopePath, { ...(window.Project200Offline.peek(scopePath) || {}), goals: state.missions });
+  window.Project200Offline?.put?.(todayPath, { ...(window.Project200Offline.peek(todayPath) || {}), goals: state.actionMissions });
+  refreshStatsMissionsFromLocalState();
+}
+
 function refreshStatsMissionsFromLocalState() {
   state.statsMissions = statsPointCategories.map((category) => (
     buildStatsPointEntry(category, state.statsSummary?.byCategory || {})
@@ -15137,6 +15171,134 @@ function applyMissionProgressLocally(goalId, delta) {
     window.Project200Offline.put(todayPath, { ...(window.Project200Offline.peek(todayPath) || {}), goals: state.actionMissions });
   }
   refreshStatsMissionsFromLocalState();
+}
+
+function missionProgressQueueStorageKey() {
+  const token = String(getToken() || "anonymous");
+  let hash = 2166136261;
+  for (let index = 0; index < token.length; index += 1) {
+    hash ^= token.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${MISSION_PROGRESS_QUEUE_STORAGE_PREFIX}.${(hash >>> 0).toString(36)}`;
+}
+
+function readMissionProgressQueue() {
+  try {
+    const value = JSON.parse(window.localStorage.getItem(missionProgressQueueStorageKey()) || "[]");
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeMissionProgressQueue(items) {
+  try {
+    if (items.length) window.localStorage.setItem(missionProgressQueueStorageKey(), JSON.stringify(items));
+    else window.localStorage.removeItem(missionProgressQueueStorageKey());
+  } catch {}
+}
+
+function mergeMissionProgressQueue(items) {
+  const merged = new Map();
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    const profile = String(item?.profile || getDefaultProfileName()).trim();
+    const goalId = String(item?.goalId || "").trim();
+    const kind = item?.kind === "update" ? "update" : "progress";
+    if (!profile || !goalId) return;
+    const key = `${kind}\u0000${profile}\u0000${goalId}`;
+    if (kind === "update") {
+      const current = merged.get(key) || { kind, profile, goalId, patch: {} };
+      current.patch = { ...(current.patch || {}), ...(item?.patch || {}) };
+      merged.set(key, current);
+      return;
+    }
+    const delta = Math.trunc(Number(item?.delta || 0) || 0);
+    if (!delta) return;
+    const current = merged.get(key) || { kind, profile, goalId, delta: 0, variantIds: [] };
+    current.delta += delta;
+    current.variantIds = [...new Set([...(current.variantIds || []), ...(Array.isArray(item?.variantIds) ? item.variantIds : []), item?.variantId]
+      .map((value) => String(value || "").trim()).filter(Boolean))];
+    if (current.delta) merged.set(key, current);
+    else merged.delete(key);
+  });
+  return [...merged.values()];
+}
+
+function applyPendingMissionQueueToCollection(collection, profileName) {
+  const normalizedProfile = String(profileName || getDefaultProfileName()).trim().toLocaleLowerCase("pt-BR");
+  return readMissionProgressQueue().reduce((goals, item) => {
+    if (String(item?.profile || "").trim().toLocaleLowerCase("pt-BR") !== normalizedProfile) return goals;
+    return item?.kind === "update"
+      ? updateMissionDefinitionCollection(goals, item.goalId, item.patch)
+      : updateMissionProgressCollection(goals, item.goalId, item.delta);
+  }, Array.isArray(collection) ? collection : []);
+}
+
+function scheduleMissionProgressFlush() {
+  if (missionProgressFlushTimer || missionProgressFlushPromise || !readMissionProgressQueue().length) return;
+  missionProgressFlushTimer = window.setTimeout(() => {
+    missionProgressFlushTimer = null;
+    void flushMissionProgressQueue();
+  }, MISSION_PROGRESS_QUEUE_DELAY_MS);
+}
+
+function queueMissionProgressUpdate(goalId, delta, options = {}) {
+  const item = {
+    kind: "progress",
+    profile: String(options.profile || state.selectedProfile || getDefaultProfileName()).trim(),
+    goalId: String(goalId || "").trim(),
+    delta: Math.trunc(Number(delta || 0) || 0),
+    variantId: String(options.variantId || "").trim(),
+    variantIds: Array.isArray(options.variantIds) ? options.variantIds : []
+  };
+  if (!item.goalId || !item.delta) return;
+  writeMissionProgressQueue(mergeMissionProgressQueue([...readMissionProgressQueue(), item]));
+  scheduleMissionProgressFlush();
+}
+
+function queueMissionDefinitionUpdate(goalId, patch, options = {}) {
+  const item = {
+    kind: "update",
+    profile: String(options.profile || state.selectedProfile || getDefaultProfileName()).trim(),
+    goalId: String(goalId || "").trim(),
+    patch: patch && typeof patch === "object" ? patch : {}
+  };
+  if (!item.goalId) return;
+  writeMissionProgressQueue(mergeMissionProgressQueue([...readMissionProgressQueue(), item]));
+  scheduleMissionProgressFlush();
+}
+
+function flushMissionProgressQueue({ keepalive = false } = {}) {
+  if (missionProgressFlushPromise) return missionProgressFlushPromise;
+  if (missionProgressFlushTimer) {
+    window.clearTimeout(missionProgressFlushTimer);
+    missionProgressFlushTimer = null;
+  }
+  const batch = readMissionProgressQueue();
+  if (!batch.length) return Promise.resolve(null);
+  writeMissionProgressQueue([]);
+  const currentProfile = String(state.selectedProfile || getDefaultProfileName()).trim();
+  missionProgressFlushPromise = apiRequest("/api/200/extra-goals/progress/batch", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ profile: currentProfile, updates: batch }),
+    skipGlobalLoading: true,
+    forceNetwork: true,
+    keepalive
+  }).then((payload) => {
+    enqueuePointsUpdateFeedback(payload?.pointsUpdate);
+    window.Project200Offline?.invalidate?.(["/api/200/extra-goals", "/api/actions"]);
+    return payload;
+  }).catch((error) => {
+    writeMissionProgressQueue(mergeMissionProgressQueue([...batch, ...readMissionProgressQueue()]));
+    if (navigator.onLine !== false) showFloatingNotice("Alterações mantidas no aparelho; nova sincronização em instantes.");
+    throw error;
+  }).finally(() => {
+    missionProgressFlushPromise = null;
+    scheduleMissionProgressFlush();
+  });
+  return missionProgressFlushPromise;
 }
 
 function applyStatsActionProgressLocally(action, delta) {
@@ -15167,40 +15329,7 @@ function applyStatsActionProgressLocally(action, delta) {
 
 function queueRunningMissionQuickIncrement(goal) {
   const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
-  runningMissionQuickRequestChain = runningMissionQuickRequestChain
-    .catch(() => {})
-    .then(async () => {
-      try {
-        const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(String(goal.id || ""))}/progress`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            profile,
-            delta: 1
-          }),
-          offlineQueue: true,
-          offlineResponse: { goals: state.missions },
-          offlineInvalidates: ["/api/200/extra-goals", "/api/actions"]
-        });
-        if (Array.isArray(payload?.goals)) {
-          state.missions = payload.goals;
-          renderMissions();
-          renderRunningMissionQuickButtons();
-          const updatedGoal = getMissionQuickGoalById(goal.id);
-          if (updatedGoal && runningMissionQuickFeedback?.textContent) {
-            showRunningMissionQuickFeedback(updatedGoal);
-          }
-        }
-        enqueuePointsUpdateFeedback(payload?.pointsUpdate);
-      } catch (error) {
-        await loadMissions();
-        renderMissions();
-        renderRunningMissionQuickButtons();
-        if (runningMissionQuickFeedback) {
-          runningMissionQuickFeedback.textContent = error instanceof Error ? error.message : "Falha ao atualizar missão.";
-        }
-      }
-    });
+  queueMissionProgressUpdate(goal?.id, 1, { profile });
 }
 
 function startRunningMissionQuickSpotlight(goal) {
@@ -20403,49 +20532,28 @@ document.querySelectorAll("[data-mission-adjust-add]").forEach((button) => {
 });
 
 missionAdjustConfirmButton?.addEventListener("click", () => {
-  void (async () => {
-    const goalId = String(state.missionAdjust?.goalId || "").trim();
-    const targetValue = Math.max(1, Math.trunc(Number(state.missionAdjust?.targetValue || 1) || 1));
-    const goal = getAvailableMissionById(goalId);
-    if (!goalId) {
-      return;
-    }
-    const finishLoading = beginMissionActionLoading(missionAdjustConfirmButton);
-    if (!finishLoading) return;
-    if (missionAdjustStatus) {
-      missionAdjustStatus.textContent = "Salvando...";
-    }
-    try {
-      await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
-          targetValue,
-          isFolder: state.missionAdjust?.isFolder === true,
-          repeatDays: normalizeMissionRepeatDays(state.missionAdjust?.repeatDays),
-          scheduleConfig: state.missionAdjust?.scheduleConfig || state.missionAdjust?.repeatConfig || null,
-          repeatConfig: state.missionAdjust?.scheduleConfig || state.missionAdjust?.repeatConfig || null,
-          unitDurationSeconds: normalizeMissionKind(state.missionAdjust?.goalKind) === "limit" || state.missionAdjust?.isFolder === true ? 0 : normalizeMissionDurationOption(state.missionAdjust?.unitDurationSeconds),
-          limitIntervalValue: Math.max(1, Math.trunc(Number(state.missionAdjust?.limitIntervalValue || 1))),
-          limitIntervalUnit: String(state.missionAdjust?.limitIntervalUnit || "day"),
-          countSleepTime: state.missionAdjust?.countSleepTime !== false,
-          svgIconUrl: String(goal?.svgIconUrl || "").trim(),
-          svgIconLabel: String(goal?.svgIconLabel || "").trim()
-        })
-      });
-      closeModal("missionAdjustModal");
-      await Promise.all([loadMissions({ forceNetwork: true }), loadActionMissions({ forceNetwork: true })]);
-      renderMissions();
-      renderActionsMissionsPanel();
-    } catch (error) {
-      if (missionAdjustStatus) {
-        missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar missão.";
-      }
-    } finally {
-      finishLoading();
-    }
-  })();
+  const goalId = String(state.missionAdjust?.goalId || "").trim();
+  const goal = getAvailableMissionById(goalId);
+  if (!goalId || !goal) return;
+  const patch = {
+    targetValue: Math.max(1, Math.trunc(Number(state.missionAdjust?.targetValue || 1) || 1)),
+    isFolder: state.missionAdjust?.isFolder === true,
+    repeatDays: normalizeMissionRepeatDays(state.missionAdjust?.repeatDays),
+    scheduleConfig: state.missionAdjust?.scheduleConfig || state.missionAdjust?.repeatConfig || null,
+    repeatConfig: state.missionAdjust?.scheduleConfig || state.missionAdjust?.repeatConfig || null,
+    unitDurationSeconds: normalizeMissionKind(state.missionAdjust?.goalKind) === "limit" || state.missionAdjust?.isFolder === true ? 0 : normalizeMissionDurationOption(state.missionAdjust?.unitDurationSeconds),
+    limitIntervalValue: Math.max(1, Math.trunc(Number(state.missionAdjust?.limitIntervalValue || 1))),
+    limitIntervalUnit: String(state.missionAdjust?.limitIntervalUnit || "day"),
+    countSleepTime: state.missionAdjust?.countSleepTime !== false,
+    svgIconUrl: String(goal.svgIconUrl || "").trim(),
+    svgIconLabel: String(goal.svgIconLabel || "").trim()
+  };
+  closeModal("missionAdjustModal");
+  applyMissionDefinitionLocally(goalId, patch);
+  renderMissions();
+  renderActionsMissionsPanel();
+  renderRunningMissionQuickButtons();
+  queueMissionDefinitionUpdate(goalId, patch);
 });
 
 missionProgressConfirmButton?.addEventListener("click", () => {
@@ -20463,65 +20571,14 @@ missionProgressConfirmButton?.addEventListener("click", () => {
     return;
   }
 
-  const rollback = {
-    missions: (state.missions || []).map((item) => ({ ...item })),
-    actionMissions: (state.actionMissions || []).map((item) => ({ ...item })),
-    statsScopeMissions: (state.statsScopeMissions || []).map((item) => ({ ...item })),
-    linkedMissions: (state.statsAspectLinks?.missions || []).map((item) => ({ ...item }))
-  };
-
+  closeModal("missionProgressModal");
   applyMissionProgressLocally(goalId, deltaValue);
   renderMissions();
   renderActionsMissionsPanel();
   renderRunningMissionQuickButtons();
-  closeModal("missionProgressModal");
-  const completionUx = deltaValue > 0
-    ? animateDynamicMissionSettlement(goalId, deltaValue)
-    : Promise.resolve(renderActions());
-
-  void apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/progress`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
-      delta: deltaValue
-    }),
-    skipGlobalLoading: true,
-    offlineQueue: true,
-    offlineResponse: { goals: state.missions },
-    offlineInvalidates: ["/api/200/extra-goals", "/api/actions"]
-  }).then(async (payload) => {
-    if (Array.isArray(payload?.goals)) {
-      state.missions = payload.goals;
-      state.actionMissions = payload.goals;
-      if (getActiveStatsScope().key === "today") {
-        state.statsScopeMissions = payload.goals;
-      }
-    }
-    refreshStatsMissionsFromLocalState();
-    await completionUx;
-    renderMissions();
-    renderActions();
-    renderActionsMissionsPanel();
-    renderRunningMissionQuickButtons();
-    enqueuePointsUpdateFeedback(payload?.pointsUpdate);
-  }).catch(async (error) => {
-    await completionUx;
-    state.missions = rollback.missions;
-    state.actionMissions = rollback.actionMissions;
-    state.statsScopeMissions = rollback.statsScopeMissions;
-    if (state.statsAspectLinks) {
-      state.statsAspectLinks.missions = rollback.linkedMissions;
-    }
-    refreshStatsMissionsFromLocalState();
-    renderMissions();
-    renderActions();
-    renderActionsMissionsPanel();
-    renderRunningMissionQuickButtons();
-    if (missionStatus) {
-      missionStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar progresso.";
-    }
-  });
+  if (deltaValue > 0) void animateDynamicMissionSettlement(goalId, deltaValue);
+  else renderActions();
+  queueMissionProgressUpdate(goalId, deltaValue);
 });
 
 missionAdjustDeleteButton?.addEventListener("click", () => {
@@ -21088,7 +21145,7 @@ async function performRunningRestore(runningAction) {
     delete state.runningLocalStarts[String(runningAction.id || "")];
     startRunningTaskTicker();
     closeRunningTaskModalWithFade();
-    window.setTimeout(() => openModal("actionsModal"), 500);
+    openModal("actionsModal");
   } catch {}
 }
 
@@ -21098,10 +21155,8 @@ async function performRunningPause(runningAction) {
     if (!result) return;
     startRunningTaskTicker();
     closeRunningTaskModalWithFade();
-    window.setTimeout(() => {
-      openModal("actionsModal");
-      renderActions();
-    }, 500);
+    openModal("actionsModal");
+    renderActions();
   } catch (error) {
     showFloatingNotice(error instanceof Error ? error.message : "Falha ao pausar tarefa.");
   }
@@ -21119,7 +21174,7 @@ runningTaskRestoreButton?.addEventListener("click", () => {
 
 runningTaskListButton?.addEventListener("click", () => {
   closeRunningTaskModalWithFade();
-  window.setTimeout(() => openModal("actionsModal"), 500);
+  openModal("actionsModal");
 });
 runningTaskHomeButton?.addEventListener("click", () => {
   navigateToProjectHome();
@@ -22603,8 +22658,13 @@ document.addEventListener("visibilitychange", () => {
     void refreshHomeSnapshot();
     return;
   }
+  void flushMissionProgressQueue({ keepalive: true }).catch(() => {});
   clearScreenLockInactivityTimer();
 });
+window.addEventListener("pagehide", () => {
+  void flushMissionProgressQueue({ keepalive: true }).catch(() => {});
+});
+window.addEventListener("online", scheduleMissionProgressFlush);
 window.addEventListener("focus", () => {
   retryRequiredRunningDefaultAutoplay();
   void checkProject200AppUpdate().catch(() => {});

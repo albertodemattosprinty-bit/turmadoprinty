@@ -63,7 +63,7 @@ import { createQuickUserAction, createUserAction, deleteUserAction, ensureAction
 import { clearProject200CurrentTaskState, getProject200CurrentTaskState, saveProject200CurrentTaskState } from "./src/project200-current-task-state.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
-import { addProject200ExerciseSeries, addProject200ExerciseToLibrary, approveProject200ExercisePlan, createProject200NutritionEntry, createProject200WeightEntry, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, startProject200ExerciseSession, updateProject200ExerciseProgress, updateProject200MealSlots, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
+import { addProject200ExerciseSeries, addProject200ExerciseToLibrary, approveProject200ExercisePlan, createProject200NutritionEntry, createProject200WeightEntry, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, saveProject200ExerciseAssets, startProject200ExerciseSession, updateProject200ExerciseProgress, updateProject200MealSlots, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, getProject200HistorySpan, listProject200History } from "./src/project200-history.js";
@@ -4587,6 +4587,77 @@ async function handleProject200ExercisePlanRequest(request, response) {
   }
 }
 
+async function handleProject200ExerciseImagesRequest(request, response, exerciseId) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+  try {
+    const body = await readJsonBody(request);
+    const safeExerciseId = String(exerciseId || "").trim().slice(0, 120);
+    const exerciseName = String(body?.exerciseName || "").trim().slice(0, 160);
+    const category = String(body?.category || "exercício").trim().slice(0, 80);
+    const equipment = String(body?.equipment || "sem equipamento").trim().slice(0, 160);
+    const cue = String(body?.cue || "").trim().slice(0, 500);
+    const muscles = [...new Set((Array.isArray(body?.muscles) ? body.muscles : [])
+      .map((item) => String(item || "").trim().slice(0, 80)).filter(Boolean))].slice(0, 3);
+    if (!safeExerciseId || !exerciseName) throw new Error("Exercício inválido para geração de imagens.");
+    const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+    if (!apiKey) throw new Error("OPENAI_API_KEY nao configurada no backend.");
+    const model = "gpt-image-1";
+    const prompt = [
+      `Crie uma prancha técnica horizontal, dividida exatamente em dois painéis quadrados iguais, demonstrando o exercício ${exerciseName}.`,
+      `Categoria: ${category}. Equipamento: ${equipment}. Principais músculos: ${muscles.join(", ") || "corpo inteiro"}.`,
+      cue ? `Orientação do movimento: ${cue}` : "",
+      "Use a mesma pessoa adulta nos dois painéis: 1,75 m de altura, pessoa branca, corpo definido de aproximadamente 75 kg e roupa esportiva preta lisa.",
+      "O painel esquerdo mostra com clareza o ponto inicial, com iluminação e destaque corporal azul. O painel direito mostra o ponto final, com iluminação e destaque corporal verde.",
+      "Mantenha fundo bege claro nude uniforme nos dois painéis, personagem inteiro dos pés à cabeça, centralizado, anatomia correta, enquadramento frontal ou lateral que melhor ensine o movimento e aparência premium de guia fitness.",
+      "Sem texto, números, letras, logotipos, marcas, setas, molduras decorativas ou objetos extras. A divisão central deve ser limpa e exatamente no meio."
+    ].filter(Boolean).join(" ");
+    const openAiResponse = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model, prompt, size: "1536x1024", quality: "medium", output_format: "png", n: 1 })
+    });
+    const openAiPayload = await openAiResponse.json().catch(() => ({}));
+    if (!openAiResponse.ok) throw new Error(openAiPayload?.error?.message || "A OpenAI não conseguiu gerar as imagens do exercício.");
+    const generatedBase64 = String(openAiPayload?.data?.[0]?.b64_json || "").trim();
+    if (!generatedBase64) throw new Error("A OpenAI não devolveu a prancha do exercício.");
+    const generatedBuffer = Buffer.from(generatedBase64, "base64");
+    const metadata = await sharp(generatedBuffer).metadata();
+    const sourceWidth = Math.max(2, Number(metadata.width || 1536));
+    const sourceHeight = Math.max(2, Number(metadata.height || 1024));
+    const halfWidth = Math.floor(sourceWidth / 2);
+    const nudeBackground = { r: 234, g: 216, b: 196, alpha: 1 };
+    const makePose = (left, width) => sharp(generatedBuffer)
+      .extract({ left, top: 0, width, height: sourceHeight })
+      .resize({ width: 400, height: 400, fit: "contain", background: nudeBackground })
+      .webp({ quality: 78, effort: 5 })
+      .toBuffer();
+    const [startBuffer, finishBuffer] = await Promise.all([
+      makePose(0, halfWidth),
+      makePose(halfWidth, sourceWidth - halfWidth)
+    ]);
+    const safeKeyId = safeExerciseId.replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "") || "exercise";
+    const generationId = `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+    const startKey = `project200/exercises/${safeKeyId}/start-${generationId}.webp`;
+    const finishKey = `project200/exercises/${safeKeyId}/finish-${generationId}.webp`;
+    await Promise.all([
+      getR2Client().send(new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: startKey, Body: startBuffer, ContentType: "image/webp", CacheControl: "public, max-age=31536000, immutable" })),
+      getR2Client().send(new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: finishKey, Body: finishBuffer, ContentType: "image/webp", CacheControl: "public, max-age=31536000, immutable" }))
+    ]);
+    const asset = await saveProject200ExerciseAssets(admin.id, {
+      exerciseId: safeExerciseId,
+      exerciseName,
+      muscles,
+      startImageUrl: buildPublicR2UrlFromKey(startKey),
+      finishImageUrl: buildPublicR2UrlFromKey(finishKey),
+      generatedModel: model
+    });
+    sendJson(response, 201, { ok: true, asset });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível gerar as imagens do exercício." });
+  }
+}
+
 async function handleProject200NutritionAnalyzeRequest(request, response) {
   const user = await requireAuth(request, response);
   if (!user) return;
@@ -5570,6 +5641,82 @@ async function handleExtraGoalProgressRequest(request, response, goalId) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel atualizar a missao."
     });
+  }
+}
+
+async function handleExtraGoalProgressBatchRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const body = await readJsonBody(request);
+    const updates = (Array.isArray(body?.updates) ? body.updates : []).slice(0, 100);
+    if (!updates.length) throw new Error("Nenhuma alteração de missão para sincronizar.");
+    let dailyRankingBefore = null;
+    let shouldTrackPointsUpdate = false;
+    let hasPositiveGoalProgress = false;
+    let resultGoals = [];
+    let resultProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
+    const missionPointAwards = [];
+    for (const update of updates) {
+      const goalId = String(update?.goalId || "").trim();
+      if (!goalId) continue;
+      const selectedProfile = await resolveProject200ProfileName(user.id, update?.profile || resultProfile, { fallbackToDefault: true });
+      if (update?.kind === "update") {
+        const goals = await updateExtraGoal(user.id, selectedProfile, goalId, update?.patch || {});
+        if (selectedProfile === resultProfile) resultGoals = goals;
+        continue;
+      }
+      const delta = Math.trunc(Number(update?.delta || 0) || 0);
+      if (!delta) continue;
+      const currentGoal = await getExtraGoalById(user.id, selectedProfile, goalId);
+      if (!currentGoal) throw new Error("Missão não encontrada durante a sincronização.");
+      if (currentGoal?.scheduleConfig?.nativeType === "bible_reading") throw new Error("O progresso desta missão é atualizado somente pela leitura da Bíblia.");
+      const isLimit = String(currentGoal?.goalKind || "goal").trim().toLowerCase() === "limit";
+      if (!isLimit) {
+        shouldTrackPointsUpdate = true;
+        hasPositiveGoalProgress ||= delta > 0;
+      }
+      if (!dailyRankingBefore && !isLimit) {
+        try { dailyRankingBefore = await getProject200FriendsSnapshot(user.id, "today"); } catch {}
+      }
+      const goals = await updateExtraGoalProgress(user.id, selectedProfile, goalId, delta, new Date(), update?.variantId, update?.variantIds);
+      if (selectedProfile === resultProfile) resultGoals = goals;
+      const completedVariantIds = [...new Set([...(Array.isArray(update?.variantIds) ? update.variantIds : []), update?.variantId]
+        .map((value) => String(value || "").trim()).filter(Boolean))];
+      if (!isLimit && delta > 0 && completedVariantIds.length) {
+        const completedAt = new Date();
+        const pointDateKey = completedAt.toISOString().slice(0, 10);
+        for (const variantId of completedVariantIds) {
+          missionPointAwards.push(await recordProject200MissionPoints(user.id, {
+            sourceKey: `${goalId}:${variantId}:${pointDateKey}`,
+            title: currentGoal.title || "Missao",
+            points: Math.max(1, Math.ceil(delta / completedVariantIds.length)),
+            kind: "microtask"
+          }, completedAt));
+        }
+      }
+    }
+    if (hasPositiveGoalProgress) {
+      try {
+        const pointTotals = await getProject200UserPointTotals(user.id);
+        if (Number(pointTotals?.total || 0) >= 1) await recordProject200FirstPointOrigin(user.id, new Date());
+      } catch {}
+    }
+    let dailyRankingAfter = null;
+    if (shouldTrackPointsUpdate) {
+      try { dailyRankingAfter = await getProject200FriendsSnapshot(user.id, "today"); } catch {}
+    }
+    sendJson(response, 200, {
+      ok: true,
+      profile: resultProfile,
+      goals: resultGoals,
+      summary: summarizeExtraGoals(resultGoals),
+      missionPointAwards,
+      syncedCount: updates.length,
+      pointsUpdate: dailyRankingAfter ? { before: dailyRankingBefore, after: dailyRankingAfter } : null
+    });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível sincronizar as missões." });
   }
 }
 
@@ -14289,6 +14436,11 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "PATCH" && pathname === "/api/200/extra-goals/progress/batch") {
+    await handleExtraGoalProgressBatchRequest(request, response);
+    return;
+  }
+
   if (request.method === "PATCH" && pathname.match(/^\/api\/200\/extra-goals\/[^/]+\/progress$/)) {
     const goalId = pathname.replace(/^\/api\/200\/extra-goals\/([^/]+)\/progress$/, "$1");
     await handleExtraGoalProgressRequest(request, response, goalId);
@@ -15924,6 +16076,12 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "POST" && pathname.match(/^\/api\/admin\/200\/exercises\/[^/]+\/images$/)) {
+    const exerciseId = decodeURIComponent(pathname.replace(/^\/api\/admin\/200\/exercises\/([^/]+)\/images$/, "$1"));
+    await handleProject200ExerciseImagesRequest(request, response, exerciseId);
+    return;
+  }
+
   if (request.method === "PATCH" && pathname === "/api/200/nutrition/meal-slots") {
     try {
       const user = await requireAuth(request, response);
@@ -15965,7 +16123,7 @@ const server = http.createServer(async (request, response) => {
       if (!user) return;
       const profile = requestUrl.searchParams.get("profile") || PROJECT200_DEFAULT_PROFILE_NAME;
       const dashboard = await getProject200WellnessDashboard(user.id, profile);
-      sendJson(response, 200, { ok: true, dashboard });
+      sendJson(response, 200, { ok: true, dashboard, isAdmin: isAdminUser(user) });
     } catch (error) {
       sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel carregar saude e exercicios." });
     }

@@ -85,6 +85,17 @@ function normalizeExerciseLibraryRow(row) {
     todayDistanceMeters: Math.max(0, Math.trunc(Number(row?.today_distance_meters || 0)))
   };
 }
+function normalizeExerciseAssetRow(row) {
+  return {
+    exerciseId: String(row?.exercise_id || ""),
+    exerciseName: String(row?.exercise_name || "Exercício"),
+    muscles: Array.isArray(row?.muscles) ? row.muscles.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 3) : [],
+    startImageUrl: String(row?.start_image_url || ""),
+    finishImageUrl: String(row?.finish_image_url || ""),
+    generatedModel: String(row?.generated_model || ""),
+    updatedAt: row?.updated_at ? new Date(row.updated_at).toISOString() : null
+  };
+}
 function normalizeWeightRow(row) {
   if (!row?.id) return null;
   return { id: String(row.id), weightKg: Number(row.weight_kg || 0), measuredAt: new Date(row.measured_at).toISOString() };
@@ -133,6 +144,12 @@ export async function ensureProject200WellnessSchema() {
     primary key (user_id, assigned_profile, exercise_id)
   )`);
   await query(`create index if not exists idx_project200_exercise_library_user_profile on project200_exercise_library(user_id, assigned_profile, created_at)`);
+  await query(`create table if not exists project200_exercise_assets (
+    exercise_id text primary key, exercise_name text not null, muscles jsonb not null default '[]'::jsonb,
+    start_image_url text not null, finish_image_url text not null, generated_model text not null default 'gpt-image-1',
+    generated_by uuid null references users(id) on delete set null,
+    created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+  )`);
   await query(`create table if not exists project200_wellness_preferences (
     user_id uuid not null references users(id) on delete cascade, assigned_profile text not null default 'Usuario',
     height_cm numeric(6,2) null, askagain1 text not null default 'yes' check (askagain1 in ('yes','no')),
@@ -170,7 +187,7 @@ async function getActiveWorkoutRow(userId, profileName) {
 export async function getProject200WellnessDashboard(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME) {
   await ensureProject200WellnessSchema();
   const profile = normalizeProfileName(profileName);
-  const [mealResult, summaryResult, workoutResult, recentWorkoutResult, preferencesResult, libraryResult, weightResult] = await Promise.all([
+  const [mealResult, summaryResult, workoutResult, recentWorkoutResult, preferencesResult, libraryResult, weightResult, assetResult] = await Promise.all([
     query(
       `select * from project200_nutrition_entries
        where user_id = $1 and assigned_profile = $2
@@ -217,7 +234,8 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
        order by library.created_at asc`,
       [userId, profile, PROJECT200_TIME_ZONE]
     ),
-    query(`select * from project200_weight_entries where user_id = $1 and assigned_profile = $2 order by measured_at desc limit 30`, [userId, profile])
+    query(`select * from project200_weight_entries where user_id = $1 and assigned_profile = $2 order by measured_at desc limit 30`, [userId, profile]),
+    query(`select * from project200_exercise_assets order by exercise_name asc`)
   ]);
   const summary = summaryResult.rows[0] || {};
   const preference = preferencesResult.rows[0] || {};
@@ -247,6 +265,7 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
     activeWorkout: normalizeWorkoutRow(workoutResult),
     recentWorkouts: recentWorkoutResult.rows.map(normalizeWorkoutRow),
     exerciseLibrary: libraryResult.rows.map(normalizeExerciseLibraryRow),
+    exerciseAssets: assetResult.rows.map(normalizeExerciseAssetRow),
     wellness: {
       preferences: { heightCm, askagain1: preference.askagain1 === "no" ? "no" : "yes" },
       currentWeight,
@@ -254,6 +273,28 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
       weightHistory: weights
     }
   };
+}
+
+export async function saveProject200ExerciseAssets(userId, payload = {}) {
+  await ensureProject200WellnessSchema();
+  const exerciseId = String(payload.exerciseId || "").trim().slice(0, 120);
+  const exerciseName = String(payload.exerciseName || "").trim().slice(0, 160);
+  const startImageUrl = String(payload.startImageUrl || "").trim().slice(0, 2000);
+  const finishImageUrl = String(payload.finishImageUrl || "").trim().slice(0, 2000);
+  const generatedModel = String(payload.generatedModel || "gpt-image-1").trim().slice(0, 80);
+  const muscles = [...new Set((Array.isArray(payload.muscles) ? payload.muscles : [])
+    .map((item) => String(item || "").trim().slice(0, 80)).filter(Boolean))].slice(0, 3);
+  if (!exerciseId || !exerciseName || !startImageUrl || !finishImageUrl) throw new Error("Dados das imagens do exercício incompletos.");
+  const result = await query(
+    `insert into project200_exercise_assets (exercise_id, exercise_name, muscles, start_image_url, finish_image_url, generated_model, generated_by)
+     values ($1,$2,$3::jsonb,$4,$5,$6,$7)
+     on conflict (exercise_id) do update set exercise_name=excluded.exercise_name, muscles=excluded.muscles,
+       start_image_url=excluded.start_image_url, finish_image_url=excluded.finish_image_url,
+       generated_model=excluded.generated_model, generated_by=excluded.generated_by, updated_at=now()
+     returning *`,
+    [exerciseId, exerciseName, JSON.stringify(muscles), startImageUrl, finishImageUrl, generatedModel, userId]
+  );
+  return normalizeExerciseAssetRow(result.rows[0]);
 }
 
 export async function createProject200NutritionEntry(userId, payload = {}) {
