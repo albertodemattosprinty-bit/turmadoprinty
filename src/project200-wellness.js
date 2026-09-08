@@ -92,6 +92,7 @@ function normalizeExerciseAssetRow(row) {
     muscles: Array.isArray(row?.muscles) ? row.muscles.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 3) : [],
     startImageUrl: String(row?.start_image_url || ""),
     finishImageUrl: String(row?.finish_image_url || ""),
+    muscleImageUrl: String(row?.muscle_image_url || ""),
     generatedModel: String(row?.generated_model || ""),
     updatedAt: row?.updated_at ? new Date(row.updated_at).toISOString() : null
   };
@@ -146,10 +147,11 @@ export async function ensureProject200WellnessSchema() {
   await query(`create index if not exists idx_project200_exercise_library_user_profile on project200_exercise_library(user_id, assigned_profile, created_at)`);
   await query(`create table if not exists project200_exercise_assets (
     exercise_id text primary key, exercise_name text not null, muscles jsonb not null default '[]'::jsonb,
-    start_image_url text not null, finish_image_url text not null, generated_model text not null default 'gpt-image-1',
+    start_image_url text not null, finish_image_url text not null, muscle_image_url text not null default '', generated_model text not null default 'gpt-image-1',
     generated_by uuid null references users(id) on delete set null,
     created_at timestamptz not null default now(), updated_at timestamptz not null default now()
   )`);
+  await query(`alter table project200_exercise_assets add column if not exists muscle_image_url text not null default ''`);
   await query(`create table if not exists project200_wellness_preferences (
     user_id uuid not null references users(id) on delete cascade, assigned_profile text not null default 'Usuario',
     height_cm numeric(6,2) null, askagain1 text not null default 'yes' check (askagain1 in ('yes','no')),
@@ -281,18 +283,19 @@ export async function saveProject200ExerciseAssets(userId, payload = {}) {
   const exerciseName = String(payload.exerciseName || "").trim().slice(0, 160);
   const startImageUrl = String(payload.startImageUrl || "").trim().slice(0, 2000);
   const finishImageUrl = String(payload.finishImageUrl || "").trim().slice(0, 2000);
+  const muscleImageUrl = String(payload.muscleImageUrl || "").trim().slice(0, 2000);
   const generatedModel = String(payload.generatedModel || "gpt-image-1").trim().slice(0, 80);
   const muscles = [...new Set((Array.isArray(payload.muscles) ? payload.muscles : [])
     .map((item) => String(item || "").trim().slice(0, 80)).filter(Boolean))].slice(0, 3);
-  if (!exerciseId || !exerciseName || !startImageUrl || !finishImageUrl) throw new Error("Dados das imagens do exercício incompletos.");
+  if (!exerciseId || !exerciseName || !startImageUrl || !finishImageUrl || !muscleImageUrl) throw new Error("Dados das imagens do exercício incompletos.");
   const result = await query(
-    `insert into project200_exercise_assets (exercise_id, exercise_name, muscles, start_image_url, finish_image_url, generated_model, generated_by)
-     values ($1,$2,$3::jsonb,$4,$5,$6,$7)
+    `insert into project200_exercise_assets (exercise_id, exercise_name, muscles, start_image_url, finish_image_url, muscle_image_url, generated_model, generated_by)
+     values ($1,$2,$3::jsonb,$4,$5,$6,$7,$8)
      on conflict (exercise_id) do update set exercise_name=excluded.exercise_name, muscles=excluded.muscles,
        start_image_url=excluded.start_image_url, finish_image_url=excluded.finish_image_url,
-       generated_model=excluded.generated_model, generated_by=excluded.generated_by, updated_at=now()
+       muscle_image_url=excluded.muscle_image_url, generated_model=excluded.generated_model, generated_by=excluded.generated_by, updated_at=now()
      returning *`,
-    [exerciseId, exerciseName, JSON.stringify(muscles), startImageUrl, finishImageUrl, generatedModel, userId]
+    [exerciseId, exerciseName, JSON.stringify(muscles), startImageUrl, finishImageUrl, muscleImageUrl, generatedModel, userId]
   );
   return normalizeExerciseAssetRow(result.rows[0]);
 }

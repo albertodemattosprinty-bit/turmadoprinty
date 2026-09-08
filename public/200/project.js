@@ -1160,11 +1160,8 @@ const backgroundThemeModes = [
   { key: "black", label: "Black" },
   { key: "orange", label: "Laranja" },
   { key: "bluevivid", label: "Azul vivo" },
-  { key: "pinkstrong", label: "Rosa forte" },
   { key: "bluedark", label: "Azul escuro" },
-  { key: "brown", label: "Marrom" },
-  { key: "edge", label: "Edge" },
-  { key: "light", label: "Light" }
+  { key: "edge", label: "Edge" }
 ];
 
 let financeTimer = null;

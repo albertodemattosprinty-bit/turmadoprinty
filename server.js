@@ -4603,14 +4603,23 @@ async function handleProject200ExerciseImagesRequest(request, response, exercise
     const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
     if (!apiKey) throw new Error("OPENAI_API_KEY nao configurada no backend.");
     const model = "gpt-image-1";
+    const anatomySearch = `${safeExerciseId} ${muscles.join(" ")}`.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const lowerBodyFocus = /(perna|quadriceps|glute|posterior|panturr|adutor|abdutor|coxa|squat|lunge|calf|leg-|hip-thrust|bridge)/.test(anatomySearch);
+    const movementSetting = category === "calisthenics"
+      ? "uma casa luxuosa contemporânea, espaçosa, iluminada e preparada para treino funcional"
+      : "uma academia luxuosa contemporânea, organizada, iluminada e com equipamentos premium discretos";
+    const anatomyFraming = lowerBodyFocus
+      ? "mostre apenas a parte inferior do corpo, do quadril aos pés"
+      : "mostre apenas o torso, dos ombros ao quadril";
     const prompt = [
-      `Crie uma prancha técnica horizontal, dividida exatamente em dois painéis quadrados iguais, demonstrando o exercício ${exerciseName}.`,
+      `Crie uma prancha técnica horizontal dividida exatamente em três painéis quadrados iguais, alinhados lado a lado no centro, demonstrando o exercício ${exerciseName}.`,
       `Categoria: ${category}. Equipamento: ${equipment}. Principais músculos: ${muscles.join(", ") || "corpo inteiro"}.`,
       cue ? `Orientação do movimento: ${cue}` : "",
-      "Use a mesma pessoa adulta nos dois painéis: 1,75 m de altura, pessoa branca, corpo definido de aproximadamente 75 kg e roupa esportiva preta lisa.",
-      "O painel esquerdo mostra com clareza o ponto inicial, com iluminação e destaque corporal azul. O painel direito mostra o ponto final, com iluminação e destaque corporal verde.",
-      "Mantenha fundo bege claro nude uniforme nos dois painéis, personagem inteiro dos pés à cabeça, centralizado, anatomia correta, enquadramento frontal ou lateral que melhor ensine o movimento e aparência premium de guia fitness.",
-      "Sem texto, números, letras, logotipos, marcas, setas, molduras decorativas ou objetos extras. A divisão central deve ser limpa e exatamente no meio."
+      `Nos painéis A e B, use a mesma pessoa adulta: 1,75 m de altura, pessoa branca, corpo definido de aproximadamente 75 kg e roupa esportiva preta lisa, em ${movementSetting}.`,
+      "Os painéis A e B devem parecer fotografias fitness realistas e premium, com anatomia correta, luz natural cinematográfica e enquadramento que ensine o movimento. O painel A mostra o ponto inicial e possui somente a letra A pequena no canto superior esquerdo. O painel B mostra o ponto final e possui somente a letra B pequena no canto superior esquerdo.",
+      "Não use sobreposição, brilho ou pintura verde, azul ou branca no corpo das fotografias A e B. Não use setas, linhas ou diagramas nessas duas fotografias.",
+      `O terceiro painel é um gráfico anatômico fitness sofisticado em fundo escuro: ${anatomyFraming}, com os músculos ${muscles.join(", ") || "principais do movimento"} destacados por brilho neon ciano e magenta, contornos definidos e aparência tridimensional limpa. Não coloque letras nem nomes neste painel.`,
+      "Não inclua nenhuma outra palavra, número, legenda, logotipo, marca ou moldura decorativa. Preserve divisões verticais limpas e exatas entre os três painéis."
     ].filter(Boolean).join(" ");
     const openAiResponse = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
@@ -4623,26 +4632,30 @@ async function handleProject200ExerciseImagesRequest(request, response, exercise
     if (!generatedBase64) throw new Error("A OpenAI não devolveu a prancha do exercício.");
     const generatedBuffer = Buffer.from(generatedBase64, "base64");
     const metadata = await sharp(generatedBuffer).metadata();
-    const sourceWidth = Math.max(2, Number(metadata.width || 1536));
-    const sourceHeight = Math.max(2, Number(metadata.height || 1024));
-    const halfWidth = Math.floor(sourceWidth / 2);
-    const nudeBackground = { r: 234, g: 216, b: 196, alpha: 1 };
-    const makePose = (left, width) => sharp(generatedBuffer)
-      .extract({ left, top: 0, width, height: sourceHeight })
-      .resize({ width: 400, height: 400, fit: "contain", background: nudeBackground })
+    const sourceWidth = Math.max(3, Number(metadata.width || 1536));
+    const sourceHeight = Math.max(1, Number(metadata.height || 1024));
+    const panelWidth = Math.floor(sourceWidth / 3);
+    const panelSize = Math.min(panelWidth, sourceHeight);
+    const panelTop = Math.max(0, Math.floor((sourceHeight - panelSize) / 2));
+    const makePanel = (index) => sharp(generatedBuffer)
+      .extract({ left: index * panelWidth, top: panelTop, width: panelSize, height: panelSize })
+      .resize({ width: 400, height: 400, fit: "cover" })
       .webp({ quality: 78, effort: 5 })
       .toBuffer();
-    const [startBuffer, finishBuffer] = await Promise.all([
-      makePose(0, halfWidth),
-      makePose(halfWidth, sourceWidth - halfWidth)
+    const [startBuffer, finishBuffer, muscleBuffer] = await Promise.all([
+      makePanel(0),
+      makePanel(1),
+      makePanel(2)
     ]);
     const safeKeyId = safeExerciseId.replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "") || "exercise";
     const generationId = `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
     const startKey = `project200/exercises/${safeKeyId}/start-${generationId}.webp`;
     const finishKey = `project200/exercises/${safeKeyId}/finish-${generationId}.webp`;
+    const muscleKey = `project200/exercises/${safeKeyId}/muscles-${generationId}.webp`;
     await Promise.all([
       getR2Client().send(new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: startKey, Body: startBuffer, ContentType: "image/webp", CacheControl: "public, max-age=31536000, immutable" })),
-      getR2Client().send(new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: finishKey, Body: finishBuffer, ContentType: "image/webp", CacheControl: "public, max-age=31536000, immutable" }))
+      getR2Client().send(new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: finishKey, Body: finishBuffer, ContentType: "image/webp", CacheControl: "public, max-age=31536000, immutable" })),
+      getR2Client().send(new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: muscleKey, Body: muscleBuffer, ContentType: "image/webp", CacheControl: "public, max-age=31536000, immutable" }))
     ]);
     const asset = await saveProject200ExerciseAssets(admin.id, {
       exerciseId: safeExerciseId,
@@ -4650,6 +4663,7 @@ async function handleProject200ExerciseImagesRequest(request, response, exercise
       muscles,
       startImageUrl: buildPublicR2UrlFromKey(startKey),
       finishImageUrl: buildPublicR2UrlFromKey(finishKey),
+      muscleImageUrl: buildPublicR2UrlFromKey(muscleKey),
       generatedModel: model
     });
     sendJson(response, 201, { ok: true, asset });
