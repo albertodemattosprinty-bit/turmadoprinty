@@ -3,8 +3,11 @@
 
   const MAX_UPLOAD_BYTES = 150 * 1024 * 1024;
   const DOUBLE_CLICK_WINDOW_MS = 1000;
+  const TOGGLE_DOUBLE_TAP_MS = 700;
+  const IMAGE_LONG_PRESS_MS = 700;
   const ORDER_IDLE_MS = 3000;
   const LOCAL_INDEX_KEY = "midia-local-tracks-v1";
+  const VISUAL_MODE_KEY = "midia-visual-mode-v1";
   const LOCAL_DIRECTORY = "midia-audios";
   const LOCAL_CACHE = "midia-audios-v1";
   const AUTH_TOKEN_KEY = "turma_do_printy_token";
@@ -28,7 +31,21 @@
     emptyState: document.getElementById("emptyState"),
     trackTemplate: document.getElementById("trackTemplate"),
     audioPlayer: document.getElementById("audioPlayer"),
-    globalAudioButton: document.getElementById("globalAudioButton")
+    globalAudioButton: document.getElementById("globalAudioButton"),
+    visualModeToggle: document.getElementById("visualModeToggle"),
+    imagePromptDialog: document.getElementById("imagePromptDialog"),
+    imagePromptForm: document.getElementById("imagePromptForm"),
+    imagePromptTrack: document.getElementById("imagePromptTrack"),
+    imagePromptInput: document.getElementById("imagePromptInput"),
+    imagePromptStatus: document.getElementById("imagePromptStatus"),
+    generateTrackImageButton: document.getElementById("generateTrackImageButton"),
+    closeImagePromptButton: document.getElementById("closeImagePromptButton"),
+    cancelImagePromptButton: document.getElementById("cancelImagePromptButton"),
+    playbackDialog: document.getElementById("playbackDialog"),
+    playbackDialogTrack: document.getElementById("playbackDialogTrack"),
+    pauseTrackButton: document.getElementById("pauseTrackButton"),
+    stopTrackButton: document.getElementById("stopTrackButton"),
+    continueTrackButton: document.getElementById("continueTrackButton")
   };
 
   const state = {
@@ -49,7 +66,14 @@
     globalTrackId: "",
     lastGlobalRevision: -1,
     pendingGlobalPlayback: null,
-    globalPlaybackSource: null
+    globalPlaybackSource: null,
+    visualMode: loadVisualMode(),
+    lastToggleTapAt: 0,
+    imagePromptTrackId: "",
+    imageGenerating: false,
+    playbackDialogTrackId: "",
+    suppressCardClickTrackId: "",
+    pulseTimer: 0
   };
 
   function getAuthToken() {
@@ -74,6 +98,58 @@
     } catch {
       return new Set();
     }
+  }
+
+  function loadVisualMode() {
+    try {
+      return localStorage.getItem(VISUAL_MODE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  }
+
+  function setVisualMode(enabled) {
+    state.visualMode = Boolean(enabled);
+    document.documentElement.classList.toggle("midia-visual-mode", state.visualMode);
+    elements.visualModeToggle?.setAttribute("aria-checked", String(state.visualMode));
+    elements.visualModeToggle?.setAttribute(
+      "aria-label",
+      `${state.visualMode ? "Modo imagens ativado" : "Modo nomes ativado"}. Toque duas vezes para mudar.`
+    );
+    const label = elements.visualModeToggle?.querySelector(".visual-mode-toggle-label");
+    if (label) label.textContent = state.visualMode ? "Imagens" : "Nomes";
+    try {
+      localStorage.setItem(VISUAL_MODE_KEY, String(state.visualMode));
+    } catch {
+      // A preferência continua válida nesta visita mesmo sem armazenamento local.
+    }
+  }
+
+  function handleVisualModeToggle() {
+    const now = Date.now();
+    const isSecondTap = now - state.lastToggleTapAt <= TOGGLE_DOUBLE_TAP_MS;
+    state.lastToggleTapAt = now;
+    elements.visualModeToggle?.classList.toggle("is-awaiting-second-tap", !isSecondTap);
+    if (!isSecondTap) {
+      window.setTimeout(() => {
+        if (Date.now() - state.lastToggleTapAt >= TOGGLE_DOUBLE_TAP_MS) {
+          elements.visualModeToggle?.classList.remove("is-awaiting-second-tap");
+        }
+      }, TOGGLE_DOUBLE_TAP_MS);
+      return;
+    }
+    state.lastToggleTapAt = 0;
+    setVisualMode(!state.visualMode);
+    elements.visualModeToggle?.classList.remove("is-awaiting-second-tap");
+    elements.libraryStatus.textContent = state.visualMode
+      ? "Modo imagens ativado. Toque uma vez na imagem para ouvir."
+      : "Modo nomes ativado.";
+  }
+
+  function getTrackHue(trackId) {
+    let hash = 0;
+    for (const character of String(trackId || "")) hash = ((hash * 31) + character.charCodeAt(0)) >>> 0;
+    return hash % 360;
   }
 
   function persistSavedTrackIds() {
@@ -163,6 +239,20 @@
         : "Clique para ouvir";
     });
     updateOrderSelectionVisuals();
+  }
+
+  function pulsePlayingCover() {
+    if (!state.visualMode || !state.activeTrackId) return;
+    const card = elements.trackList.querySelector(`[data-track-id="${CSS.escape(state.activeTrackId)}"]`);
+    if (!card) return;
+    if (state.pulseTimer) window.clearTimeout(state.pulseTimer);
+    card.classList.remove("is-start-pulsing");
+    void card.offsetWidth;
+    card.classList.add("is-start-pulsing");
+    state.pulseTimer = window.setTimeout(() => {
+      card.classList.remove("is-start-pulsing");
+      state.pulseTimer = 0;
+    }, 1600);
   }
 
   function updateSavedVisuals() {
@@ -291,10 +381,25 @@
       const fragment = elements.trackTemplate.content.cloneNode(true);
       const card = fragment.querySelector(".track-card");
       card.dataset.trackId = track.id;
-      card.setAttribute("aria-label", `${track.title}. Clique para ouvir; dois cliques para pausar; clique direito para mudar a ordem.`);
+      card.style.setProperty("--track-hue", String(getTrackHue(track.id)));
+      card.setAttribute("aria-label", `${track.title}. Clique para ouvir; dois cliques para abrir as opções de reprodução${state.isAdmin ? "; no modo imagens, segure para criar a imagem" : ""}.`);
       fragment.querySelector(".track-number").textContent = String(state.tracks.indexOf(track) + 1).padStart(2, "0");
       fragment.querySelector(".track-title").textContent = track.title;
       fragment.querySelector(".track-size").textContent = formatBytes(track.sizeBytes);
+
+      const coverImage = fragment.querySelector(".track-cover-image");
+      const coverFallback = fragment.querySelector(".track-cover-fallback");
+      if (track.imageUrl) {
+        card.classList.add("has-image");
+        coverImage.src = track.imageUrl;
+        coverImage.hidden = false;
+        coverFallback.hidden = true;
+        coverImage.addEventListener("error", () => {
+          card.classList.remove("has-image");
+          coverImage.hidden = true;
+          coverFallback.hidden = false;
+        }, { once: true });
+      }
 
       const pcDownload = fragment.querySelector(".pc-download");
       pcDownload.href = track.downloadUrl;
@@ -309,9 +414,11 @@
       card.addEventListener("contextmenu", (event) => {
         if (event.target.closest("[data-action]")) return;
         event.preventDefault();
+        if (state.visualMode && state.isAdmin) return;
         selectTrackForOrder(track, card);
       });
       card.addEventListener("dblclick", (event) => event.preventDefault());
+      bindTrackImageLongPress(card, track);
       card.addEventListener("keydown", (event) => {
         if ((event.key === "Enter" || event.key === " ") && !event.target.closest("[data-action]")) {
           event.preventDefault();
@@ -325,9 +432,103 @@
     elements.emptyState.hidden = !noResults;
     elements.libraryStatus.textContent = term
       ? `${visibleTracks.length} resultado${visibleTracks.length === 1 ? "" : "s"} para “${elements.searchInput.value.trim()}”`
-      : `${state.tracks.length} música${state.tracks.length === 1 ? "" : "s"} disponível${state.tracks.length === 1 ? "" : "is"}`;
+      : `${state.tracks.length} música${state.tracks.length === 1 ? "" : "s"} disponíve${state.tracks.length === 1 ? "l" : "is"}`;
     updatePlayingVisuals();
     updateSavedVisuals();
+  }
+
+  function openImagePrompt(track) {
+    if (!state.isAdmin || !track || state.imageGenerating) return;
+    state.imagePromptTrackId = track.id;
+    elements.imagePromptTrack.textContent = track.title;
+    elements.imagePromptInput.value = "";
+    elements.imagePromptStatus.textContent = track.imageUrl
+      ? "Essa música já tem imagem. A nova criação substituirá a atual."
+      : "";
+    elements.imagePromptStatus.classList.remove("is-error");
+    if (!elements.imagePromptDialog.open) elements.imagePromptDialog.showModal();
+    window.setTimeout(() => elements.imagePromptInput.focus(), 80);
+  }
+
+  function closeImagePrompt() {
+    if (state.imageGenerating) return;
+    state.imagePromptTrackId = "";
+    if (elements.imagePromptDialog.open) elements.imagePromptDialog.close();
+  }
+
+  function bindTrackImageLongPress(card, track) {
+    let timer = 0;
+    let startX = 0;
+    let startY = 0;
+    const cancel = () => {
+      if (timer) window.clearTimeout(timer);
+      timer = 0;
+    };
+    card.addEventListener("pointerdown", (event) => {
+      if (!state.visualMode || !state.isAdmin || event.target.closest("[data-action]") || event.button > 0) return;
+      startX = event.clientX;
+      startY = event.clientY;
+      cancel();
+      timer = window.setTimeout(() => {
+        timer = 0;
+        state.suppressCardClickTrackId = track.id;
+        state.lastCardClickAt = 0;
+        state.lastCardTrackId = "";
+        navigator.vibrate?.(35);
+        openImagePrompt(track);
+      }, IMAGE_LONG_PRESS_MS);
+    });
+    card.addEventListener("pointermove", (event) => {
+      if (Math.hypot(event.clientX - startX, event.clientY - startY) > 12) cancel();
+    });
+    card.addEventListener("pointerup", cancel);
+    card.addEventListener("pointercancel", cancel);
+    card.addEventListener("pointerleave", cancel);
+  }
+
+  async function generateTrackImage(event) {
+    event.preventDefault();
+    if (state.imageGenerating) return;
+    const track = getTrackById(state.imagePromptTrackId);
+    const prompt = elements.imagePromptInput.value.trim();
+    if (!track || prompt.length < 3) {
+      elements.imagePromptStatus.textContent = "Descreva como a imagem deve ser.";
+      elements.imagePromptStatus.classList.add("is-error");
+      elements.imagePromptInput.focus();
+      return;
+    }
+
+    state.imageGenerating = true;
+    elements.generateTrackImageButton.disabled = true;
+    elements.cancelImagePromptButton.disabled = true;
+    elements.closeImagePromptButton.disabled = true;
+    elements.imagePromptInput.disabled = true;
+    elements.imagePromptStatus.classList.remove("is-error");
+    elements.imagePromptStatus.textContent = "Criando a imagem com GPT Image 1…";
+    try {
+      const response = await fetch(`/api/midia/tracks/${encodeURIComponent(track.id)}/image`, {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ prompt })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Não foi possível criar a imagem.");
+      const index = state.tracks.findIndex((item) => item.id === track.id);
+      if (index >= 0 && payload.track) state.tracks[index] = { ...state.tracks[index], ...payload.track };
+      renderTracks();
+      elements.libraryStatus.textContent = payload.feedback || `Imagem de “${track.title}” criada.`;
+      elements.imagePromptStatus.textContent = "Imagem pronta.";
+      window.setTimeout(() => closeImagePrompt(), 450);
+    } catch (error) {
+      elements.imagePromptStatus.textContent = error instanceof Error ? error.message : "Não foi possível criar a imagem.";
+      elements.imagePromptStatus.classList.add("is-error");
+    } finally {
+      state.imageGenerating = false;
+      elements.generateTrackImageButton.disabled = false;
+      elements.cancelImagePromptButton.disabled = false;
+      elements.closeImagePromptButton.disabled = false;
+      elements.imagePromptInput.disabled = false;
+    }
   }
 
   async function getLocalTrackFile(track) {
@@ -514,6 +715,10 @@
 
   function activateTrackCard(track, event) {
     if (event.target.closest("[data-action]")) return;
+    if (state.suppressCardClickTrackId === track.id) {
+      state.suppressCardClickTrackId = "";
+      return;
+    }
     const now = Date.now();
     const sameTrackIsPlaying = state.activeTrackId === track.id && !elements.audioPlayer.paused;
 
@@ -522,20 +727,12 @@
     state.lastCardTrackId = track.id;
 
     if (isDoubleClick) {
-      state.lastCardClickAt = now;
-      const positionSeconds = elements.audioPlayer.dataset.trackId === track.id
-        ? elements.audioPlayer.currentTime
-        : 0;
-      pauseCurrentTrack();
-      void broadcastGlobalPlayback("pause", track, positionSeconds);
+      state.lastCardClickAt = 0;
+      state.lastCardTrackId = "";
+      openPlaybackDialog(track);
       return;
     }
     if (sameTrackIsPlaying) {
-      if (now - state.lastCardClickAt < DOUBLE_CLICK_WINDOW_MS) {
-        const positionSeconds = elements.audioPlayer.currentTime;
-        pauseCurrentTrack();
-        void broadcastGlobalPlayback("pause", track, positionSeconds);
-      }
       state.lastCardClickAt = now;
       return;
     }
@@ -546,6 +743,40 @@
       : 0;
     void playTrack(track);
     void broadcastGlobalPlayback("play", track, positionSeconds);
+  }
+
+  function openPlaybackDialog(track) {
+    state.playbackDialogTrackId = track.id;
+    elements.playbackDialogTrack.textContent = track.title;
+    if (!elements.playbackDialog.open) elements.playbackDialog.showModal();
+  }
+
+  function closePlaybackDialog() {
+    state.playbackDialogTrackId = "";
+    if (elements.playbackDialog.open) elements.playbackDialog.close();
+  }
+
+  function choosePlaybackAction(action) {
+    const track = getTrackById(state.playbackDialogTrackId);
+    if (!track || action === "continue") {
+      closePlaybackDialog();
+      return;
+    }
+    const isCurrentTrack = elements.audioPlayer.dataset.trackId === track.id;
+    const positionSeconds = action === "stop" ? 0 : (isCurrentTrack ? elements.audioPlayer.currentTime : 0);
+    pauseCurrentTrack();
+    if (action === "stop" && isCurrentTrack) {
+      try {
+        elements.audioPlayer.currentTime = 0;
+      } catch {
+        // O navegador aplicará o início quando os metadados estiverem disponíveis.
+      }
+    }
+    void broadcastGlobalPlayback("pause", track, positionSeconds);
+    elements.libraryStatus.textContent = action === "stop"
+      ? `“${track.title}” parada e devolvida ao início.`
+      : `“${track.title}” pausada.`;
+    closePlaybackDialog();
   }
 
   function updateLocalButtonProgress(button, loaded, total) {
@@ -729,6 +960,13 @@
   elements.cancelUploadButton.addEventListener("click", () => resetUploadForm(true));
   elements.submitUploadButton.addEventListener("click", uploadSelectedTrack);
   elements.globalAudioButton?.addEventListener("click", () => void enablePendingGlobalAudio());
+  elements.visualModeToggle?.addEventListener("click", handleVisualModeToggle);
+  elements.imagePromptForm?.addEventListener("submit", (event) => void generateTrackImage(event));
+  elements.closeImagePromptButton?.addEventListener("click", closeImagePrompt);
+  elements.cancelImagePromptButton?.addEventListener("click", closeImagePrompt);
+  elements.pauseTrackButton?.addEventListener("click", () => choosePlaybackAction("pause"));
+  elements.stopTrackButton?.addEventListener("click", () => choosePlaybackAction("stop"));
+  elements.continueTrackButton?.addEventListener("click", () => choosePlaybackAction("continue"));
   elements.trackFileInput.addEventListener("change", () => selectFile(elements.trackFileInput.files?.[0]));
   elements.searchInput.addEventListener("input", renderTracks);
   document.addEventListener("keydown", (event) => {
@@ -763,6 +1001,7 @@
   elements.audioPlayer.addEventListener("play", () => {
     state.activeTrackId = elements.audioPlayer.dataset.trackId || "";
     updatePlayingVisuals();
+    pulsePlayingCover();
   });
   elements.audioPlayer.addEventListener("pause", () => {
     state.activeTrackId = "";
@@ -786,6 +1025,7 @@
   window.addEventListener("pagehide", () => void finalizeOrderSelection({ silent: true }));
 
   async function initialize() {
+    setVisualMode(state.visualMode);
     await Promise.all([loadTracks(), loadAdminAccess()]);
     connectGlobalPlayback();
   }

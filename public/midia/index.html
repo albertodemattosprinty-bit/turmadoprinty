@@ -15,6 +15,11 @@
       <span>/midia</span>
     </a>
     <div class="topbar-actions">
+      <button class="visual-mode-toggle" id="visualModeToggle" type="button" role="switch" aria-checked="false" aria-label="Modo imagens. Toque duas vezes para ativar.">
+        <span class="visual-mode-toggle-icon" aria-hidden="true">▦</span>
+        <span class="visual-mode-toggle-label">Imagens</span>
+        <span class="visual-mode-toggle-knob" aria-hidden="true"></span>
+      </button>
       <button class="button button-ghost global-audio-button" id="globalAudioButton" type="button" hidden>
         <span aria-hidden="true">♪</span>
         Ativar som global
@@ -85,10 +90,48 @@
     <span>Ouça com calma. Uma por vez.</span>
   </footer>
 
+  <dialog class="image-prompt-dialog" id="imagePromptDialog" aria-labelledby="imagePromptTitle">
+    <form class="image-prompt-form" id="imagePromptForm" method="dialog">
+      <button class="dialog-close" id="closeImagePromptButton" type="button" aria-label="Fechar">×</button>
+      <p class="eyebrow">IMAGEM DA MÚSICA</p>
+      <h2 id="imagePromptTitle">Como ela deve aparecer?</h2>
+      <p class="image-prompt-track" id="imagePromptTrack"></p>
+      <label class="field image-prompt-field">
+        <span>Descreva a imagem</span>
+        <textarea id="imagePromptInput" rows="5" maxlength="1500" placeholder="Ex.: Uma casinha vermelha iluminada no centro, céu azul escuro, formas grandes e bem contrastadas."></textarea>
+      </label>
+      <p class="image-model-note">Será criada com GPT Image 1 · qualidade média · formato quadrado.</p>
+      <p class="form-status" id="imagePromptStatus" role="status" aria-live="polite"></p>
+      <div class="upload-actions">
+        <button class="button button-ghost" id="cancelImagePromptButton" type="button">Cancelar</button>
+        <button class="button button-primary" id="generateTrackImageButton" type="submit">Criar imagem</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="playback-dialog" id="playbackDialog" aria-labelledby="playbackDialogTitle">
+    <div class="playback-dialog-content">
+      <p class="eyebrow">REPRODUÇÃO</p>
+      <h2 id="playbackDialogTitle">O que deseja fazer?</h2>
+      <p class="playback-dialog-track" id="playbackDialogTrack"></p>
+      <div class="playback-dialog-actions">
+        <button class="playback-choice playback-choice-pause" id="pauseTrackButton" type="button">Pausar</button>
+        <button class="playback-choice playback-choice-stop" id="stopTrackButton" type="button">Stop</button>
+        <button class="playback-choice playback-choice-continue" id="continueTrackButton" type="button">Continuar</button>
+      </div>
+    </div>
+  </dialog>
+
   <audio id="audioPlayer" preload="metadata"></audio>
 
   <template id="trackTemplate">
     <article class="track-card" tabindex="0" role="button">
+      <figure class="track-cover" aria-hidden="true">
+        <img class="track-cover-image" alt="" draggable="false" hidden>
+        <span class="track-cover-fallback">♪</span>
+        <span class="track-cover-playing">▶</span>
+        <span class="track-cover-admin-hint">Segure para criar imagem</span>
+      </figure>
       <div class="track-number" aria-hidden="true"></div>
       <div class="track-main">
         <div class="track-title-row">

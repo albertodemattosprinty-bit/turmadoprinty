@@ -146,6 +146,7 @@ const MINI_MEDIA_IMAGE_MODELS = [
 const MINI_MEDIA_IMAGE_EDIT_MODEL_IDS = new Set(["gpt-image-1", "gpt-image-1-mini"]);
 const MAX_MINI_COURSE_COVER_BYTES = 15 * 1024 * 1024;
 const MIDIA_AUDIO_PREFIX = "midia/audio/";
+const MIDIA_IMAGE_PREFIX = "midia/images/";
 const MIDIA_ORDER_KEY = "midia/order.json";
 const MAX_MIDIA_TRACK_BYTES = 150 * 1024 * 1024;
 const MIDIA_UPLOAD_WINDOW_MS = 60 * 60 * 1000;
@@ -396,10 +397,19 @@ function getMidiaTrackTitleFromKey(key) {
   return normalizeMidiaTrackTitle(withoutPrefix.replace(/\.[^.]+$/, ""), "Musica");
 }
 
-function buildMidiaTrackPayload(item) {
+function getMidiaTrackImageKey(trackKey) {
+  const digest = crypto.createHash("sha256").update(String(trackKey || ""), "utf8").digest("hex");
+  return `${MIDIA_IMAGE_PREFIX}${digest}.webp`;
+}
+
+function buildMidiaTrackPayload(item, artworkByKey = new Map()) {
   const key = String(item?.Key || item?.key || "");
   const id = encodeMidiaTrackId(key);
   const extension = path.posix.extname(key).toLowerCase();
+  const artwork = artworkByKey.get(getMidiaTrackImageKey(key));
+  const artworkVersion = artwork?.LastModified instanceof Date
+    ? artwork.LastModified.getTime()
+    : Date.parse(String(artwork?.LastModified || ""));
   return {
     id,
     title: getMidiaTrackTitleFromKey(key),
@@ -409,28 +419,39 @@ function buildMidiaTrackPayload(item) {
       ? item.LastModified.toISOString()
       : String(item?.uploadedAt || ""),
     streamUrl: `/api/midia/tracks/${id}/audio`,
-    downloadUrl: `/api/midia/tracks/${id}/download`
+    downloadUrl: `/api/midia/tracks/${id}/download`,
+    imageUrl: artwork
+      ? `${buildPublicR2UrlFromKey(String(artwork.Key || ""))}?v=${Number.isFinite(artworkVersion) ? artworkVersion : Date.now()}`
+      : ""
   };
 }
 
 async function listMidiaTracks() {
-  const tracks = [];
-  let continuationToken;
-
-  do {
-    const result = await getR2Client().send(new ListObjectsV2Command({
-      Bucket: R2_BUCKET_NAME,
-      Prefix: MIDIA_AUDIO_PREFIX,
-      ContinuationToken: continuationToken
-    }));
-    for (const item of Array.isArray(result?.Contents) ? result.Contents : []) {
+  const listObjects = async (prefix) => {
+    const objects = [];
+    let continuationToken;
+    do {
+      const result = await getR2Client().send(new ListObjectsV2Command({
+        Bucket: R2_BUCKET_NAME,
+        Prefix: prefix,
+        ContinuationToken: continuationToken
+      }));
+      objects.push(...(Array.isArray(result?.Contents) ? result.Contents : []));
+      continuationToken = result?.IsTruncated ? result?.NextContinuationToken : undefined;
+    } while (continuationToken);
+    return objects;
+  };
+  const [audioObjects, artworkObjects] = await Promise.all([
+    listObjects(MIDIA_AUDIO_PREFIX),
+    listObjects(MIDIA_IMAGE_PREFIX)
+  ]);
+  const artworkByKey = new Map(artworkObjects.map((item) => [String(item?.Key || ""), item]));
+  const tracks = audioObjects
+    .filter((item) => {
       const key = String(item?.Key || "");
-      if (key && !key.endsWith("/") && getMidiaAudioFormat(key)) {
-        tracks.push(buildMidiaTrackPayload(item));
-      }
-    }
-    continuationToken = result?.IsTruncated ? result?.NextContinuationToken : undefined;
-  } while (continuationToken);
+      return key && !key.endsWith("/") && getMidiaAudioFormat(key);
+    })
+    .map((item) => buildMidiaTrackPayload(item, artworkByKey));
 
   const fallbackSortedTracks = tracks.sort((first, second) => {
     const dateDifference = Date.parse(first.uploadedAt || 0) - Date.parse(second.uploadedAt || 0);
@@ -2483,6 +2504,9 @@ function isProject200OnboardingRequestAllowed(request) {
     return true;
   }
   if (request.method === "POST" && pathname === "/api/midia/playback") {
+    return true;
+  }
+  if (request.method === "POST" && /^\/api\/midia\/tracks\/[^/]+\/image$/.test(pathname)) {
     return true;
   }
   if (pathname === "/api/200/onboarding" || pathname === "/api/200/onboarding/start") {
@@ -13582,6 +13606,102 @@ async function handleMidiaTracksList(response) {
   }
 }
 
+async function handleMidiaTrackImageGenerate(request, response, trackId) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) return;
+
+  const trackKey = decodeMidiaTrackId(trackId);
+  if (!trackKey || !getMidiaAudioFormat(trackKey)) {
+    sendJson(response, 404, { error: "Musica nao encontrada." });
+    return;
+  }
+
+  const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+  if (!apiKey) {
+    sendJson(response, 503, { error: "OPENAI_API_KEY nao configurada no backend." });
+    return;
+  }
+
+  try {
+    const body = await readJsonBody(request);
+    const userPrompt = String(body?.prompt || "").trim().slice(0, 1500);
+    if (userPrompt.length < 3) {
+      sendJson(response, 400, { error: "Descreva como a imagem dessa musica deve ser." });
+      return;
+    }
+
+    const tracks = await listMidiaTracks();
+    const track = tracks.find((item) => item.id === trackId);
+    if (!track) {
+      sendJson(response, 404, { error: "Musica nao encontrada." });
+      return;
+    }
+
+    const model = "gpt-image-1";
+    const prompt = [
+      `Crie uma imagem quadrada original para representar visualmente a musica "${track.title}".`,
+      `Direcao criativa dada pelo administrador: ${userPrompt}.`,
+      "A imagem sera reconhecida por uma pessoa com baixa visao, de longe, em um palco: use uma composicao simples, um assunto principal grande, silhueta clara, alto contraste e cores marcantes.",
+      "Evite detalhes pequenos e fundos visualmente confusos.",
+      "Nao inclua palavras, letras, numeros, logotipos ou marcas, a menos que a direcao criativa peca isso explicitamente.",
+      "Entregue somente a arte quadrada, sem moldura externa e sem mockup."
+    ].join(" ");
+    const openAiResponse = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        prompt,
+        size: "1024x1024",
+        quality: "medium",
+        output_format: "png",
+        n: 1
+      })
+    });
+    const openAiPayload = await openAiResponse.json().catch(() => ({}));
+    if (!openAiResponse.ok) {
+      sendJson(response, openAiResponse.status || 502, {
+        error: openAiPayload?.error?.message || "A OpenAI nao conseguiu gerar a imagem da musica."
+      });
+      return;
+    }
+
+    const generatedBase64 = String(openAiPayload?.data?.[0]?.b64_json || "").trim();
+    if (!generatedBase64) {
+      sendJson(response, 502, { error: "A OpenAI nao devolveu a imagem gerada." });
+      return;
+    }
+
+    const imageBuffer = await sharp(Buffer.from(generatedBase64, "base64"))
+      .resize({ width: 1024, height: 1024, fit: "cover" })
+      .webp({ quality: 86, effort: 5 })
+      .toBuffer();
+    const imageKey = getMidiaTrackImageKey(trackKey);
+    await getR2Client().send(new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: imageKey,
+      Body: imageBuffer,
+      ContentLength: imageBuffer.length,
+      ContentType: "image/webp",
+      CacheControl: "public, max-age=0, must-revalidate"
+    }));
+    const version = Date.now();
+    sendJson(response, 201, {
+      ok: true,
+      model,
+      track: {
+        ...track,
+        imageUrl: `${buildPublicR2UrlFromKey(imageKey)}?v=${version}`
+      },
+      feedback: `Imagem de "${track.title}" criada com GPT Image 1.`
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel criar a imagem da musica."
+    });
+  }
+}
+
 async function handleMidiaPlaybackUpdate(request, response) {
   const adminUser = await requireAdmin(request, response);
   if (!adminUser) return;
@@ -13787,6 +13907,12 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "PUT" && pathname === "/api/midia/tracks") {
     await handleMidiaTrackUpload(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && /^\/api\/midia\/tracks\/[^/]+\/image$/.test(pathname)) {
+    const trackId = decodeURIComponent(pathname.replace(/^\/api\/midia\/tracks\/([^/]+)\/image$/, "$1"));
+    await handleMidiaTrackImageGenerate(request, response, trackId);
     return;
   }
 
