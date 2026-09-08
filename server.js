@@ -63,14 +63,15 @@ import { createQuickUserAction, createUserAction, deleteUserAction, ensureAction
 import { clearProject200CurrentTaskState, getProject200CurrentTaskState, saveProject200CurrentTaskState } from "./src/project200-current-task-state.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
-import { addProject200ExerciseSeries, addProject200ExerciseToLibrary, createProject200NutritionEntry, createProject200WeightEntry, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, startProject200ExerciseSession, updateProject200ExerciseProgress, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
+import { addProject200ExerciseSeries, addProject200ExerciseToLibrary, approveProject200ExercisePlan, createProject200NutritionEntry, createProject200WeightEntry, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, startProject200ExerciseSession, updateProject200ExerciseProgress, updateProject200MealSlots, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, getProject200HistorySpan, listProject200History } from "./src/project200-history.js";
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicGlobalDefault, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
-import { buildProject200LaxKey, createProject200FinanceItem, deleteProject200FinanceItem, settleProject200FinanceOccurrence, summarizeProject200FinanceLedgerMonth, transferProject200LaxBalance, updateProject200FinanceItem } from "./src/project200-finance-ledger.js";
+import { buildProject200LaxKey, createProject200FinanceItem, deleteProject200FinanceItem, ensureProject200FinanceLedgerSchema, settleProject200FinanceOccurrence, summarizeProject200FinanceLedgerMonth, transferProject200LaxBalance, updateProject200FinanceItem } from "./src/project200-finance-ledger.js";
+import { createProject200FinancialGoal, listProject200FinancialGoals } from "./src/project200-financial-goals.js";
 import { createExtraGoal, createExtraGoalVariant, deleteExtraGoal, deleteExtraGoalVariant, deleteLatestExtraGoalProgressEvent, ensureExtraGoalsSchema, getExtraGoalById, getProject200ActiveTime, getProject200MissionInstallmentOrder, listExtraGoalProgressEvents, listExtraGoalsByScope, listExtraGoalVariants, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress, updateExtraGoalVariant, updateLatestExtraGoalProgressEvent, updateProject200ActiveTime, updateProject200MissionInstallmentOrder } from "./src/extra-goals.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName, updateProject200ProfileSvgIcon } from "./src/project200-profiles.js";
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
@@ -3730,6 +3731,12 @@ const PROJECT200_MARIN_ASPECT_IDS = new Set([
   "sono", "alimentacao", "hidratacao", "aprendizado", "trabalho", "casa",
   "exercicios", "social", "planejamento", "higiene", "lazer", "aspecto"
 ]);
+const PROJECT200_MARIN_MANUAL_ASPECT_IDS = new Set([...PROJECT200_MARIN_ASPECT_IDS].filter((id) => id !== "sono" && id !== "planejamento"));
+
+function normalizeProject200ManualAspectId(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return PROJECT200_MARIN_MANUAL_ASPECT_IDS.has(normalized) ? normalized : "trabalho";
+}
 
 const PROJECT200_MARIN_REPLY_SCHEMA = {
   type: "object",
@@ -4160,18 +4167,14 @@ function sanitizeProject200MarinProposals(rawProposals) {
       const startAt = new Date(raw?.startAt || "");
       const endAt = new Date(raw?.endAt || "");
       if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()) || endAt <= startAt) continue;
-      proposal.aspectId = PROJECT200_MARIN_ASPECT_IDS.has(String(raw?.aspectId || "").trim().toLowerCase())
-        ? String(raw.aspectId).trim().toLowerCase()
-        : "aspecto";
+      proposal.aspectId = normalizeProject200ManualAspectId(raw?.aspectId || "aspecto");
       proposal.startAt = startAt.toISOString();
       proposal.endAt = endAt.toISOString();
       proposal.durationMinutes = Math.max(1, Math.min(1440, Math.round((endAt - startAt) / 60000)));
     }
 
     if (type === "mission" || type === "limit") {
-      proposal.aspectId = PROJECT200_MARIN_ASPECT_IDS.has(String(raw?.aspectId || "").trim().toLowerCase())
-        ? String(raw.aspectId).trim().toLowerCase()
-        : "planejamento";
+      proposal.aspectId = normalizeProject200ManualAspectId(raw?.aspectId);
       proposal.targetValue = Math.max(1, Math.min(10000, Math.trunc(Number(raw?.targetValue) || 1)));
       proposal.unitDurationMinutes = type === "limit"
         ? 0
@@ -4376,10 +4379,10 @@ async function requestProject200MarinReply({ apiKey, user, profileName, personaK
     "- Nunca diga que ja gravou algo. Voce somente oferece cartoes; o usuario precisa tocar para confirmar.",
     "- Nao crie microtarefas de missoes.",
     "- Nao invente datas, horarios, valores ou duracoes. Se faltar dado obrigatorio, pergunte antes e retorne proposals vazio.",
-    "- Acoes usam apenas estes IDs de aspecto: alimentacao, hidratacao, aprendizado, trabalho, casa, exercicios, social, planejamento, higiene, lazer, aspecto. Sono nunca e atribuido a uma acao.",
+    "- Acoes usam apenas estes IDs de aspecto: alimentacao, hidratacao, aprendizado, trabalho, casa, exercicios, social, higiene, lazer, aspecto. Sono e planejamento/Financas nunca sao atribuidos a uma acao manual.",
     "- Quando criar missao, tarefa ou limite com repeticao, preencha scheduleConfig no modelo universal: frequency none/daily/weekly/monthly_custom/yearly/periodic; interval; intervalUnit day/week/month/year; weekDays 0=Dom a 6=Sab; monthlyMode day ou weekday; monthDay; monthlyOrdinalIndex 0=primeira, 1=segunda, 2=terceira, 3=quarta, 4=ultima; monthlyWeekdayIndex 0=Dom a 6=Sab; startsOn YYYY-MM-DD; endMode never/date/count; endsOn; count; notification com mode at_time/5m/10m/30m/1h/1d/custom, customAmount e customUnit minutes/hours/days.",
     "- Exemplos: diariamente use frequency daily, interval 1 e intervalUnit day. Toda segunda use weekly com weekDays [1]. Primeira segunda do mes use monthly_custom, intervalUnit month, monthlyMode weekday, monthlyOrdinalIndex 0, monthlyWeekdayIndex 1. Dia 15 do mes use monthlyMode day e monthDay 15.",
-    "- Ambiente mapeia para casa. Proposito usa planejamento. Familia usa aspecto e nunca social.",
+    "- Ambiente mapeia para casa. Proposito deixou de ser um aspecto; nao use planejamento para tarefas ou missoes manuais. Familia usa aspecto e nunca social.",
     "- Preserve sono, alimentacao, saude, seguranca, autonomia e limites fisicos. Disciplina nunca significa privacao perigosa.",
     "- Nao substitua orientacao medica, juridica ou financeira profissional.",
     "- Ao receber uma imagem, descreva e interprete somente o que estiver visivel. Diga quando algo nao puder ser confirmado.",
@@ -4453,22 +4456,25 @@ async function requestProject200MarinReply({ apiKey, user, profileName, personaK
 const PROJECT200_NUTRITION_ANALYSIS_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["description", "calories", "qualityScore", "feedback", "components"],
+  required: ["description", "calories", "qualityScore", "nutrients"],
   properties: {
     description: { type: "string" },
     calories: { type: "number", minimum: 0, maximum: 20000 },
     qualityScore: { type: "integer", minimum: 0, maximum: 100 },
-    feedback: { type: "string" },
-    components: {
+    nutrients: {
       type: "array",
-      maxItems: 12,
+      minItems: 8,
+      maxItems: 8,
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["name", "calories"],
+        required: ["key", "label", "value", "unit", "percent"],
         properties: {
-          name: { type: "string" },
-          calories: { type: "number", minimum: 0, maximum: 10000 }
+          key: { type: "string" },
+          label: { type: "string" },
+          value: { type: "number", minimum: 0, maximum: 100000 },
+          unit: { type: "string" },
+          percent: { type: "integer", minimum: 0, maximum: 100 }
         }
       }
     }
@@ -4482,13 +4488,12 @@ async function analyzeProject200NutritionWithLuna(apiKey, description) {
     body: JSON.stringify({
       model: PROJECT200_MARIN_MODEL_LUNA,
       instructions: [
-        "Voce e Luna, nutricionista virtual do iLife. Estime calorias com a maior precisao razoavel a partir das porcoes informadas.",
-        "Se a quantidade nao foi dada, use uma porcao brasileira comum e deixe claro no feedback que se trata de uma estimativa.",
-        "A nota qualityScore mede qualidade alimentar de 0 a 100, sem moralizar a pessoa.",
-        "Doces e refrigerantes comuns ficam proximos de 0. Coxinha fica por volta de 20 pelo frango. Misto quente fica por volta de 40 pelo pao e mussarela.",
-        "Alimentos naturais, pouco processados, variados e equilibrados puxam a nota para 100.",
-        "Considere preparo, acucar, fritura, fibra, proteina, frutas, legumes, verduras e nivel de processamento.",
-        "O feedback deve ter no maximo 260 caracteres, ser direto e util. Nao faca diagnostico nem prescricao medica. Responda em portugues do Brasil."
+        "Voce e Luna, a IA nutricional do iLife. Nao escreva relatorio, conselho ou diagnostico: devolva apenas os calculos estruturados.",
+        "Estime a refeicao descrita com porcoes brasileiras comuns quando a quantidade nao tiver sido informada.",
+        "A nota qualityScore mede o equilibrio nutricional percebido de 0 a 100, sem moralizar a pessoa.",
+        "A lista nutrients deve conter exatamente 8 itens, nesta ordem e com estas chaves/rotulos/unidades: calories/Calorias/kcal, carbohydrates/Carboidratos/g, proteins/Proteinas/g, sugars/Acucares/g, fats/Gorduras/g, fiber/Fibras/g, sodium/Sodio/mg, micronutrients/Micronutrientes/%.",
+        "Em percent, represente visualmente o quanto a refeicao oferece de cada elemento numa escala de 0 a 100; micronutrients usa value e unitagem em porcentagem.",
+        "Considere preparo, acucar, fritura, fibra, proteina, frutas, legumes, verduras e nivel de processamento. Responda em portugues do Brasil."
       ].join("\n"),
       input: String(description || "").trim().slice(0, 500),
       reasoning: { effort: "medium" },
@@ -4508,6 +4513,78 @@ async function analyzeProject200NutritionWithLuna(apiKey, description) {
   const parsed = await readApiResponse(openAiResponse);
   if (!openAiResponse.ok) throw new Error("Luna nao conseguiu analisar essa refeicao agora.");
   return parseProject200MarinReply(parsed.data);
+}
+
+const PROJECT200_EXERCISE_PLAN_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name", "summary", "exercises"],
+  properties: {
+    name: { type: "string" },
+    summary: { type: "string" },
+    exercises: {
+      type: "array",
+      minItems: 1,
+      maxItems: 24,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["exerciseId", "exerciseName", "category", "trackingType", "equipment", "targetSeries", "targetReps", "targetMinutes", "targetDistanceMeters"],
+        properties: {
+          exerciseId: { type: "string" },
+          exerciseName: { type: "string" },
+          category: { type: "string", enum: ["strength", "aerobic", "calisthenics"] },
+          trackingType: { type: "string", enum: ["series", "minutes", "gps"] },
+          equipment: { type: "string" },
+          targetSeries: { type: "integer", minimum: 0, maximum: 100 },
+          targetReps: { type: "integer", minimum: 0, maximum: 10000 },
+          targetMinutes: { type: "number", minimum: 0, maximum: 1440 },
+          targetDistanceMeters: { type: "integer", minimum: 0, maximum: 10000000 }
+        }
+      }
+    }
+  }
+};
+
+async function createProject200ExercisePlanWithAi(apiKey, description) {
+  const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: PROJECT200_MARIN_MODEL_LUNA,
+      instructions: [
+        "Voce e a IA de exercicios do iLife. Transforme o plano narrado pelo usuario em um pacote simples de exercicios para ele revisar.",
+        "Respeite objetivo, experiencia, equipamento, limites e disponibilidade mencionados. Nao diagnostique nem prescreva tratamento.",
+        "Use series para musculacao e calistenia; minutes para atividades por tempo; gps para caminhada, corrida ou bicicleta ao ar livre.",
+        "Para trackingType series preencha targetSeries e targetReps e zere os demais. Para minutes preencha targetMinutes. Para gps preencha targetDistanceMeters. Crie exerciseId curto, estavel, sem acentos e com prefixo ai-.",
+        "O resumo deve ser curto e deixar claro que o usuario precisa revisar e aprovar antes de usar. Responda em portugues do Brasil."
+      ].join("\n"),
+      input: String(description || "").trim().slice(0, 2000),
+      reasoning: { effort: "medium" },
+      text: { verbosity: "low", format: { type: "json_schema", name: "project200_exercise_plan", strict: true, schema: PROJECT200_EXERCISE_PLAN_SCHEMA } },
+      max_output_tokens: 1800,
+      store: false
+    })
+  });
+  const parsed = await readApiResponse(openAiResponse);
+  if (!openAiResponse.ok) throw new Error("A IA não conseguiu montar o plano de exercícios agora.");
+  return parseProject200MarinReply(parsed.data);
+}
+
+async function handleProject200ExercisePlanRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const body = await readJsonBody(request);
+    const description = String(body?.description || "").trim();
+    if (description.length < 8) throw new Error("Conte um pouco sobre o plano de exercícios que deseja.");
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error("OPENAI_API_KEY nao configurada no backend.");
+    const plan = await createProject200ExercisePlanWithAi(apiKey, description);
+    sendJson(response, 200, { ok: true, plan });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível montar o plano." });
+  }
 }
 
 async function handleProject200NutritionAnalyzeRequest(request, response) {
@@ -4533,8 +4610,9 @@ async function handleProject200NutritionAnalyzeRequest(request, response) {
       description: String(analysis?.description || description).trim() || description,
       calories: analysis?.calories,
       qualityScore: analysis?.qualityScore,
-      feedback: analysis?.feedback,
-      components: analysis?.components,
+      feedback: "",
+      nutrients: analysis?.nutrients,
+      mealSlot: body?.mealSlot,
       consumedAt
     });
     const dashboard = await getProject200WellnessDashboard(user.id, body?.profile || PROJECT200_DEFAULT_PROFILE_NAME);
@@ -5037,7 +5115,7 @@ async function handleProject200MarinProposalApplyRequest(request, response, mess
       const actions = await createUserAction(user.id, {
         title: proposal.title,
         assignee: profileName,
-        categoryId: proposal.aspectId || "planejamento",
+        categoryId: normalizeProject200ManualAspectId(proposal.aspectId),
         repeatRule: "none",
         repeatDays: [],
         occurrences: [{ startAt: proposal.startAt, endAt: proposal.endAt }]
@@ -5046,7 +5124,7 @@ async function handleProject200MarinProposalApplyRequest(request, response, mess
     } else if (proposal.type === "mission" || proposal.type === "limit") {
       const goals = await createExtraGoal(user.id, profileName, {
         title: proposal.title,
-        categoryId: proposal.aspectId || proposal.categoryId || "planejamento",
+        categoryId: normalizeProject200ManualAspectId(proposal.aspectId || proposal.categoryId),
         goalKind: proposal.type === "limit" ? "limit" : "goal",
         targetValue: proposal.targetValue,
         unitDurationSeconds: proposal.unitDurationSeconds,
@@ -5172,7 +5250,7 @@ async function applyProject200TutorProposalEntity(userId, profileName, proposal)
     const actions = await createUserAction(userId, {
       title: proposal.title,
       assignee: profileName,
-      categoryId: proposal.aspectId || "planejamento",
+      categoryId: normalizeProject200ManualAspectId(proposal.aspectId),
       svgIconUrl: proposal.svgIconUrl || "",
       svgIconLabel: proposal.svgIconLabel || "",
       repeatRule: proposal.repeatRule || "none",
@@ -5184,7 +5262,7 @@ async function applyProject200TutorProposalEntity(userId, profileName, proposal)
   if (proposal.type === "mission") {
     const goals = await createExtraGoal(userId, profileName, {
       title: proposal.title,
-      categoryId: proposal.aspectId || proposal.categoryId || "planejamento",
+      categoryId: normalizeProject200ManualAspectId(proposal.aspectId || proposal.categoryId),
       targetValue: proposal.targetValue,
       unitDurationSeconds: proposal.unitDurationSeconds,
       unitDurationMinutes: proposal.unitDurationMinutes,
@@ -5762,12 +5840,12 @@ const PROJECT200_TASK_CATEGORIES = [
   { aspectId: "20000000-0000-4000-8000-000000000006", id: "casa", name: "Casa" },
   { aspectId: "20000000-0000-4000-8000-000000000007", id: "exercicios", name: "Exercícios" },
   { aspectId: "20000000-0000-4000-8000-000000000008", id: "social", name: "Social" },
-  { aspectId: "20000000-0000-4000-8000-000000000009", id: "planejamento", name: "Propósito" },
+  { aspectId: "20000000-0000-4000-8000-000000000009", id: "planejamento", name: "Finanças" },
   { aspectId: "20000000-0000-4000-8000-000000000010", id: "higiene", name: "Higiene" },
   { aspectId: "20000000-0000-4000-8000-000000000011", id: "lazer", name: "Lazer" },
   { aspectId: "20000000-0000-4000-8000-000000000012", id: "aspecto", name: "Família" }
 ];
-const PROJECT200_TASK_ASSIGNABLE_CATEGORIES = PROJECT200_TASK_CATEGORIES.filter((item) => item.id !== "sono");
+const PROJECT200_TASK_ASSIGNABLE_CATEGORIES = PROJECT200_TASK_CATEGORIES.filter((item) => item.id !== "sono" && item.id !== "planejamento");
 
 function inferProject200CategoryLocally(title) {
   const normalized = String(title || "")
@@ -5775,7 +5853,7 @@ function inferProject200CategoryLocally(title) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
   const pick = (id) => PROJECT200_TASK_ASSIGNABLE_CATEGORIES.find((item) => item.id === id)
-    || PROJECT200_TASK_ASSIGNABLE_CATEGORIES.find((item) => item.id === "planejamento");
+    || PROJECT200_TASK_ASSIGNABLE_CATEGORIES.find((item) => item.id === "trabalho");
   if (/\b(agua|hidrata|garrafa|beber|sede)\b/.test(normalized)) return pick("hidratacao");
   if (/\b(cafe|almoco|jantar|comida|comer|refeicao|lanche|cozinhar|aliment)\b/.test(normalized)) return pick("alimentacao");
   if (/\b(estudar|estudo|ler|leitura|curso|aula|escola|revisao|aprender|habilidade|treinar idioma|praticar idioma)\b/.test(normalized)) return pick("aprendizado");
@@ -5786,8 +5864,9 @@ function inferProject200CategoryLocally(title) {
   if (/\b(treino|academia|corrida|caminhada|alongamento|exercicio|flexao|agachamento|esporte)\b/.test(normalized)) return pick("exercicios");
   if (/\b(amigo|amizade|social|evento|encontro|whatsapp|mensagem|responder|visitar pessoas)\b/.test(normalized)) return pick("social");
   if (/\b(filme|serie|jogo|lazer|passeio|diversao|hobby|descansar)\b/.test(normalized)) return pick("lazer");
-  if (/\b(igreja|orar|oracao|meditar|meditacao|atencao plena|mindfulness|voluntari|acao social|proposito|espiritual|planejar|planejamento|agenda|meta|dormir|sono|cochilo)\b/.test(normalized)) return pick("planejamento");
-  return pick("planejamento");
+  if (/\b(igreja|orar|oracao|meditar|meditacao|atencao plena|mindfulness|voluntari|acao social|proposito|espiritual)\b/.test(normalized)) return pick("aspecto");
+  if (/\b(planejar|planejamento|agenda|meta|dormir|sono|cochilo)\b/.test(normalized)) return pick("trabalho");
+  return pick("trabalho");
 }
 async function suggestProject200SvgAsset(text, options = {}) {
   const input = String(text || "").trim();
@@ -5881,7 +5960,7 @@ async function handleProject200ActionCategorize(request, response) {
       messages: [
         {
           role: "system",
-          content: `Classifique o título em exatamente UM aspecto permitido e responda somente JSON: {"categoryId":"...","categoryName":"..."}. Sono é proibido para tarefas. Regras: alimentação cobre qualquer ação de comer; hidratação cobre beber água; aprendizado cobre escola, cursos e habilidades; trabalho cobre atividades profissionais; casa cobre ambiente, arrumação e manutenção; exercícios cobre atividade física; social cobre amigos, mensagens e encontros, nunca família; propósito cobre igreja, oração, meditação, atenção plena, ação social e o que transcende as outras categorias; higiene cobre banheiro, banho, rosto, dentes, unhas, barba e roupas; lazer cobre diversão; família cobre somente relações familiares. Aspectos permitidos: ${PROJECT200_TASK_ASSIGNABLE_CATEGORIES.map((c) => `${c.id}=${c.name}`).join("; ")}.`
+          content: `Classifique o título em exatamente UM aspecto permitido e responda somente JSON: {"categoryId":"...","categoryName":"..."}. Sono e Finanças são nativos e proibidos para tarefas manuais. Regras: alimentação cobre qualquer ação de comer; hidratação cobre beber água; aprendizado cobre escola, cursos e habilidades; trabalho cobre atividades profissionais e organização sem categoria própria; casa cobre ambiente, arrumação e manutenção; exercícios cobre atividade física; social cobre amigos, mensagens e encontros, nunca família; higiene cobre banheiro, banho, rosto, dentes, unhas, barba e roupas; lazer cobre diversão; família cobre somente relações familiares. Aspectos permitidos: ${PROJECT200_TASK_ASSIGNABLE_CATEGORIES.map((c) => `${c.id}=${c.name}`).join("; ")}.`
         },
         { role: "user", content: title.slice(0, 180) }
       ]
@@ -13951,6 +14030,33 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && pathname === "/api/200/finance/goals") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      await ensureProject200FinanceLedgerSchema();
+      const goals = await listProject200FinancialGoals(user.id, requestUrl.searchParams.get("profile") || PROJECT200_DEFAULT_PROFILE_NAME);
+      sendJson(response, 200, { ok: true, goals });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível carregar as metas financeiras." });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/finance/goals") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      await ensureProject200FinanceLedgerSchema();
+      const body = await readJsonBody(request);
+      const goal = await createProject200FinancialGoal(user.id, { ...body, profileName: body?.profile || PROJECT200_DEFAULT_PROFILE_NAME });
+      sendJson(response, 201, { ok: true, goal });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível salvar a meta financeira." });
+    }
+    return;
+  }
+
   if (request.method === "POST" && pathname === "/api/200/finance/lax-transfer") {
     try {
       const user = await requireAuth(request, response);
@@ -15815,6 +15921,41 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/200/nutrition/analyze") {
     await handleProject200NutritionAnalyzeRequest(request, response);
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname === "/api/200/nutrition/meal-slots") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const mealSlots = await updateProject200MealSlots(user.id, { profileName: body?.profile || PROJECT200_DEFAULT_PROFILE_NAME, mealSlots: body?.mealSlots });
+      const dashboard = await getProject200WellnessDashboard(user.id, body?.profile || PROJECT200_DEFAULT_PROFILE_NAME);
+      sendJson(response, 200, { ok: true, mealSlots, dashboard });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível configurar as refeições." });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/exercises/plan") {
+    await handleProject200ExercisePlanRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/exercises/plan/approve") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const approval = String(body?.approval || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+      if (approval !== "aprovar") throw new Error('Digite "Aprovar" para confirmar o pacote de exercícios.');
+      const exercises = await approveProject200ExercisePlan(user.id, { profileName: body?.profile || PROJECT200_DEFAULT_PROFILE_NAME, exercises: body?.exercises });
+      const dashboard = await getProject200WellnessDashboard(user.id, body?.profile || PROJECT200_DEFAULT_PROFILE_NAME);
+      sendJson(response, 201, { ok: true, exercises, dashboard });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível aprovar o plano." });
+    }
     return;
   }
 

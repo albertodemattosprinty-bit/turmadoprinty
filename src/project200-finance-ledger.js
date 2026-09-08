@@ -1,6 +1,7 @@
 ﻿import { query } from "./db.js";
 
 import { db } from "./db.js";
+import { assertProject200FinancialGoal, ensureProject200FinancialGoalsSchema } from "./project200-financial-goals.js";
 
 const ITEM_KINDS = new Set(["INCOME", "EXPENSE"]);
 const SETTLEMENT_TYPES = new Set(["CASH", "FUTURE"]);
@@ -203,8 +204,6 @@ function normalizeItemRow(row) {
     category: row.category || "Outros",
     kind: row.kind,
     amountCents: Number(row.amount_cents || 0),
-    accountName: row.account_name || "Conta principal",
-    category: row.category || "Outros",
     settlementType: row.settlement_type,
     scheduleMode: row.schedule_mode,
     scheduleFrequency: row.schedule_frequency,
@@ -212,11 +211,14 @@ function normalizeItemRow(row) {
     startsOn: toDateOnly(row.starts_on),
     endsOn: toDateOnly(row.ends_on),
     valueMode: row.value_mode || row.schedule_config?.valueMode || "FIXED",
+    financialGoalId: row.financial_goal_id ? String(row.financial_goal_id) : null,
+    financialGoalName: String(row.financial_goal_name || ""),
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : null
   };
 }
 
 export async function ensureProject200FinanceLedgerSchema() {
+  await ensureProject200FinancialGoalsSchema();
   await query(`
     create table if not exists project200_finance_items (
       id uuid primary key default gen_random_uuid(),
@@ -240,6 +242,7 @@ export async function ensureProject200FinanceLedgerSchema() {
   await query("alter table project200_finance_items add column if not exists account_name text not null default 'Conta principal';");
   await query("alter table project200_finance_items add column if not exists category text not null default 'Outros';");
   await query("alter table project200_finance_items add column if not exists value_mode text not null default 'FIXED';");
+  await query("alter table project200_finance_items add column if not exists financial_goal_id uuid references project200_financial_goals(id) on delete set null;");
   await query("create index if not exists idx_project200_finance_items_user_dates on project200_finance_items(user_id, starts_on, ends_on) where deleted_at is null;");
   await query("create index if not exists idx_project200_finance_items_user_category on project200_finance_items(user_id, category) where deleted_at is null;");
   await query(`
@@ -306,14 +309,15 @@ export async function createProject200FinanceItem(userId, payload) {
   const accountName = normalizeShortText(payload?.accountName, "Conta principal", 80);
   const category = normalizeShortText(payload?.category, "Outros", 80);
   const valueMode = normalizeEnum(payload?.valueMode || payload?.scheduleConfig?.valueMode || "FIXED", VALUE_MODES, "Tipo de valor");
+  const financialGoalId = kind === "INCOME" ? await assertProject200FinancialGoal(userId, payload?.financialGoalId) : null;
 
   const result = await query(`
     insert into project200_finance_items (
       user_id, title, kind, amount_cents, account_name, category, settlement_type, schedule_mode,
-      schedule_frequency, schedule_config, starts_on, ends_on, value_mode
-    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::date,$12::date,$13)
+      schedule_frequency, schedule_config, starts_on, ends_on, value_mode, financial_goal_id
+    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::date,$12::date,$13,$14)
     returning *
-  `, [userId, title, kind, amountCents, accountName, category, settlementType, scheduleMode, scheduleFrequency, JSON.stringify({ ...scheduleConfig, valueMode }), startsOn, endsOn, valueMode]);
+  `, [userId, title, kind, amountCents, accountName, category, settlementType, scheduleMode, scheduleFrequency, JSON.stringify({ ...scheduleConfig, valueMode }), startsOn, endsOn, valueMode, financialGoalId]);
 
   const item = normalizeItemRow(result.rows[0]);
   if (scheduleMode === "ONCE") {
@@ -360,6 +364,7 @@ export async function updateProject200FinanceItem(userId, itemId, payload) {
   const accountName = normalizeShortText(payload?.accountName, "Conta principal", 80);
   const category = normalizeShortText(payload?.category, "Outros", 80);
   const valueMode = normalizeEnum(payload?.valueMode || payload?.scheduleConfig?.valueMode || "FIXED", VALUE_MODES, "Tipo de valor");
+  const financialGoalId = kind === "INCOME" ? await assertProject200FinancialGoal(userId, payload?.financialGoalId) : null;
 
   const result = await query(`
     update project200_finance_items
@@ -375,10 +380,11 @@ export async function updateProject200FinanceItem(userId, itemId, payload) {
            starts_on = $12::date,
            ends_on = $13::date,
            value_mode = $14,
+           financial_goal_id = $15,
            updated_at = now()
      where user_id = $1 and id = $2 and deleted_at is null
      returning *
-  `, [userId, id, title, kind, amountCents, accountName, category, settlementType, scheduleMode, scheduleFrequency, JSON.stringify({ ...scheduleConfig, valueMode }), startsOn, endsOn, valueMode]);
+  `, [userId, id, title, kind, amountCents, accountName, category, settlementType, scheduleMode, scheduleFrequency, JSON.stringify({ ...scheduleConfig, valueMode }), startsOn, endsOn, valueMode, financialGoalId]);
   if (!result.rowCount) throw new Error("Lancamento nao encontrado.");
 
   await query("delete from project200_finance_occurrences where user_id = $1 and item_id = $2", [userId, id]);
@@ -394,7 +400,7 @@ export async function settleProject200FinanceOccurrence(userId, occurrenceId, pa
   const id = String(occurrenceId || "").trim();
   if (!id) throw new Error("Movimentacao invalida.");
   const result = await query(`
-    select o.*, i.title, i.account_name, i.category
+    select o.*, i.title, i.account_name, i.category, i.financial_goal_id
       from project200_finance_occurrences o
       join project200_finance_items i on i.id = o.item_id
      where o.user_id = $1 and o.id = $2 and o.status = 'SCHEDULED' and i.deleted_at is null
@@ -420,6 +426,7 @@ export async function settleProject200FinanceOccurrence(userId, occurrenceId, pa
       amountCents: remainderCents,
       accountName: row.account_name || "Conta principal",
       category: row.category || "Outros",
+      financialGoalId: row.financial_goal_id || null,
       settlementType: "FUTURE",
       valueMode: payload.valueMode || "VARIABLE",
       scheduleMode: "ONCE",
@@ -474,11 +481,12 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
   await materializeRange(userId, rangeStart, rangeEnd);
 
   const occurrencesResult = await query(`
-    select o.id, o.item_id, i.title, i.account_name, i.category, o.kind, o.amount_cents, o.due_on, o.status,
+    select o.id, o.item_id, i.title, i.account_name, i.category, i.financial_goal_id, goal.name as financial_goal_name, o.kind, o.amount_cents, o.due_on, o.status,
            i.settlement_type, i.schedule_mode, i.schedule_frequency, i.schedule_config, i.value_mode,
            t.id as lax_transfer_id
     from project200_finance_occurrences o
     join project200_finance_items i on i.id = o.item_id
+    left join project200_financial_goals goal on goal.id=i.financial_goal_id
     left join project200_lax_transfers t on i.id = t.sender_item_id or i.id = t.recipient_item_id
     where o.user_id = $1 and o.due_on between $2::date and $3::date and o.status <> 'CANCELLED'
     order by o.due_on asc, o.created_at asc
@@ -489,6 +497,8 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
     title: row.title,
     accountName: row.account_name || "Conta principal",
     category: row.category || "Outros",
+    financialGoalId: row.financial_goal_id ? String(row.financial_goal_id) : null,
+    financialGoalName: String(row.financial_goal_name || ""),
     kind: row.kind,
     amountCents: Number(row.amount_cents || 0),
     dueOn: toDateOnly(row.due_on),
@@ -504,10 +514,11 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
   const attentionEnd = getProject200AttentionEndKey(today);
   await materializeRange(userId, today, attentionEnd);
   const attentionResult = await query(`
-    select o.id, o.item_id, i.title, i.account_name, i.category, o.kind, o.amount_cents, o.due_on, o.status,
+    select o.id, o.item_id, i.title, i.account_name, i.category, i.financial_goal_id, goal.name as financial_goal_name, o.kind, o.amount_cents, o.due_on, o.status,
            i.settlement_type, i.schedule_mode, i.schedule_frequency, i.schedule_config, i.value_mode
     from project200_finance_occurrences o
     join project200_finance_items i on i.id = o.item_id
+    left join project200_financial_goals goal on goal.id=i.financial_goal_id
     where o.user_id = $1
       and o.due_on between $2::date and $3::date
       and o.status = 'SCHEDULED'
@@ -520,6 +531,8 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
     title: row.title,
     accountName: row.account_name || "Conta principal",
     category: row.category || "Outros",
+    financialGoalId: row.financial_goal_id ? String(row.financial_goal_id) : null,
+    financialGoalName: String(row.financial_goal_name || ""),
     kind: row.kind,
     amountCents: Number(row.amount_cents || 0),
     dueOn: toDateOnly(row.due_on),

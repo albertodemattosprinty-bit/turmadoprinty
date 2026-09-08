@@ -200,7 +200,7 @@ export function initializeProject200MarinUi(dependencies = {}) {
     casa: "/200/aspect-icons/casa.svg",
     exercicios: "/200/aspect-icons/exercicios.svg",
     social: "/200/aspect-icons/social.svg",
-    planejamento: "/200/aspect-icons/proposito.svg",
+    planejamento: "/200/icons/financas.svg",
     higiene: "/200/aspect-icons/higiene.svg",
     lazer: "/200/aspect-icons/lazer.svg",
     aspecto: "/200/aspect-icons/familia.svg"

@@ -119,6 +119,7 @@ const EXERCISE_CATEGORIES = [
 const EXERCISES = [...strengthExercises, ...fatLossExercises, ...calisthenicsExercises];
 
 const byId = (id) => document.getElementById(id);
+const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g,(character)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[character]);
 const modal = byId("wellnessModal");
 const elements = {
   title:byId("wellnessTitle"), headerIcon:byId("wellnessHeaderIcon"), calories:byId("wellnessCaloriesToday"), quality:byId("wellnessQualityToday"),
@@ -140,9 +141,11 @@ const elements = {
   weightCurrent:byId("wellnessWeightCurrent"), bmiSummary:byId("wellnessBmiSummary"), bmiMarker:byId("wellnessBmiMarker"), weightLayer:byId("wellnessWeightLayer"),
   weightModalCurrent:byId("wellnessWeightModalCurrent"), bmiValue:byId("wellnessBmiValue"), bmiModalMarker:byId("wellnessBmiModalMarker"), weightForm:byId("wellnessWeightForm"),
   heightInput:byId("wellnessHeightInput"), weightInput:byId("wellnessWeightInput"), weightHistory:byId("wellnessWeightHistory")
+  ,mealConfigLayer:byId("wellnessMealConfigLayer"), mealConfigList:byId("wellnessMealConfigList"), mealConfigStatus:byId("wellnessMealConfigStatus"), mealAddLayer:byId("wellnessMealAddLayer"), mealAddTitle:byId("wellnessMealAddTitle"), mealAddStatus:byId("wellnessMealAddStatus"), foodMic:byId("wellnessFoodMic")
+  ,aiPlanLayer:byId("wellnessAiPlanLayer"), aiPlanInput:byId("wellnessAiPlanInput"), aiPlanMic:byId("wellnessAiPlanMic"), aiPlanCreate:byId("wellnessAiPlanCreate"), aiPlanReview:byId("wellnessAiPlanReview"), aiApprovalWrap:byId("wellnessAiApprovalWrap"), aiApprovalInput:byId("wellnessAiApprovalInput"), aiPlanApprove:byId("wellnessAiPlanApprove"), aiPlanStatus:byId("wellnessAiPlanStatus")
 };
-const phaseLayers = [elements.catalogLayer,elements.detail,elements.goalLayer,elements.workoutLayer,elements.repsLayer,elements.finishLayer,elements.weightLayer].filter(Boolean);
-const state = { tab:"nutrition", filter:"strength", dashboard:null, selectedExercise:null, detailMode:"selected", workout:null, steps:0, lastStepAt:0, motionListening:false, saveTimer:null, ticker:null, pendingMeal:"", gpsWatchId:null, gpsProvider:"", gpsLastPoint:null, gpsDistanceMeters:0, gpsAccuracy:null, gpsStatus:"GPS aguardando localização", gpsPlugin:null, seriesRepsDraft:null };
+const phaseLayers = [elements.catalogLayer,elements.detail,elements.goalLayer,elements.workoutLayer,elements.repsLayer,elements.finishLayer,elements.weightLayer,elements.mealConfigLayer,elements.mealAddLayer,elements.aiPlanLayer].filter(Boolean);
+const state = { tab:"nutrition", filter:"strength", dashboard:null, selectedExercise:null, detailMode:"selected", workout:null, steps:0, lastStepAt:0, motionListening:false, saveTimer:null, ticker:null, pendingMeal:"", selectedMealSlot:"", gpsWatchId:null, gpsProvider:"", gpsLastPoint:null, gpsDistanceMeters:0, gpsAccuracy:null, gpsStatus:"GPS aguardando localização", gpsPlugin:null, seriesRepsDraft:null, aiPlan:null, voiceRecorder:null, voiceStream:null, voiceTarget:null };
 function profileName(){ return String(window.localStorage.getItem(PROFILE_KEY)||document.body.dataset.profile||"Usuario").trim()||"Usuario"; }
 async function apiRequest(path,options={}){
   const headers={...(options.headers||{})};
@@ -166,22 +169,88 @@ function readOfflineWorkouts(){ try{ const value=JSON.parse(localStorage.getItem
 function writeOfflineWorkouts(items){ try{ localStorage.setItem(offlineWorkoutsKey(),JSON.stringify(items)); }catch{} }
 function isOfflineWorkout(workout=state.workout){ return String(workout?.id||"").startsWith("offline-"); }
 function cacheDashboard(){ if(!state.dashboard)return; window.Project200Offline?.put?.(dashboardPath(),{dashboard:state.dashboard}); }
-function persistOfflineWorkout(workout,extra={}){ const items=readOfflineWorkouts(),id=String(workout?.id||""); const index=items.findIndex((item)=>String(item?.localId||"")===id); const previous=index>=0?items[index]:{}; const next={...previous,...extra,localId:id,workout:{...workout,series:Array.isArray(workout?.series)?workout.series:[]},updatedAt:Date.now()}; if(index>=0)items[index]=next; else items.push(next); writeOfflineWorkouts(items); return next; }
+function persistOfflineWorkout(workout,extra={}){
+  const items=readOfflineWorkouts(), id=String(workout?.id||"");
+  const index=items.findIndex((item)=>String(item?.localId||"")===id);
+  const previous=index>=0?items[index]:{};
+  const next={...previous,...extra,localId:id,workout:{...workout,series:Array.isArray(workout?.series)?workout.series:[]},updatedAt:Date.now()};
+  if(index>=0)items[index]=next; else items.push(next);
+  writeOfflineWorkouts(items);
+  return next;
+}
 function removeOfflineWorkout(localId){ writeOfflineWorkouts(readOfflineWorkouts().filter((item)=>String(item?.localId||"")!==String(localId||""))); }
-function createOfflineWorkout(exercise,goals){ const id=`offline-${Date.now()}-${Math.random().toString(36).slice(2)}`; return {id,profileName:profileName(),exerciseId:exercise.id,exerciseName:exercise.name,category:exercise.category,trackingType:exercise.tracking,equipment:exercise.equipment,targetSeries:goals.targetSeries,targetReps:goals.targetReps,targetMinutes:goals.targetMinutes,targetDistanceMeters:goals.targetDistanceMeters,steps:0,distanceMeters:0,durationMinutes:0,seriesCount:0,totalReps:0,series:[],startedAt:new Date().toISOString(),offline:true}; }
-function activateOfflineWorkout(workout,startPayload){ state.dashboard=state.dashboard||{}; state.dashboard.activeWorkout=workout; state.workout=workout; state.seriesRepsDraft=null; state.steps=Number(workout.steps||0); state.gpsDistanceMeters=Number(workout.distanceMeters||0); persistOfflineWorkout(workout,{startPayload,finished:false,syncedSeriesCount:0}); cacheDashboard(); window.dispatchEvent(new CustomEvent("project200:offline-queued",{detail:{path:"/api/200/exercises/start"}})); }
-async function syncOfflineWorkouts(){ if(navigator.onLine===false)return; if(offlineWorkoutSyncPromise)return offlineWorkoutSyncPromise; const run=async()=>{ const items=readOfflineWorkouts(); for(const original of items){ let item={...original}; try{ let serverWorkout=null; if(!item.serverId){ const started=await apiRequest("/api/200/exercises/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(item.startPayload||{}),forceNetwork:true}); serverWorkout=started.workout; item.serverId=String(serverWorkout?.id||""); if(!item.serverId)throw new Error("Treino offline sem identificador no servidor."); persistOfflineWorkout(item.workout,item); } const series=Array.isArray(item.workout?.series)?item.workout.series:[]; for(let index=Number(item.syncedSeriesCount||0);index<series.length;index+=1){ const result=await apiRequest(`/api/200/exercises/${encodeURIComponent(item.serverId)}/series`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({repetitions:Number(series[index]?.repetitions||0),targetRepetitions:Number(item.workout?.targetReps||0)}),forceNetwork:true}); serverWorkout=result.workout||serverWorkout; item.syncedSeriesCount=index+1; persistOfflineWorkout(item.workout,item); } if(item.workout?.trackingType!=="series"){ const result=await apiRequest(`/api/200/exercises/${encodeURIComponent(item.serverId)}/progress`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({steps:Number(item.workout?.steps||0),distanceMeters:Number(item.workout?.distanceMeters||0),durationMinutes:Number(item.workout?.durationMinutes||0)}),forceNetwork:true}); serverWorkout=result.workout||serverWorkout; } if(item.finished){ await apiRequest(`/api/200/exercises/${encodeURIComponent(item.serverId)}/finish`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(item.finishPayload||{}),forceNetwork:true}); }else if(String(state.workout?.id||"")===String(item.localId||"")){ state.workout=serverWorkout||{...item.workout,id:item.serverId,offline:false}; state.dashboard={...(state.dashboard||{}),activeWorkout:state.workout}; } removeOfflineWorkout(item.localId); window.Project200Offline?.invalidate?.(["/api/200/wellness"]); }catch{ break; } } if(!readOfflineWorkouts().length){ await loadDashboard(); } }; const pending=window.Project200Offline?.activity?window.Project200Offline.activity(run):run(); offlineWorkoutSyncPromise=Promise.resolve(pending).finally(()=>{offlineWorkoutSyncPromise=null;}); return offlineWorkoutSyncPromise; }
+function createOfflineWorkout(exercise,goals){
+  const id=`offline-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return {id,profileName:profileName(),exerciseId:exercise.id,exerciseName:exercise.name,category:exercise.category,trackingType:exercise.tracking,equipment:exercise.equipment,targetSeries:goals.targetSeries,targetReps:goals.targetReps,targetMinutes:goals.targetMinutes,targetDistanceMeters:goals.targetDistanceMeters,steps:0,distanceMeters:0,durationMinutes:0,seriesCount:0,totalReps:0,series:[],startedAt:new Date().toISOString(),offline:true};
+}
+function activateOfflineWorkout(workout,startPayload){
+  state.dashboard=state.dashboard||{};
+  state.dashboard.activeWorkout=workout;
+  state.workout=workout;
+  state.seriesRepsDraft=null;
+  state.steps=Number(workout.steps||0);
+  state.gpsDistanceMeters=Number(workout.distanceMeters||0);
+  persistOfflineWorkout(workout,{startPayload,finished:false,syncedSeriesCount:0});
+  cacheDashboard();
+  window.dispatchEvent(new CustomEvent("project200:offline-queued",{detail:{path:"/api/200/exercises/start"}}));
+}
+async function syncOfflineWorkouts(){
+  if(navigator.onLine===false)return;
+  if(offlineWorkoutSyncPromise)return offlineWorkoutSyncPromise;
+  const run=async()=>{
+    const items=readOfflineWorkouts();
+    for(const original of items){
+      let item={...original};
+      try{
+        let serverWorkout=null;
+        if(!item.serverId){
+          const started=await apiRequest("/api/200/exercises/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(item.startPayload||{}),forceNetwork:true});
+          serverWorkout=started.workout;
+          item.serverId=String(serverWorkout?.id||"");
+          if(!item.serverId)throw new Error("Treino offline sem identificador no servidor.");
+          persistOfflineWorkout(item.workout,item);
+        }
+        const series=Array.isArray(item.workout?.series)?item.workout.series:[];
+        for(let index=Number(item.syncedSeriesCount||0);index<series.length;index+=1){
+          const result=await apiRequest(`/api/200/exercises/${encodeURIComponent(item.serverId)}/series`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({repetitions:Number(series[index]?.repetitions||0),targetRepetitions:Number(item.workout?.targetReps||0)}),forceNetwork:true});
+          serverWorkout=result.workout||serverWorkout;
+          item.syncedSeriesCount=index+1;
+          persistOfflineWorkout(item.workout,item);
+        }
+        if(item.workout?.trackingType!=="series"){
+          const result=await apiRequest(`/api/200/exercises/${encodeURIComponent(item.serverId)}/progress`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({steps:Number(item.workout?.steps||0),distanceMeters:Number(item.workout?.distanceMeters||0),durationMinutes:Number(item.workout?.durationMinutes||0)}),forceNetwork:true});
+          serverWorkout=result.workout||serverWorkout;
+        }
+        if(item.finished){
+          await apiRequest(`/api/200/exercises/${encodeURIComponent(item.serverId)}/finish`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(item.finishPayload||{}),forceNetwork:true});
+        }else if(String(state.workout?.id||"")===String(item.localId||"")){
+          state.workout=serverWorkout||{...item.workout,id:item.serverId,offline:false};
+          state.dashboard={...(state.dashboard||{}),activeWorkout:state.workout};
+        }
+        removeOfflineWorkout(item.localId);
+        window.Project200Offline?.invalidate?.(["/api/200/wellness"]);
+      }catch{ break; }
+    }
+    if(!readOfflineWorkouts().length){ await loadDashboard(); }
+  };
+  const pending=window.Project200Offline?.activity?window.Project200Offline.activity(run):run();
+  offlineWorkoutSyncPromise=Promise.resolve(pending).finally(()=>{offlineWorkoutSyncPromise=null;});
+  return offlineWorkoutSyncPromise;
+}
 function showLayer(layer){ phaseLayers.forEach((item)=>{ item.hidden=item!==layer; }); }
-function hideLayers(){ phaseLayers.forEach((item)=>{ item.hidden=true; }); }
+function stopWellnessVoice(){
+  if(state.voiceRecorder&&state.voiceRecorder.state!=="inactive")state.voiceRecorder.stop();
+}
+function hideLayers(){ stopWellnessVoice(); phaseLayers.forEach((item)=>{ item.hidden=true; }); }
 function setTab(tab){ state.tab=tab==="exercises"?"exercises":"nutrition"; document.querySelectorAll("[data-wellness-tab]").forEach((button)=>button.classList.toggle("active",button.dataset.wellnessTab===state.tab)); document.querySelectorAll("[data-wellness-pane]").forEach((pane)=>pane.classList.toggle("active",pane.dataset.wellnessPane===state.tab)); const exercising=state.tab==="exercises"; elements.title.textContent=exercising?"Exercícios":"Nutrição"; elements.headerIcon.src=exercising?"/200/apps/exercicios.png":"/200/apps/nutricao.png"; }
-function openWellness(tab){ setTab(tab); modal?.classList.add("active"); modal?.setAttribute("aria-hidden","false"); document.body.classList.add("modal-open"); hideLayers(); void loadDashboard(); }
+function openWellness(tab){ setTab(tab); modal?.setAttribute("aria-label",state.tab==="nutrition"?"Nutrição":"Exercícios"); modal?.classList.add("active"); modal?.setAttribute("aria-hidden","false"); document.body.classList.add("modal-open"); hideLayers(); void loadDashboard(); }
 function closeWellness(){ hideLayers(); modal?.classList.remove("active"); modal?.setAttribute("aria-hidden","true"); if(!document.querySelector(".workspace-modal.active"))document.body.classList.remove("modal-open"); }
 
 function exerciseInstructions(exercise){ if(exercise.category==="calisthenics")return ["Escolha um espaço firme e livre ao seu redor.",exercise.cue,"Use apenas o peso do corpo, controle cada repetição e pare se sentir dor aguda."]; if(exercise.tracking==="series")return [`Prepare ${exercise.equipment.toLowerCase()} com uma carga confortável.`,exercise.cue,"Mantenha o movimento controlado e pare se sentir dor aguda."]; if(exercise.tracking==="gps")return ["Ative a localização precisa e leve o celular com você.",exercise.cue,"Metros, quilômetros, cronômetro e velocidade média serão registrados automaticamente pelo GPS."]; return [`Prepare ${exercise.equipment.toLowerCase()} e comece leve.`,exercise.cue,"Ao finalizar, informe a distância percorrida em metros."]; }
 function currentExerciseCategory(){ return EXERCISE_CATEGORIES.find((item)=>item.id===state.filter)||EXERCISE_CATEGORIES[0]; }
 function exerciseLibrary(){ return Array.isArray(state.dashboard?.exerciseLibrary)?state.dashboard.exerciseLibrary:[]; }
 function libraryItem(exerciseId){ return exerciseLibrary().find((item)=>item.exerciseId===exerciseId)||null; }
-function exerciseFromLibrary(item){ const source=EXERCISES.find((exercise)=>exercise.id===item?.exerciseId); return source?{...source,library:item}:null; }
+function exerciseFromLibrary(item){ const source=EXERCISES.find((exercise)=>exercise.id===item?.exerciseId); return source?{...source,library:item}:{id:item?.exerciseId,name:item?.exerciseName||"Exercício",tracking:item?.trackingType||"minutes",equipment:item?.equipment||"Sem equipamento",cue:"Siga o plano aprovado com movimentos controlados e respeite seus limites.",category:item?.category||"strength",library:item}; }
 function exerciseTodayValue(item){
   if(!item)return 0;
   const active=state.workout?.exerciseId===item.exerciseId?state.workout:null;
@@ -264,7 +333,22 @@ function openGoal(){
   else elements.targetMinutes.value=String(item?.targetMinutes||30);
   showLayer(elements.goalLayer);
 }
-function renderMeals(){ const dashboard=state.dashboard||{}; const today=dashboard.today||{}; elements.calories.textContent=String(Math.round(Number(today.calories||0))); elements.quality.textContent=String(Math.round(Number(today.qualityScore||0))); elements.qualityFill.style.width=`${Math.max(0,Math.min(100,Number(today.qualityScore||0)))}%`; const count=Number(today.mealCount||0); elements.mealCount.textContent=count?`${count} ${count===1?"registro":"registros"} hoje`:"Nenhum alimento registrado"; elements.mealList.innerHTML=""; const meals=Array.isArray(dashboard.meals)?dashboard.meals:[]; if(!meals.length){ const empty=document.createElement("div"); empty.className="wellness-meal-empty"; empty.textContent="Sua tabela de hoje começa quando você contar para Luna o que comeu."; elements.mealList.appendChild(empty); return; } meals.forEach((meal)=>{ const article=document.createElement("article"); article.className="wellness-meal-item"; article.innerHTML=`<div><strong></strong><small></small><time></time></div><div class="wellness-meal-score"><b>${Math.round(Number(meal.calories||0))} kcal</b><span>${Math.round(Number(meal.qualityScore||0))}% qualidade</span></div>`; article.querySelector("strong").textContent=meal.description||"Alimento"; article.querySelector("small").textContent=meal.feedback||"Estimativa registrada por Luna."; article.querySelector("time").textContent=new Date(meal.consumedAt).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); elements.mealList.appendChild(article); }); }
+function renderNutrientBars(meal){ const nutrients=Array.isArray(meal?.nutrients||meal?.components)?(meal.nutrients||meal.components):[]; return nutrients.map((item,index)=>`<div class="wellness-nutrient"><span><b>${escapeHtml(item.label||item.name||"")}</b><em>${Number(item.value??item.calories??0).toLocaleString("pt-BR",{maximumFractionDigits:1})} ${escapeHtml(item.unit||"")}</em></span><i><u style="width:${Math.max(0,Math.min(100,Number(item.percent||0)))}%;--nutrient-index:${index}"></u></i></div>`).join(""); }
+function renderMealConfig(){ if(!elements.mealConfigList)return; const slots=Array.isArray(state.dashboard?.mealSlots)?state.dashboard.mealSlots:[]; elements.mealConfigList.innerHTML=slots.map((slot)=>`<label><input type="checkbox" value="${slot.key}" ${slot.enabled?"checked":""}/><span>${slot.label}</span></label>`).join(""); }
+function openMealConfig(){ renderMealConfig(); if(elements.mealConfigStatus)elements.mealConfigStatus.textContent=""; showLayer(elements.mealConfigLayer); }
+function openMealAdd(slot){ state.selectedMealSlot=slot.key; if(elements.mealAddTitle)elements.mealAddTitle.textContent=slot.label; if(elements.foodInput)elements.foodInput.value=""; const now=new Date(); if(elements.foodTime)elements.foodTime.value=`${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`; if(elements.mealAddStatus)elements.mealAddStatus.textContent=""; showLayer(elements.mealAddLayer); window.setTimeout(()=>elements.foodInput?.focus(),80); }
+function renderMeals(){
+  const dashboard=state.dashboard||{},today=dashboard.today||{};
+  elements.calories.textContent=String(Math.round(Number(today.calories||0)));
+  elements.quality.textContent=String(Math.round(Number(today.qualityScore||0)));
+  elements.qualityFill.style.width=`${Math.max(0,Math.min(100,Number(today.qualityScore||0)))}%`;
+  const complete=Number(today.completedMealSlots||0),total=Number(today.enabledMealSlots||0);
+  elements.mealCount.textContent=total?`${complete} de ${total} refeições preenchidas`:"Configure suas refeições";
+  elements.mealList.innerHTML="";
+  const slots=(Array.isArray(dashboard.mealSlots)?dashboard.mealSlots:[]).filter((slot)=>slot.enabled);
+  if(!slots.length){ elements.mealList.innerHTML='<button class="wellness-meal-empty" type="button" data-configure-meals>Ative pelo menos uma refeição para começar.</button>'; return; }
+  elements.mealList.innerHTML=slots.map((slot)=>{ const meal=slot.meal; return `<article class="wellness-meal-slot ${meal?"is-filled":"is-empty"}" data-meal-slot="${escapeHtml(slot.key)}"><header><div><span>${meal?"PREENCHIDA":"0% · NÃO INFORMADA"}</span><h3>${escapeHtml(slot.label)}</h3></div><button type="button" data-add-meal="${escapeHtml(slot.key)}">${meal?"Atualizar":"Adicionar refeição"}</button></header>${meal?`<p>${escapeHtml(meal.description)}</p><div class="wellness-meal-score"><b>${Math.round(Number(meal.calories||0))} kcal</b><span>${Math.round(Number(meal.qualityScore||0))}% qualidade</span></div><div class="wellness-nutrients">${renderNutrientBars(meal)}</div>`:'<div class="wellness-meal-zero"><strong>0%</strong><span>Informe esta refeição para gerar a análise.</span></div>'}</article>`; }).join("");
+}
 function bmiPosition(bmi){ if(!Number.isFinite(bmi))return 50; const points=[[12,4],[18.5,24],[22,50],[24.9,63],[30,86],[45,96]]; for(let i=1;i<points.length;i+=1){ if(bmi<=points[i][0]){ const [a,pa]=points[i-1], [b,pb]=points[i]; return pa+((bmi-a)/(b-a))*(pb-pa); } } return 96; }
 function renderWeight(){ const wellness=state.dashboard?.wellness||{}; const current=wellness.currentWeight; const bmi=Number(wellness.bmi); const hasBmi=Number.isFinite(bmi)&&bmi>0; const weight=current?Number(current.weightKg):null; const label=weight?weight.toFixed(weight%1?1:0):"--"; elements.weightCurrent.textContent=label; elements.weightModalCurrent.textContent=label; const summary=hasBmi?`IMC ${bmi.toFixed(1)} · toque para ver histórico`:(weight?"Adicione sua altura para calcular o IMC":"Toque para adicionar peso e altura"); elements.bmiSummary.textContent=summary; elements.bmiValue.textContent=hasBmi?`IMC ${bmi.toFixed(1)}`:"Informe sua altura"; const position=`${bmiPosition(bmi)}%`; elements.bmiMarker.style.left=position; elements.bmiModalMarker.style.left=position; elements.heightInput.value=wellness.preferences?.heightCm||""; elements.weightInput.value=""; elements.weightHistory.innerHTML=""; const history=Array.isArray(wellness.weightHistory)?wellness.weightHistory:[]; if(!history.length){ elements.weightHistory.textContent="Nenhuma pesagem registrada."; return; } history.forEach((entry)=>{ const row=document.createElement("div"); row.className="wellness-weight-history-entry"; row.innerHTML=`<strong>${Number(entry.weightKg).toFixed(1)} kg</strong><span>${new Date(entry.measuredAt).toLocaleDateString("pt-BR")}</span>`; elements.weightHistory.appendChild(row); }); }
 function elapsedSeconds(workout=state.workout){ const started=new Date(workout?.startedAt||"").getTime(); return Number.isFinite(started)?Math.max(0,Math.floor((Date.now()-started)/1000)):0; }
@@ -321,7 +405,25 @@ function stopStepCounter(){ if(state.motionListening)window.removeEventListener(
 async function saveWeight(event){ event.preventDefault(); const heightCm=Number(elements.heightInput.value||0), weightKg=Number(String(elements.weightInput.value||"").replace(",",".")); if(!heightCm&&!weightKg)return; const submit=elements.weightForm.querySelector("button[type=submit]"); submit.disabled=true; try{ const askagain1=state.dashboard?.wellness?.preferences?.askagain1||"yes"; if(heightCm)await apiRequest("/api/200/wellness/preferences",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:profileName(),heightCm,askagain1})}); if(weightKg){ const payload=await apiRequest("/api/200/wellness/weight",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:profileName(),weightKg})}); state.dashboard=payload.dashboard||state.dashboard; }else await loadDashboard(); renderWeight(); }catch(error){ elements.bmiValue.textContent=error instanceof Error?error.message:"Nao foi possivel atualizar."; }finally{ submit.disabled=false; } }
 function extractMealTime(text){ const match=String(text||"").toLowerCase().match(/(?:\b(?:as|às)\s*)?([01]?\d|2[0-3])\s*(?:h|:)\s*([0-5]\d)?/i); return match?`${String(Number(match[1])).padStart(2,"0")}:${String(Number(match[2]||0)).padStart(2,"0")}`:""; }
 function mealDateAt(time){ if(!/^\d{2}:\d{2}$/.test(time||""))return null; const [hours,minutes]=time.split(":").map(Number),date=new Date(); date.setHours(hours,minutes,0,0); return date.toISOString(); }
-async function submitFood(event){ event.preventDefault(); const description=String(state.pendingMeal||elements.foodInput.value||"").trim(); if(description.length<2){ elements.nutritionStatus.textContent="Conte para Luna o que você comeu."; return; } const time=elements.foodTime.value||extractMealTime(description); if(!time){ state.pendingMeal=description; elements.timeQuestion.hidden=false; elements.lunaMessage.textContent="Que horas você comeu isso? Preciso do horário antes de guardar."; elements.foodTime.focus(); return; } const consumedAt=mealDateAt(time),placeholder={id:`offline-meal-${Date.now()}`,description,consumedAt,calories:0,qualityScore:0,feedback:"Aguardando análise quando a internet voltar."},localDashboard={...(state.dashboard||{}),meals:[placeholder,...(state.dashboard?.meals||[])]}; elements.foodSend.disabled=true; elements.nutritionStatus.textContent="Luna está estimando calorias e qualidade..."; try{ const payload=await apiRequest("/api/200/nutrition/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:profileName(),description,consumedAt}),offlineQueue:true,offlineResponse:{dashboard:localDashboard,entry:placeholder},offlineInvalidates:["/api/200/wellness"]}); state.dashboard=payload.dashboard||state.dashboard; if(payload.offlineQueued)cacheDashboard(); elements.lunaMessage.textContent=payload.entry?.feedback||"Registro salvo."; elements.foodInput.value=""; elements.foodTime.value=""; state.pendingMeal=""; elements.timeQuestion.hidden=true; elements.nutritionStatus.textContent=payload.offlineQueued?"Alimento guardado offline.":"Alimento guardado."; renderMeals(); renderWeight(); }catch(error){ elements.nutritionStatus.textContent=error instanceof Error?error.message:"Nao foi possivel analisar."; }finally{ elements.foodSend.disabled=false; } }
+async function saveMealConfig(){ const selected=[...elements.mealConfigList.querySelectorAll("input:checked")].map((input)=>input.value); if(!selected.length){ elements.mealConfigStatus.textContent="Ative pelo menos uma refeição."; return; } const button=byId("wellnessMealConfigSave"); button.disabled=true; elements.mealConfigStatus.textContent="Salvando..."; try{ const payload=await apiRequest("/api/200/nutrition/meal-slots",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:profileName(),mealSlots:selected})}); state.dashboard=payload.dashboard||state.dashboard; hideLayers(); renderMeals(); }catch(error){ elements.mealConfigStatus.textContent=error instanceof Error?error.message:"Não foi possível salvar."; }finally{ button.disabled=false; } }
+function blobToBase64(blob){ return new Promise((resolve,reject)=>{ const reader=new FileReader(); reader.onload=()=>resolve(String(reader.result||"").split(",").pop()||""); reader.onerror=()=>reject(reader.error); reader.readAsDataURL(blob); }); }
+function voiceStatus(){ return state.voiceTarget==="plan"?elements.aiPlanStatus:elements.mealAddStatus; }
+async function toggleWellnessVoice(target){
+  if(state.voiceRecorder&&state.voiceRecorder.state!=="inactive"){ state.voiceRecorder.stop(); return; }
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true}); state.voiceStream=stream; state.voiceTarget=target; const chunks=[];
+    const recorder=new MediaRecorder(stream,{mimeType:"audio/webm"}); state.voiceRecorder=recorder;
+    recorder.ondataavailable=(event)=>{ if(event.data?.size)chunks.push(event.data); };
+    recorder.onstop=async()=>{ stream.getTracks().forEach((track)=>track.stop()); const status=voiceStatus(); if(status)status.textContent="Transcrevendo com a OpenAI..."; try{ const blob=new Blob(chunks,{type:"audio/webm"}); const audioBase64=await blobToBase64(blob); const payload=await apiRequest("/api/audio/transcribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({audioBase64,mimeType:"audio/webm",fileName:`${target}.webm`})}); const text=String(payload?.text||"").trim(); const input=target==="plan"?elements.aiPlanInput:elements.foodInput; if(input&&text)input.value=[input.value.trim(),text].filter(Boolean).join(" "); if(status)status.textContent=text?"Texto captado. Revise e continue.":"Não ouvi texto suficiente."; }catch(error){ if(status)status.textContent=error instanceof Error?error.message:"Falha ao transcrever."; }finally{ state.voiceRecorder=null; state.voiceStream=null; state.voiceTarget=null; }
+    };
+    recorder.start(); const status=voiceStatus(); if(status)status.textContent="Ouvindo... toque novamente para parar.";
+  }catch(error){ const status=voiceStatus(); if(status)status.textContent=error instanceof Error?error.message:"Falha ao abrir o microfone."; }
+}
+async function submitFood(event){ event.preventDefault(); const description=String(elements.foodInput.value||"").trim(); const status=elements.mealAddStatus; if(description.length<2){ status.textContent="Conte o que você comeu."; return; } const time=elements.foodTime.value||extractMealTime(description); const consumedAt=mealDateAt(time); if(!consumedAt){ status.textContent="Informe o horário da refeição."; return; } elements.foodSend.disabled=true; status.textContent="A IA está calculando os 8 elementos..."; try{ const payload=await apiRequest("/api/200/nutrition/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:profileName(),description,consumedAt,mealSlot:state.selectedMealSlot})}); state.dashboard=payload.dashboard||state.dashboard; elements.foodInput.value=""; hideLayers(); renderMeals(); elements.nutritionStatus.textContent="Refeição analisada e guardada."; }catch(error){ status.textContent=error instanceof Error?error.message:"Não foi possível calcular."; }finally{ elements.foodSend.disabled=false; } }
+function openAiPlan(){ state.aiPlan=null; elements.aiPlanReview.hidden=true; elements.aiApprovalWrap.hidden=true; elements.aiPlanApprove.hidden=true; elements.aiApprovalInput.value=""; elements.aiPlanStatus.textContent=""; showLayer(elements.aiPlanLayer); }
+function renderAiPlan(){ const plan=state.aiPlan; if(!plan)return; elements.aiPlanReview.hidden=false; elements.aiPlanReview.innerHTML=`<header><strong>${escapeHtml(plan.name||"Plano de exercícios")}</strong><p>${escapeHtml(plan.summary||"")}</p></header>${(plan.exercises||[]).map((item,index)=>`<article><b>${index+1}</b><div><strong>${escapeHtml(item.exerciseName)}</strong><small>${item.trackingType==="series"?`${item.targetSeries} séries de ${item.targetReps}`:item.trackingType==="gps"?`${Number(item.targetDistanceMeters||0)/1000} km`:`${item.targetMinutes} minutos`} · ${escapeHtml(item.equipment||"Sem equipamento")}</small></div></article>`).join("")}`; elements.aiApprovalWrap.hidden=false; elements.aiPlanApprove.hidden=false; }
+async function createAiPlan(){ const description=String(elements.aiPlanInput.value||"").trim(); if(description.length<8){ elements.aiPlanStatus.textContent="Conte um pouco mais sobre o plano que deseja."; return; } elements.aiPlanCreate.disabled=true; elements.aiPlanStatus.textContent="A IA está montando seu plano..."; try{ const payload=await apiRequest("/api/200/exercises/plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({description})}); state.aiPlan=payload.plan; renderAiPlan(); elements.aiPlanStatus.textContent="Revise a lista. Nada foi adicionado ainda."; }catch(error){ elements.aiPlanStatus.textContent=error instanceof Error?error.message:"Não foi possível montar."; }finally{ elements.aiPlanCreate.disabled=false; } }
+async function approveAiPlan(){ const approval=String(elements.aiApprovalInput.value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLowerCase(); if(approval!=="aprovar"){ elements.aiPlanStatus.textContent='Digite "Aprovar" para confirmar o pacote.'; return; } elements.aiPlanApprove.disabled=true; elements.aiPlanStatus.textContent="Adicionando ao seu pacote..."; try{ const payload=await apiRequest("/api/200/exercises/plan/approve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:profileName(),approval:"Aprovar",exercises:state.aiPlan?.exercises||[]})}); state.dashboard=payload.dashboard||state.dashboard; hideLayers(); renderExerciseGrid(); }catch(error){ elements.aiPlanStatus.textContent=error instanceof Error?error.message:"Não foi possível aprovar."; }finally{ elements.aiPlanApprove.disabled=false; } }
 
 renderExerciseGrid();
 byId("appsHomeExercisesButton")?.addEventListener("click",()=>openWellness("exercises"));
@@ -359,12 +461,23 @@ elements.weightCard?.addEventListener("click",()=>{ renderWeight(); showLayer(el
 byId("wellnessWeightClose")?.addEventListener("click",hideLayers);
 elements.weightForm?.addEventListener("submit",saveWeight);
 elements.foodForm?.addEventListener("submit",submitFood);
-state.ticker=window.setInterval(()=>{
-  if(document.hidden||!modal?.classList.contains("active")||!state.workout)return;
-  renderWorkout();
-  refreshExerciseProgress();
-  if(!elements.detail?.hidden&&state.detailMode==="selected")updateExerciseProgressDetail();
-},2000);
+byId("wellnessConfigureMeals")?.addEventListener("click",openMealConfig);
+byId("wellnessMealConfigClose")?.addEventListener("click",hideLayers);
+byId("wellnessMealConfigSave")?.addEventListener("click",()=>void saveMealConfig());
+byId("wellnessMealAddClose")?.addEventListener("click",hideLayers);
+elements.mealList?.addEventListener("click",(event)=>{ if(event.target.closest("[data-configure-meals]")){openMealConfig();return;} const button=event.target.closest("[data-add-meal]"); if(!button)return; const slot=(state.dashboard?.mealSlots||[]).find((item)=>item.key===button.dataset.addMeal); if(slot)openMealAdd(slot); });
+elements.foodMic?.addEventListener("click",()=>void toggleWellnessVoice("meal"));
+byId("wellnessAiPlanOpen")?.addEventListener("click",openAiPlan);
+byId("wellnessAiPlanClose")?.addEventListener("click",hideLayers);
+elements.aiPlanMic?.addEventListener("click",()=>void toggleWellnessVoice("plan"));
+elements.aiPlanCreate?.addEventListener("click",()=>void createAiPlan());
+elements.aiPlanApprove?.addEventListener("click",()=>void approveAiPlan());
+  state.ticker=window.setInterval(()=>{
+    if(document.hidden||!modal?.classList.contains("active")||!state.workout)return;
+    renderWorkout();
+    refreshExerciseProgress();
+    if(!elements.detail?.hidden&&state.detailMode==="selected")updateExerciseProgressDetail();
+  },2000);
 window.addEventListener("pagehide",()=>{ if(state.workout)void saveWorkoutProgress().catch(()=>{}); });
 window.addEventListener("online",()=>void syncOfflineWorkouts());
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&navigator.onLine!==false)void syncOfflineWorkouts(); });

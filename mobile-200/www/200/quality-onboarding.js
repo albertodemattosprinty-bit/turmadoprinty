@@ -1,4 +1,4 @@
-import { QUALITY_ASPECTS, QUALITY_GRADIENT, qualityTagIndex } from './quality-data.js';
+import { QUALITY_ASPECTS, QUALITY_GRADIENT, qualityTagIndex } from './quality-data.js?v=20260908-native-aspects-v1';
 
 export function assessQuality({ request, profile, required = false, onSaved = () => {} }) {
   return new Promise((resolve) => {

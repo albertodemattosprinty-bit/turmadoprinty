@@ -4,6 +4,28 @@ import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME }
 const PROJECT200_TIME_ZONE = process.env.PROJECT200_TIME_ZONE || "America/Sao_Paulo";
 const TRACKING_TYPES = new Set(["steps", "minutes", "series", "gps"]);
 const EXERCISE_CATEGORIES = new Set(["strength", "aerobic", "calisthenics"]);
+export const PROJECT200_MEAL_SLOTS = [
+  ["pre_morning_snack", "Lanche pré-matinal"],
+  ["breakfast", "Café da manhã"],
+  ["morning_snack", "Lanche da manhã"],
+  ["lunch", "Almoço"],
+  ["afternoon_snack", "Lanche da tarde"],
+  ["afternoon_coffee", "Café da tarde"],
+  ["dinner", "Janta"],
+  ["night_snack", "Lanche da noite"]
+].map(([key, label]) => ({ key, label }));
+const MEAL_SLOT_KEYS = new Set(PROJECT200_MEAL_SLOTS.map(({ key }) => key));
+const DEFAULT_MEAL_SLOT_KEYS = ["breakfast", "lunch", "dinner"];
+const PROJECT200_NUTRIENT_DEFINITIONS = [
+  { key: "calories", label: "Calorias", unit: "kcal" },
+  { key: "carbohydrates", label: "Carboidratos", unit: "g" },
+  { key: "proteins", label: "Proteínas", unit: "g" },
+  { key: "sugars", label: "Açúcares", unit: "g" },
+  { key: "fats", label: "Gorduras", unit: "g" },
+  { key: "fiber", label: "Fibras", unit: "g" },
+  { key: "sodium", label: "Sódio", unit: "mg" },
+  { key: "micronutrients", label: "Micronutrientes", unit: "%" }
+];
 
 function normalizeProfileName(value) {
   return normalizeStoredProject200ProfileName(value || PROJECT200_DEFAULT_PROFILE_NAME);
@@ -18,6 +40,8 @@ function normalizeMealRow(row) {
     id: String(row.id), profileName: normalizeProfileName(row.assigned_profile),
     description: String(row.description || ""), calories: Math.max(0, Number(row.calories || 0)),
     qualityScore: clampInteger(row.quality_score, 0, 100), feedback: String(row.feedback || ""),
+    mealSlot: MEAL_SLOT_KEYS.has(row.meal_slot) ? row.meal_slot : "",
+    nutrients: Array.isArray(row.components) ? row.components : [],
     components: Array.isArray(row.components) ? row.components : [],
     consumedAt: new Date(row.consumed_at).toISOString(), createdAt: new Date(row.created_at).toISOString()
   };
@@ -75,6 +99,7 @@ export async function ensureProject200WellnessSchema() {
     created_at timestamptz not null default now(), updated_at timestamptz not null default now()
   )`);
   await query(`create index if not exists idx_project200_nutrition_user_profile_date on project200_nutrition_entries(user_id, assigned_profile, consumed_at desc)`);
+  await query("alter table project200_nutrition_entries add column if not exists meal_slot text not null default '';");
   await query(`create table if not exists project200_exercise_sessions (
     id uuid primary key default gen_random_uuid(), user_id uuid not null references users(id) on delete cascade,
     assigned_profile text not null default 'Usuario', exercise_id text not null, exercise_name text not null,
@@ -114,6 +139,7 @@ export async function ensureProject200WellnessSchema() {
     created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
     primary key (user_id, assigned_profile)
   )`);
+  await query("alter table project200_wellness_preferences add column if not exists meal_slots jsonb not null default '[\"breakfast\",\"lunch\",\"dinner\"]'::jsonb;");
   await query(`create table if not exists project200_weight_entries (
     id uuid primary key default gen_random_uuid(), user_id uuid not null references users(id) on delete cascade,
     assigned_profile text not null default 'Usuario', weight_kg numeric(6,2) not null check (weight_kg between 1 and 500),
@@ -172,7 +198,7 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
        order by session.completed_at desc limit 8`,
       [userId, profile]
     ),
-    query(`select height_cm, askagain1 from project200_wellness_preferences where user_id = $1 and assigned_profile = $2 limit 1`, [userId, profile]),
+    query(`select height_cm, askagain1, meal_slots from project200_wellness_preferences where user_id = $1 and assigned_profile = $2 limit 1`, [userId, profile]),
     query(
       `select library.*, coalesce(stats.today_total_reps, 0)::integer as today_total_reps,
          coalesce(stats.today_duration_minutes, 0)::numeric as today_duration_minutes,
@@ -195,6 +221,13 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
   ]);
   const summary = summaryResult.rows[0] || {};
   const preference = preferencesResult.rows[0] || {};
+  const storedMealSlots = Array.isArray(preference.meal_slots) ? preference.meal_slots.filter((key) => MEAL_SLOT_KEYS.has(key)) : [];
+  const enabledMealSlotKeys = storedMealSlots.length ? storedMealSlots : DEFAULT_MEAL_SLOT_KEYS;
+  const normalizedMeals = mealResult.rows.map(normalizeMealRow);
+  const latestMealBySlot = new Map();
+  normalizedMeals.forEach((meal) => { if (meal.mealSlot && !latestMealBySlot.has(meal.mealSlot)) latestMealBySlot.set(meal.mealSlot, meal); });
+  const mealMissionQuality = Math.round(enabledMealSlotKeys.reduce((sum, key) => sum + Number(latestMealBySlot.get(key)?.qualityScore || 0), 0) / Math.max(1, enabledMealSlotKeys.length));
+  const completedMealSlots = enabledMealSlotKeys.filter((key) => latestMealBySlot.has(key)).length;
   const weights = weightResult.rows.map(normalizeWeightRow);
   const heightCm = preference.height_cm ? Number(preference.height_cm) : null;
   const currentWeight = weights[0] || null;
@@ -203,10 +236,14 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
     profileName: profile,
     today: {
       calories: Math.round(Number(summary.total_calories || 0)),
-      qualityScore: clampInteger(summary.quality_score, 0, 100),
-      mealCount: Math.max(0, Math.trunc(Number(summary.meal_count || 0) || 0))
+      qualityScore: clampInteger(mealMissionQuality, 0, 100),
+      mealCount: Math.max(0, Math.trunc(Number(summary.meal_count || 0) || 0)),
+      completedMealSlots,
+      enabledMealSlots: enabledMealSlotKeys.length,
+      mealCompletionPercent: Math.round((completedMealSlots / Math.max(1, enabledMealSlotKeys.length)) * 100)
     },
-    meals: mealResult.rows.map(normalizeMealRow),
+    meals: normalizedMeals,
+    mealSlots: PROJECT200_MEAL_SLOTS.map((slot) => ({ ...slot, enabled: enabledMealSlotKeys.includes(slot.key), meal: latestMealBySlot.get(slot.key) || null })),
     activeWorkout: normalizeWorkoutRow(workoutResult),
     recentWorkouts: recentWorkoutResult.rows.map(normalizeWorkoutRow),
     exerciseLibrary: libraryResult.rows.map(normalizeExerciseLibraryRow),
@@ -229,15 +266,27 @@ export async function createProject200NutritionEntry(userId, payload = {}) {
   if (Number.isNaN(consumedAt.getTime())) throw new Error("Informe o horario da refeicao.");
   const calories = Math.max(0, Math.min(20000, Number(payload.calories || 0) || 0));
   const qualityScore = clampInteger(payload.qualityScore, 0, 100);
-  const components = (Array.isArray(payload.components) ? payload.components : []).slice(0, 12).map((item) => ({
-    name: String(item?.name || "").trim().slice(0, 100),
-    calories: Math.max(0, Math.min(10000, Number(item?.calories || 0) || 0))
-  })).filter((item) => item.name);
+  const mealSlot = String(payload.mealSlot || "").trim();
+  if (!MEAL_SLOT_KEYS.has(mealSlot)) throw new Error("Escolha qual refeição está registrando.");
+  const suppliedNutrients = Array.isArray(payload.nutrients || payload.components) ? (payload.nutrients || payload.components) : [];
+  const components = PROJECT200_NUTRIENT_DEFINITIONS.map((definition, index) => {
+    const item = suppliedNutrients.find((candidate) => String(candidate?.key || "").trim() === definition.key) || suppliedNutrients[index] || {};
+    return {
+      key: definition.key,
+      label: definition.label,
+      value: Math.max(0, Math.min(100000, Number(item?.value ?? item?.calories ?? 0) || 0)),
+      unit: definition.unit,
+      percent: clampInteger(item?.percent, 0, 100)
+    };
+  });
+  await query(`delete from project200_nutrition_entries where user_id=$1 and assigned_profile=$2 and meal_slot=$3
+    and (consumed_at at time zone $4)::date=($5::timestamptz at time zone $4)::date`,
+    [userId, profile, mealSlot, PROJECT200_TIME_ZONE, consumedAt.toISOString()]);
   const result = await query(
     `insert into project200_nutrition_entries (
-       user_id, assigned_profile, description, calories, quality_score, feedback, components, consumed_at
-     ) values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8) returning *`,
-    [userId, profile, description, calories, qualityScore, feedback, JSON.stringify(components), consumedAt.toISOString()]
+       user_id, assigned_profile, description, calories, quality_score, feedback, components, consumed_at, meal_slot
+     ) values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9) returning *`,
+    [userId, profile, description, calories, qualityScore, feedback, JSON.stringify(components), consumedAt.toISOString(), mealSlot]
   );
   return normalizeMealRow(result.rows[0]);
 }
@@ -250,10 +299,10 @@ export async function addProject200ExerciseToLibrary(userId, payload = {}) {
   const trackingType = TRACKING_TYPES.has(payload.trackingType) ? payload.trackingType : "minutes";
   const category = EXERCISE_CATEGORIES.has(payload.category) ? payload.category : "strength";
   if (!exerciseId || exerciseName.length < 2) throw new Error("Escolha um exercicio valido.");
-  const targetSeries = trackingType === "series" ? 3 : 0;
-  const targetReps = trackingType === "series" ? 12 : 0;
-  const targetMinutes = trackingType === "minutes" ? 30 : 0;
-  const targetDistanceMeters = trackingType === "gps" ? 3000 : 0;
+  const targetSeries = trackingType === "series" ? clampInteger(payload.targetSeries || 3, 1, 100) : 0;
+  const targetReps = trackingType === "series" ? clampInteger(payload.targetReps || 12, 1, 10000) : 0;
+  const targetMinutes = trackingType === "minutes" ? Math.max(1, Math.min(1440, Number(payload.targetMinutes || 30) || 30)) : 0;
+  const targetDistanceMeters = trackingType === "gps" ? clampInteger(payload.targetDistanceMeters || 3000, 100, 10000000) : 0;
   const dailyGoal = trackingType === "series" ? targetSeries * targetReps : trackingType === "gps" ? targetDistanceMeters : targetMinutes;
   const result = await query(
     `insert into project200_exercise_library (
@@ -262,12 +311,36 @@ export async function addProject200ExerciseToLibrary(userId, payload = {}) {
      ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      on conflict (user_id, assigned_profile, exercise_id) do update
      set exercise_name = excluded.exercise_name, category = excluded.category, tracking_type = excluded.tracking_type,
-       equipment = excluded.equipment, updated_at = now()
+       equipment = excluded.equipment, daily_goal = excluded.daily_goal, target_series = excluded.target_series,
+       target_reps = excluded.target_reps, target_minutes = excluded.target_minutes,
+       target_distance_meters = excluded.target_distance_meters, updated_at = now()
      returning *, 0::integer as today_total_reps, 0::numeric as today_duration_minutes, 0::integer as today_distance_meters`,
     [userId, profile, exerciseId, exerciseName, category, trackingType, String(payload.equipment || "").trim().slice(0, 120),
       dailyGoal, targetSeries, targetReps, targetMinutes, targetDistanceMeters]
   );
   return normalizeExerciseLibraryRow(result.rows[0]);
+}
+
+export async function updateProject200MealSlots(userId, payload = {}) {
+  await ensureProject200WellnessSchema();
+  const profile = normalizeProfileName(payload.profileName);
+  const mealSlots = [...new Set((Array.isArray(payload.mealSlots) ? payload.mealSlots : []).map(String).filter((key) => MEAL_SLOT_KEYS.has(key)))];
+  if (mealSlots.length < 1 || mealSlots.length > 8) throw new Error("Ative entre 1 e 8 refeições.");
+  const result = await query(`insert into project200_wellness_preferences (user_id,assigned_profile,meal_slots)
+    values ($1,$2,$3::jsonb) on conflict(user_id,assigned_profile) do update set meal_slots=excluded.meal_slots,updated_at=now()
+    returning meal_slots`, [userId, profile, JSON.stringify(mealSlots)]);
+  return PROJECT200_MEAL_SLOTS.map((slot) => ({ ...slot, enabled: result.rows[0].meal_slots.includes(slot.key) }));
+}
+
+export async function approveProject200ExercisePlan(userId, payload = {}) {
+  const profileName = normalizeProfileName(payload.profileName);
+  const proposed = Array.isArray(payload.exercises) ? payload.exercises.slice(0, 24) : [];
+  if (!proposed.length) throw new Error("O plano não possui exercícios para aprovar.");
+  const exercises = [];
+  for (const item of proposed) {
+    exercises.push(await addProject200ExerciseToLibrary(userId, { ...item, profileName }));
+  }
+  return exercises;
 }
 export async function startProject200ExerciseSession(userId, payload = {}) {
   await ensureProject200WellnessSchema();

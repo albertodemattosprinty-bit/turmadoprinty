@@ -18,7 +18,7 @@ const ASPECTS = [
   { name: "Casa", icon: "/200/aspect-icons/casa.svg" },
   { name: "Exercícios", icon: "/200/aspect-icons/exercicios.svg" },
   { name: "Social", icon: "/200/aspect-icons/social.svg" },
-  { name: "Propósito", icon: "/200/aspect-icons/proposito.svg" },
+  { name: "Finanças", icon: "/200/icons/financas.svg" },
   { name: "Higiene", icon: "/200/aspect-icons/higiene.svg" },
   { name: "Lazer", icon: "/200/aspect-icons/lazer.svg" },
   { name: "Família", icon: "/200/aspect-icons/familia.svg" }
