@@ -196,12 +196,23 @@ async function apiRequest(path,options={}){
 }
 const OFFLINE_WORKOUTS_KEY="project200.wellness.offline-workouts.v1";
 let offlineWorkoutSyncPromise=null;
+let adminAccessPromise=null;
 function dashboardPath(){ return `/api/200/wellness?profile=${encodeURIComponent(profileName())}`; }
 function offlineWorkoutsKey(){ const token=String(localStorage.getItem(TOKEN_KEY)||"anonymous"); let hash=2166136261; for(let index=0;index<token.length;index+=1){hash^=token.charCodeAt(index);hash=Math.imul(hash,16777619);} return `${OFFLINE_WORKOUTS_KEY}.${(hash>>>0).toString(36)}.${profileName().toLowerCase()}`; }
 function readOfflineWorkouts(){ try{ const value=JSON.parse(localStorage.getItem(offlineWorkoutsKey())||"[]"); return Array.isArray(value)?value:[]; }catch{return [];} }
 function writeOfflineWorkouts(items){ try{ localStorage.setItem(offlineWorkoutsKey(),JSON.stringify(items)); }catch{} }
 function isOfflineWorkout(workout=state.workout){ return String(workout?.id||"").startsWith("offline-"); }
-function cacheDashboard(){ if(!state.dashboard)return; window.Project200Offline?.put?.(dashboardPath(),{dashboard:state.dashboard}); }
+function cacheDashboard(){ if(!state.dashboard)return; window.Project200Offline?.put?.(dashboardPath(),{dashboard:state.dashboard,isAdmin:state.isAdmin}); }
+function applyAdminAccess(value){
+  if(typeof value!=="boolean")return;
+  const changed=state.isAdmin!==value; state.isAdmin=value;
+  if(changed&&!elements.detail?.hidden&&state.selectedExercise)openExerciseDetail(state.selectedExercise,state.detailMode);
+}
+async function refreshAdminAccess(){
+  if(adminAccessPromise)return adminAccessPromise;
+  adminAccessPromise=(async()=>{ try{ const payload=await apiRequest("/api/auth/me?app=project200",{cache:"no-store",forceNetwork:true}); applyAdminAccess(Boolean(payload?.user?.isAdmin)); }catch{} })().finally(()=>{ adminAccessPromise=null; });
+  return adminAccessPromise;
+}
 function persistOfflineWorkout(workout,extra={}){
   const items=readOfflineWorkouts(), id=String(workout?.id||"");
   const index=items.findIndex((item)=>String(item?.localId||"")===id);
@@ -276,7 +287,7 @@ function stopWellnessVoice(){
 }
 function hideLayers(){ stopWellnessVoice(); phaseLayers.forEach((item)=>{ item.hidden=true; }); }
 function setTab(tab){ state.tab=tab==="exercises"?"exercises":"nutrition"; document.querySelectorAll("[data-wellness-tab]").forEach((button)=>button.classList.toggle("active",button.dataset.wellnessTab===state.tab)); document.querySelectorAll("[data-wellness-pane]").forEach((pane)=>pane.classList.toggle("active",pane.dataset.wellnessPane===state.tab)); const exercising=state.tab==="exercises"; elements.title.textContent=exercising?"Exercícios":"Nutrição"; elements.headerIcon.src=exercising?"/200/apps/exercicios.png":"/200/apps/nutricao.png"; }
-function openWellness(tab){ setTab(tab); modal?.setAttribute("aria-label",state.tab==="nutrition"?"Nutrição":"Exercícios"); modal?.classList.add("active"); modal?.setAttribute("aria-hidden","false"); document.body.classList.add("modal-open"); hideLayers(); startExerciseImageTicker(); renderExerciseGrid(); void loadDashboard(); }
+function openWellness(tab){ setTab(tab); modal?.setAttribute("aria-label",state.tab==="nutrition"?"Nutrição":"Exercícios"); modal?.classList.add("active"); modal?.setAttribute("aria-hidden","false"); document.body.classList.add("modal-open"); hideLayers(); startExerciseImageTicker(); renderExerciseGrid(); void refreshAdminAccess(); void loadDashboard(); }
 function closeWellness(){ hideLayers(); modal?.classList.remove("active"); modal?.setAttribute("aria-hidden","true"); if(!document.querySelector(".workspace-modal.active"))document.body.classList.remove("modal-open"); }
 
 function exerciseInstructions(exercise){ if(exercise.category==="calisthenics")return ["Escolha um espaço firme e livre ao seu redor.",exercise.cue,"Use apenas o peso do corpo, controle cada repetição e pare se sentir dor aguda."]; if(exercise.tracking==="series")return [`Prepare ${exercise.equipment.toLowerCase()} com uma carga confortável.`,exercise.cue,"Mantenha o movimento controlado e pare se sentir dor aguda."]; if(exercise.tracking==="gps")return ["Ative a localização precisa e leve o celular com você.",exercise.cue,"Metros, quilômetros, cronômetro e velocidade média serão registrados automaticamente pelo GPS."]; return [`Prepare ${exercise.equipment.toLowerCase()} e comece leve.`,exercise.cue,"Ao finalizar, informe a distância percorrida em metros."]; }
@@ -448,7 +459,7 @@ function renderWorkout(){
   else{ const targetSeconds=Math.max(60,Number(workout.targetMinutes||1)*60); elements.phaseLabel.textContent=`Meta de ${Math.round(Number(workout.targetMinutes||0))} minutos`; elements.phaseUnit.textContent=`${formatTimer(elapsed)} de atividade`; elements.workoutPrimaryLabel.textContent="Salvar progresso"; setWorkoutProgress((elapsed/targetSeconds)*100); }
 }
 async function loadDashboard(){
-  try{ const payload=await apiRequest(dashboardPath(),{cache:"no-store"}); state.dashboard=payload?.dashboard||{}; state.isAdmin=Boolean(payload?.isAdmin); const local=readOfflineWorkouts().find((item)=>!item.finished)?.workout||null; state.workout=local||state.dashboard.activeWorkout||null; if(local)state.dashboard.activeWorkout=local; state.seriesRepsDraft=null; state.steps=Number(state.workout?.steps||0); state.gpsDistanceMeters=Number(state.workout?.distanceMeters||0); renderMeals(); renderWeight(); renderExerciseGrid(); renderWorkoutHistory(); renderWorkout(); if(!elements.catalogLayer?.hidden)renderCatalog(); if(!elements.detail?.hidden&&state.selectedExercise)openExerciseDetail(state.selectedExercise,state.detailMode); if(state.workout?.trackingType==="steps")void startStepCounter(false); if(state.workout?.trackingType==="gps")void startGpsTracking(false); }
+  try{ const payload=await apiRequest(dashboardPath(),{cache:"no-store"}); state.dashboard=payload?.dashboard||{}; applyAdminAccess(payload?.isAdmin); const local=readOfflineWorkouts().find((item)=>!item.finished)?.workout||null; state.workout=local||state.dashboard.activeWorkout||null; if(local)state.dashboard.activeWorkout=local; state.seriesRepsDraft=null; state.steps=Number(state.workout?.steps||0); state.gpsDistanceMeters=Number(state.workout?.distanceMeters||0); renderMeals(); renderWeight(); renderExerciseGrid(); renderWorkoutHistory(); renderWorkout(); if(!elements.catalogLayer?.hidden)renderCatalog(); if(!elements.detail?.hidden&&state.selectedExercise)openExerciseDetail(state.selectedExercise,state.detailMode); if(state.workout?.trackingType==="steps")void startStepCounter(false); if(state.workout?.trackingType==="gps")void startGpsTracking(false); }
   catch(error){ elements.nutritionStatus.textContent=error instanceof Error?error.message:"Nao foi possivel carregar."; }
 }
 async function startExercise(event){
@@ -572,10 +583,12 @@ document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==
 window.addEventListener("project200:offline-data-updated",(event)=>{
   if(String(event?.detail?.path||"")!==dashboardPath())return;
   state.dashboard=event.detail.payload?.dashboard||state.dashboard;
+  applyAdminAccess(event.detail.payload?.isAdmin);
   const local=readOfflineWorkouts().find((item)=>!item.finished)?.workout||null;
   state.workout=local||state.dashboard?.activeWorkout||null;
   renderMeals();renderWeight();renderExerciseGrid();renderWorkoutHistory();renderWorkout();
 });
 window.addEventListener("project200:offline-sync-complete",()=>{ if(modal?.classList.contains("active"))void loadDashboard(); });
 if(navigator.onLine!==false&&readOfflineWorkouts().length)window.setTimeout(()=>void syncOfflineWorkouts(),800);
+void refreshAdminAccess();
 window.project200Wellness={open:openWellness,close:closeWellness,exercises:EXERCISES};
