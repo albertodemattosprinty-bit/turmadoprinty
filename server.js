@@ -63,7 +63,7 @@ import { createQuickUserAction, createUserAction, deleteUserAction, ensureAction
 import { clearProject200CurrentTaskState, getProject200CurrentTaskState, saveProject200CurrentTaskState } from "./src/project200-current-task-state.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
-import { addProject200ExerciseSeries, addProject200ExerciseToLibrary, approveProject200ExercisePlan, createProject200NutritionEntry, createProject200WeightEntry, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, saveProject200ExerciseAssets, startProject200ExerciseSession, updateProject200ExerciseProgress, updateProject200MealSlots, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
+import { addProject200ExerciseSeries, addProject200ExerciseToLibrary, approveProject200ExercisePlan, createProject200NutritionEntry, createProject200WeightEntry, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, saveProject200ExerciseAssets, startProject200ExerciseSession, syncProject200ExerciseMission, updateProject200ExerciseProgress, updateProject200MealSlots, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, getProject200HistorySpan, listProject200History } from "./src/project200-history.js";
@@ -4640,7 +4640,7 @@ async function handleProject200ExerciseImagesRequest(request, response, exercise
       `Categoria: ${category}. Equipamento: ${equipment}. Principais músculos: ${muscles.join(", ") || "corpo inteiro"}.`,
       cue ? `Orientação do movimento: ${cue}` : "",
       `Nos painéis A e B, use a mesma pessoa adulta: 1,75 m de altura, pessoa branca, corpo definido de aproximadamente 75 kg e roupa esportiva preta lisa, em ${movementSetting}.`,
-      "Os painéis A e B devem parecer fotografias fitness realistas e premium, com anatomia correta, luz natural cinematográfica e enquadramento que ensine o movimento. O painel A mostra o ponto inicial e possui somente a letra A pequena no canto superior esquerdo. O painel B mostra o ponto final e possui somente a letra B pequena no canto superior esquerdo.",
+      "Os painéis A e B devem parecer fotografias fitness realistas e premium, com anatomia correta, luz natural cinematográfica e enquadramento que ensine o movimento. Mostre a pessoa inteira, da cabeça aos pés, centralizada, sem cortar nenhuma parte do corpo e com margem de segurança visível em todos os lados. O painel A mostra o ponto inicial e possui somente a letra A pequena no canto superior esquerdo. O painel B mostra o ponto final e possui somente a letra B pequena no canto superior esquerdo.",
       "Não use sobreposição, brilho ou pintura verde, azul ou branca no corpo das fotografias A e B. Não use setas, linhas ou diagramas nessas duas fotografias.",
       `O terceiro painel é um gráfico anatômico fitness sofisticado em fundo escuro: ${anatomyFraming}, com os músculos ${muscles.join(", ") || "principais do movimento"} destacados por brilho neon ciano e magenta, contornos definidos e aparência tridimensional limpa. Não coloque letras nem nomes neste painel.`,
       "Não inclua nenhuma outra palavra, número, legenda, logotipo, marca ou moldura decorativa. Preserve divisões verticais limpas e exatas entre os três painéis."
@@ -4659,11 +4659,9 @@ async function handleProject200ExerciseImagesRequest(request, response, exercise
     const sourceWidth = Math.max(3, Number(metadata.width || 1536));
     const sourceHeight = Math.max(1, Number(metadata.height || 1024));
     const panelWidth = Math.floor(sourceWidth / 3);
-    const panelSize = Math.min(panelWidth, sourceHeight);
-    const panelTop = Math.max(0, Math.floor((sourceHeight - panelSize) / 2));
     const makePanel = (index) => sharp(generatedBuffer)
-      .extract({ left: index * panelWidth, top: panelTop, width: panelSize, height: panelSize })
-      .resize({ width: 400, height: 400, fit: "cover" })
+      .extract({ left: index * panelWidth, top: 0, width: panelWidth, height: sourceHeight })
+      .resize({ width: 400, height: 400, fit: "contain", background: { r: 234, g: 216, b: 196, alpha: 1 } })
       .webp({ quality: 78, effort: 5 })
       .toBuffer();
     const [startBuffer, finishBuffer, muscleBuffer] = await Promise.all([
@@ -5489,6 +5487,7 @@ async function handleExtraGoalsListRequest(request, response) {
   try {
     const requestUrl = new URL(request.url || "/api/200/extra-goals", `http://${request.headers.host || "localhost"}`);
     const selectedProfile = await resolveProject200ProfileName(user.id, requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
+    await syncProject200ExerciseMission(user.id, selectedProfile);
     const scopedGoals = await listExtraGoalsByScope(user.id, selectedProfile, requestUrl.searchParams.get("scope"));
     const goals = Array.isArray(scopedGoals?.goals) ? scopedGoals.goals : [];
     const summary = summarizeExtraGoals(goals);
@@ -5616,7 +5615,7 @@ async function handleExtraGoalProgressRequest(request, response, goalId) {
   try {
     const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
     const currentGoal = await getExtraGoalById(user.id, selectedProfile, goalId);
-    if (currentGoal?.scheduleConfig?.nativeType === "bible_reading") throw new Error("O progresso desta missão é atualizado somente pela leitura da Bíblia.");
+    if (["bible_reading", "exercise_plan"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("O progresso desta missão é atualizado somente pelo aplicativo nativo correspondente.");
     const isLimit = String(currentGoal?.goalKind || "goal").trim().toLowerCase() === "limit";
     const shouldTrackPointsUpdate = !isLimit && Math.trunc(Number(body?.delta || 0) || 0) !== 0;
     const pointsSnapshotPrepared = body?.pointsSnapshotPrepared === true;
@@ -5708,7 +5707,7 @@ async function handleExtraGoalProgressBatchRequest(request, response) {
       if (!delta) continue;
       const currentGoal = await getExtraGoalById(user.id, selectedProfile, goalId);
       if (!currentGoal) throw new Error("Missão não encontrada durante a sincronização.");
-      if (currentGoal?.scheduleConfig?.nativeType === "bible_reading") throw new Error("O progresso desta missão é atualizado somente pela leitura da Bíblia.");
+      if (["bible_reading", "exercise_plan"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("O progresso desta missão é atualizado somente pelo aplicativo nativo correspondente.");
       const isLimit = String(currentGoal?.goalKind || "goal").trim().toLowerCase() === "limit";
       if (!isLimit) {
         shouldTrackPointsUpdate = true;
@@ -5875,7 +5874,7 @@ async function handleExtraGoalUpdateRequest(request, response, goalId) {
   try {
     const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
     const currentGoal = await getExtraGoalById(user.id, selectedProfile, goalId);
-    if (currentGoal?.scheduleConfig?.nativeType === "bible_reading") throw new Error("Edite o plano de leitura dentro de Livros.");
+    if (["bible_reading", "exercise_plan"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("Edite esta missão dentro do aplicativo nativo correspondente.");
     const goals = await updateExtraGoal(user.id, selectedProfile, goalId, body);
     const summary = summarizeExtraGoals(goals);
     sendJson(response, 200, { ok: true, profile: selectedProfile, goals, summary });
@@ -5896,7 +5895,7 @@ async function handleExtraGoalDeleteRequest(request, response, goalId) {
     const requestUrl = new URL(request.url || "/api/200/extra-goals", `http://${request.headers.host || "localhost"}`);
     const selectedProfile = await resolveProject200ProfileName(user.id, requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
     const currentGoal = await getExtraGoalById(user.id, selectedProfile, goalId);
-    if (currentGoal?.scheduleConfig?.nativeType === "bible_reading") throw new Error("O plano de leitura só pode ser removido dentro de Livros.");
+    if (["bible_reading", "exercise_plan"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("Esta missão só pode ser alterada dentro do aplicativo nativo correspondente.");
     const goals = await deleteExtraGoal(user.id, selectedProfile, goalId);
     const summary = summarizeExtraGoals(goals);
     sendJson(response, 200, { ok: true, profile: selectedProfile, goals, summary });
@@ -16308,7 +16307,9 @@ const server = http.createServer(async (request, response) => {
       const body = await readJsonBody(request);
       const exercise = await addProject200ExerciseToLibrary(user.id, {
         profileName: body?.profile || PROJECT200_DEFAULT_PROFILE_NAME, exerciseId: body?.exerciseId,
-        exerciseName: body?.exerciseName, category: body?.category, trackingType: body?.trackingType, equipment: body?.equipment
+        exerciseName: body?.exerciseName, category: body?.category, trackingType: body?.trackingType, equipment: body?.equipment,
+        targetSeries: body?.targetSeries, targetReps: body?.targetReps, targetMinutes: body?.targetMinutes,
+        targetDistanceMeters: body?.targetDistanceMeters, scheduleConfig: body?.scheduleConfig
       });
       const dashboard = await getProject200WellnessDashboard(user.id, body?.profile || PROJECT200_DEFAULT_PROFILE_NAME);
       sendJson(response, 201, { ok: true, exercise, dashboard });

@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
   <link rel="stylesheet" href="/200/quality.css?v=20260906-1" />
   <link rel="stylesheet" href="/200/books.css?v=20260904-biblia-plano-v6" />
-  <link rel="stylesheet" href="/200/wellness.css?v=20260908-workout-polish-v3" />
+  <link rel="stylesheet" href="/200/wellness.css?v=20260909-exercise-flow-v1" />
   <link rel="stylesheet" href="/200/performance.css?v=20260906-scroll-v1" />
 </head>
 <body data-background-theme="edge">
@@ -2103,8 +2103,7 @@
           <section class="wellness-list-section"><header><div><span>Hoje</span><h2>Suas refeições</h2></div></header><div class="wellness-meal-list" id="wellnessMealList"></div></section>
         </section>
         <section class="wellness-pane" data-wellness-pane="exercises">
-          <section class="wellness-exercise-hero"><img src="/200/apps/exercicios.png" alt="Tênis, garrafa e peso representando exercícios" /><div><span>Movimente seu dia</span><h2>Seus exercícios</h2><p>Escolha no acervo apenas os exercícios que fazem parte da sua rotina.</p></div></section>
-          <button class="wellness-ai-plan-open" type="button" id="wellnessAiPlanOpen"><span>IA</span><div><strong>Montar meu plano de exercícios</strong><small>Conte por voz ou texto; você revisa antes de aprovar.</small></div></button>
+          <section class="wellness-exercise-daily-progress" aria-label="Progresso total do treino diário"><strong id="wellnessExerciseDailyPercent">0%</strong><span>do treino diário</span><div aria-hidden="true"><i id="wellnessExerciseDailyProgressFill"></i></div></section>
           <section class="wellness-active-workout" id="wellnessActiveWorkout" hidden>
             <div class="wellness-active-workout-main"><img id="wellnessActiveWorkoutImage" src="/200/apps/exercicios.png" alt="" /><div><span>Treino em andamento</span><h2 id="wellnessWorkoutName">Caminhar</h2><div class="wellness-workout-counter" id="wellnessWorkoutCounter">00:00</div><small id="wellnessWorkoutDetail">Progresso salvo no seu perfil</small></div></div>
             <button type="button" class="wellness-start-button" id="wellnessWorkoutResume">Retomar em tela cheia</button>
@@ -2126,16 +2125,15 @@
         </article>
       </div>
       <div class="wellness-phase-layer" id="wellnessExerciseDetail" hidden>
-        <article class="wellness-phase-screen">
+        <article class="wellness-phase-screen wellness-exercise-detail-screen">
           <button class="wellness-phase-close" type="button" id="wellnessExerciseDetailClose" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
           <span class="wellness-phase-kicker" id="wellnessExerciseCategory">Musculação</span>
           <h2 id="wellnessExerciseName">Agachamento</h2>
           <div class="wellness-exercise-detail-frame" id="wellnessExerciseDetailFrame"><img class="wellness-exercise-detail-image" id="wellnessExerciseDetailImage" src="/200/apps/exercicios.png" alt="" /><span class="wellness-exercise-image-loader" aria-live="polite"><i></i><b>Criando imagens...</b></span></div>
-          <section class="wellness-exercise-muscle-visual" id="wellnessExerciseMuscleVisual" hidden><span>Músculos trabalhados</span><img id="wellnessExerciseMuscleImage" src="/200/apps/exercicios.png" alt="" /></section>
           <p id="wellnessExerciseEquipment"></p>
           <section class="wellness-exercise-progress" id="wellnessExerciseProgress" hidden><strong id="wellnessExerciseProgressText">0% completo hoje</strong><div class="wellness-exercise-progress-track"><i id="wellnessExerciseProgressFill"></i></div><span id="wellnessExerciseTotal">0 movimentos totais</span></section>
           <ol class="wellness-instruction-list" id="wellnessExerciseInstructions"></ol>
-          <button class="wellness-phase-primary" type="button" id="wellnessExerciseStart">Definir meta</button><button class="wellness-phase-secondary wellness-exercise-generate" type="button" id="wellnessExerciseGenerate" hidden>Adicionar imagens com IA</button><p class="wellness-status" id="wellnessExerciseGenerateStatus" aria-live="polite"></p><button class="wellness-phase-secondary" type="button" id="wellnessExerciseShare" hidden>Compartilhar exercício</button>
+          <button class="wellness-phase-primary" type="button" id="wellnessExerciseStart">Definir meta</button><button class="wellness-phase-secondary wellness-exercise-generate" type="button" id="wellnessExerciseGenerate" hidden>Adicionar imagens com IA</button><p class="wellness-status" id="wellnessExerciseGenerateStatus" aria-live="polite"></p><button class="wellness-phase-secondary wellness-exercise-goal" type="button" id="wellnessExerciseGoal" hidden>Alterar meta</button>
         </article>
       </div>
 
@@ -2153,7 +2151,7 @@
           <div class="wellness-goal-fields" id="wellnessDistanceGoalFields" hidden>
             <label><span>Quilômetros</span><input type="number" id="wellnessTargetDistanceKm" min="0.1" max="10000" step="0.1" inputmode="decimal" value="3" /></label>
           </div>
-          <p>Você pode fazer em várias etapas ao longo do dia ou encerrar antes. Tudo realizado será somado na sua tabela.</p>
+          <p id="wellnessGoalHelp">Você pode fazer em várias etapas ao longo do dia ou encerrar antes. Tudo realizado será somado na sua tabela.</p>
           <button class="wellness-phase-primary" type="submit" id="wellnessGoalStart">Iniciar treino</button>
         </form>
       </div>
@@ -2162,7 +2160,7 @@
         <article class="wellness-phase-screen wellness-workout-screen">
           <button class="wellness-phase-close" type="button" id="wellnessWorkoutBack" aria-label="Voltar aos exercícios"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
           <span class="wellness-phase-kicker" id="wellnessPhaseLabel">Série 1 de 3</span><h2 id="wellnessPhaseExerciseName">Agachamento</h2>
-          <div class="wellness-workout-image-ring" id="wellnessWorkoutProgressRing"><img id="wellnessWorkoutExerciseImage" src="/200/apps/exercicios.png" alt="" /></div><div class="wellness-workout-series-status" id="wellnessWorkoutSeriesStatus"><strong id="wellnessWorkoutSeriesCount">0/3</strong><span>séries concluídas</span></div><div class="wellness-phase-number" id="wellnessPhaseNumber" hidden>12</div><p id="wellnessPhaseUnit">movimentos nesta série</p>
+          <div class="wellness-workout-image-ring" id="wellnessWorkoutProgressRing"><img id="wellnessWorkoutExerciseImage" src="/200/apps/exercicios.png" alt="" /><i class="wellness-workout-image-flash" aria-hidden="true"></i></div><div class="wellness-workout-series-status" id="wellnessWorkoutSeriesStatus"><strong id="wellnessWorkoutSeriesCount">0/3</strong><span>séries concluídas</span></div><div class="wellness-phase-number" id="wellnessPhaseNumber" hidden>12</div><p id="wellnessPhaseUnit">movimentos nesta série</p>
           <div class="wellness-workout-action-stepper" id="wellnessWorkoutNumberStepper"><button class="wellness-workout-reps-arrow" type="button" id="wellnessWorkoutRepsDecrease" aria-label="Diminuir movimentos desta série" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><button class="wellness-phase-primary wellness-workout-add-button" type="button" id="wellnessWorkoutPrimary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span id="wellnessWorkoutPrimaryLabel">Adicionar 12</span></button><button class="wellness-workout-reps-arrow" type="button" id="wellnessWorkoutRepsIncrease" aria-label="Aumentar movimentos desta série" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div>
           <button class="wellness-workout-finish-button" type="button" id="wellnessWorkoutFinish"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v4a4 4 0 0 1-8 0V4Zm0 2H5v1a4 4 0 0 0 4 4M16 6h3v1a4 4 0 0 1-4 4M12 12v5M8 20h8M9 17h6"/></svg><span>Concluir treino</span></button>
         </article>
@@ -2207,7 +2205,6 @@
       </div>
       <div class="wellness-phase-layer" id="wellnessMealConfigLayer" hidden><article class="wellness-phase-screen"><button class="wellness-phase-close" type="button" id="wellnessMealConfigClose" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><span class="wellness-phase-kicker">MISSÃO NUTRIÇÃO</span><h2>Quais refeições fazem parte do seu dia?</h2><p>Ative entre 1 e 8. Você pode mudar quando quiser.</p><div class="wellness-meal-config-list" id="wellnessMealConfigList"></div><button class="wellness-phase-primary" type="button" id="wellnessMealConfigSave">Salvar refeições</button><p class="wellness-status" id="wellnessMealConfigStatus" aria-live="polite"></p></article></div>
       <div class="wellness-phase-layer" id="wellnessMealAddLayer" hidden><form class="wellness-phase-screen" id="wellnessFoodForm"><button class="wellness-phase-close" type="button" id="wellnessMealAddClose" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><span class="wellness-phase-kicker">ADICIONAR REFEIÇÃO</span><h2 id="wellnessMealAddTitle">Café da manhã</h2><p>Diga o que comeu e a quantidade.</p><textarea id="wellnessFoodInput" rows="5" maxlength="500" placeholder="Ex.: dois ovos, uma fatia de pão e café sem açúcar"></textarea><button class="wellness-meal-mic" type="button" id="wellnessFoodMic" aria-label="Falar refeição"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm-7 9a7 7 0 0 0 14 0M12 19v3M8 22h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Falar com a IA</span></button><div class="wellness-time-question" id="wellnessTimeQuestion"><label>Horário<input type="time" id="wellnessFoodTime" /></label></div><button class="wellness-phase-primary" type="submit" id="wellnessFoodSend">Calcular e guardar</button><p class="wellness-status" id="wellnessMealAddStatus" aria-live="polite"></p></form></div>
-      <div class="wellness-phase-layer" id="wellnessAiPlanLayer" hidden><article class="wellness-phase-screen wellness-ai-plan-screen"><button class="wellness-phase-close" type="button" id="wellnessAiPlanClose" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><span class="wellness-phase-kicker">PLANO COM IA</span><h2>Conte o plano que deseja</h2><textarea id="wellnessAiPlanInput" rows="6" maxlength="2000" placeholder="Ex.: quero treinar três vezes por semana em casa, sou iniciante e não tenho equipamentos"></textarea><button class="wellness-meal-mic" type="button" id="wellnessAiPlanMic"><span>Falar meu plano</span></button><button class="wellness-phase-primary" type="button" id="wellnessAiPlanCreate">Montar plano</button><div class="wellness-ai-plan-review" id="wellnessAiPlanReview" hidden></div><label class="wellness-ai-approval" id="wellnessAiApprovalWrap" hidden><span>Para aprovar, digite <b>Aprovar</b></span><input type="text" id="wellnessAiApprovalInput" autocomplete="off" /></label><button class="wellness-phase-primary" type="button" id="wellnessAiPlanApprove" hidden>Aprovar e adicionar ao meu pacote</button><p class="wellness-status" id="wellnessAiPlanStatus" aria-live="polite"></p></article></div>
     </div>
   </section>
 
@@ -2221,9 +2218,9 @@
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
   <script src="/200/offline-data.js?v=1.10-offline-refresh-v1"></script>
-  <script type="module" src="/200/project.js?v=20260908-workout-polish-v2"></script>
+  <script type="module" src="/200/project.js?v=20260909-exercise-mission-v1"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
-  <script type="module" src="/200/wellness.js?v=20260908-workout-polish-v4"></script>
+  <script type="module" src="/200/wellness.js?v=20260909-exercise-flow-v1"></script>
   <script src="/200/books.js?v=20260904-biblia-plano-v7"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260908-readonly-v1"></script>

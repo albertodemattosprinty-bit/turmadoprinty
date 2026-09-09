@@ -17281,6 +17281,10 @@ function openMissionEditorModal(goalId) {
     window.Project200Books?.openBible?.();
     return;
   }
+  if (goal?.scheduleConfig?.nativeType === "exercise_plan") {
+    window.project200Wellness?.open?.("exercises");
+    return;
+  }
   if (isMissionFolder(goal)) {
     void openMissionFolderModal(goalId, "edit");
     return;
@@ -17294,6 +17298,11 @@ function openMissionEntryModal(goalId) {
   if (goal?.scheduleConfig?.nativeType === "bible_reading") {
     closeModal("historyModal");
     window.Project200Books?.openBible?.();
+    return;
+  }
+  if (goal?.scheduleConfig?.nativeType === "exercise_plan") {
+    closeModal("historyModal");
+    window.project200Wellness?.open?.("exercises");
     return;
   }
   if (isMissionFolder(goal)) {
@@ -17782,6 +17791,7 @@ function formatMissionRangeProgress(progress, days) {
 function createMissionCard(goal, initialPercent = null) {
   const goalIcon = getMissionDisplayIcon(goal);
   const nativeBibleReading = goal?.scheduleConfig?.nativeType === "bible_reading";
+  const nativeExercisePlan = goal?.scheduleConfig?.nativeType === "exercise_plan";
   const historyRangeActive = isMissionHistoryRangeActive();
   const limit = isLimitGoal(goal);
   const variants = Array.isArray(goal?.variants) ? goal.variants : [];
@@ -17803,7 +17813,9 @@ function createMissionCard(goal, initialPercent = null) {
         ? "Clique para criar uma tarefa"
         : limit
         ? (showLimitRatio ? `${limitVisual.ratio.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% do esperado` : formatLimitLastProgress(goal))
-        : `${Math.max(0, Math.trunc(progress))} de ${Math.max(1, Math.trunc(target))}${nativeBibleReading ? " minutos" : ""}`;
+        : nativeExercisePlan
+          ? `${regularPercent}% do treino diário`
+          : `${Math.max(0, Math.trunc(progress))} de ${Math.max(1, Math.trunc(target))}${nativeBibleReading ? " minutos" : ""}`;
   const card = document.createElement("article");
   const hasInitialPercent = initialPercent !== null && initialPercent !== undefined && Number.isFinite(Number(initialPercent));
   const safeInitialPercent = hasInitialPercent ? Number(initialPercent) : percent;
@@ -22189,6 +22201,10 @@ void (async () => {
       renderActionsMissionsPanel();
     });
   });
+
+  window.addEventListener("project200:exercise-mission-updated", () => {
+    void loadMissions({ forceNetwork: true }).then(renderMissions);
+  });
 })();
 
 profileFooter?.addEventListener("contextmenu", (event) => {
@@ -23104,7 +23120,7 @@ window.project200ProjectsContext = {
     if (target === "mission-create") return normalizeSchedule(state.missionCreate?.scheduleConfig || state.missionCreate?.repeatConfig, state.missionCreate?.repeatDays);
     if (target === "mission-adjust") return normalizeSchedule(state.missionAdjust?.scheduleConfig || state.missionAdjust?.repeatConfig, state.missionAdjust?.repeatDays);
     if (target === "microtask") return normalizeSchedule(state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig, state.missionVariants?.repeatDays);
-    if (target === "bible-plan") return normalizeSchedule(bridgeExternalSchedule, ALL_MISSION_REPEAT_DAYS);
+    if (target === "bible-plan" || target === "exercise-goal") return normalizeSchedule(bridgeExternalSchedule, ALL_MISSION_REPEAT_DAYS);
     return normalizeSchedule();
   }
   function derivedRepeatDays(schedule) {
@@ -23135,7 +23151,7 @@ window.project200ProjectsContext = {
       state.missionVariants.avoidDays = cfg.frequency === "periodic" ? normalizeAvoidDays(cfg.avoidDays, [0, 6]) : [];
       const start = projectDateKeyToDate(cfg.startsOn, 12);
       state.missionVariants.nextDueOffsetDays = Math.max(0, Math.round((start.getTime() - todayStart().getTime()) / 86400000));
-    } else if (target === "bible-plan") {
+    } else if (target === "bible-plan" || target === "exercise-goal") {
       bridgeExternalSchedule = cfg;
     }
     renderBridgeButtons();
@@ -23210,7 +23226,7 @@ window.project200ProjectsContext = {
   function openDailyRepetitionModal(target, callback = null, initialSchedule = null) {
     bridgeTarget = target;
     bridgeApplyCallback = callback;
-    if (target === "bible-plan") bridgeExternalSchedule = normalizeSchedule(initialSchedule, ALL_MISSION_REPEAT_DAYS);
+    if (target === "bible-plan" || target === "exercise-goal") bridgeExternalSchedule = normalizeSchedule(initialSchedule, ALL_MISSION_REPEAT_DAYS);
     const modal = ensureModal();
     renderBridgeModal();
     modal.classList.add("active");

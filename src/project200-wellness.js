@@ -1,5 +1,6 @@
 import { query } from "./db.js";
 import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
+import { ensureExtraGoalsSchema } from "./extra-goals.js";
 
 const PROJECT200_TIME_ZONE = process.env.PROJECT200_TIME_ZONE || "America/Sao_Paulo";
 const TRACKING_TYPES = new Set(["steps", "minutes", "series", "gps"]);
@@ -33,6 +34,19 @@ function normalizeProfileName(value) {
 
 function clampInteger(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, Math.trunc(Number(value || 0) || 0)));
+}
+
+function normalizeExerciseSchedule(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const { nativeType: _ignoredNativeType, ...schedule } = value;
+  return schedule;
+}
+
+function project200DateKey(value = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-CA", { timeZone: PROJECT200_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
+  const parts = formatter.formatToParts(value);
+  const read = (type) => parts.find((part) => part.type === type)?.value || "00";
+  return `${read("year")}-${read("month")}-${read("day")}`;
 }
 
 function normalizeMealRow(row) {
@@ -80,6 +94,7 @@ function normalizeExerciseLibraryRow(row) {
     targetReps: Math.max(0, Math.trunc(Number(row?.target_reps || 0))),
     targetMinutes: Math.max(0, Number(row?.target_minutes || 0)),
     targetDistanceMeters: Math.max(0, Math.trunc(Number(row?.target_distance_meters || 0))),
+    scheduleConfig: normalizeExerciseSchedule(row?.schedule_config),
     todayTotalReps: Math.max(0, Math.trunc(Number(row?.today_total_reps || 0))),
     todayDurationMinutes: Math.max(0, Number(row?.today_duration_minutes || 0)),
     todayDistanceMeters: Math.max(0, Math.trunc(Number(row?.today_distance_meters || 0)))
@@ -145,6 +160,7 @@ export async function ensureProject200WellnessSchema() {
     primary key (user_id, assigned_profile, exercise_id)
   )`);
   await query(`create index if not exists idx_project200_exercise_library_user_profile on project200_exercise_library(user_id, assigned_profile, created_at)`);
+  await query(`alter table project200_exercise_library add column if not exists schedule_config jsonb`);
   await query(`create table if not exists project200_exercise_assets (
     exercise_id text primary key, exercise_name text not null, muscles jsonb not null default '[]'::jsonb,
     start_image_url text not null, finish_image_url text not null, muscle_image_url text not null default '', generated_model text not null default 'gpt-image-1',
@@ -184,6 +200,84 @@ async function getActiveWorkoutRow(userId, profileName) {
     [userId, normalizeProfileName(profileName)]
   );
   return result.rows[0] || null;
+}
+
+function exerciseLibraryCompletionPercent(rows = []) {
+  const items = Array.isArray(rows) ? rows : [];
+  if (!items.length) return 0;
+  const total = items.reduce((sum, row) => {
+    const trackingType = TRACKING_TYPES.has(row?.tracking_type) ? row.tracking_type : "minutes";
+    const value = trackingType === "series"
+      ? Number(row?.today_total_reps || 0)
+      : trackingType === "gps"
+        ? Number(row?.today_distance_meters || 0)
+        : Number(row?.today_duration_minutes || 0);
+    const target = Math.max(1, Number(row?.daily_goal || 1));
+    return sum + Math.min(100, Math.max(0, Math.round((value / target) * 100)));
+  }, 0);
+  return Math.round(total / items.length);
+}
+
+export async function syncProject200ExerciseMission(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, libraryRows = null) {
+  await ensureProject200WellnessSchema();
+  await ensureExtraGoalsSchema();
+  const profile = normalizeProfileName(profileName);
+  let rows = Array.isArray(libraryRows) ? libraryRows : null;
+  if (!rows) {
+    const result = await query(
+      `select library.*, coalesce(stats.today_total_reps, 0)::integer as today_total_reps,
+         coalesce(stats.today_duration_minutes, 0)::numeric as today_duration_minutes,
+         coalesce(stats.today_distance_meters, 0)::integer as today_distance_meters
+       from project200_exercise_library library
+       left join lateral (
+         select coalesce(sum(session.total_reps), 0)::integer as today_total_reps,
+           coalesce(sum(session.duration_minutes), 0)::numeric as today_duration_minutes,
+           coalesce(sum(session.distance_meters), 0)::integer as today_distance_meters
+         from project200_exercise_sessions session
+         where session.user_id = library.user_id and session.assigned_profile = library.assigned_profile
+           and session.exercise_id = library.exercise_id
+           and (session.started_at at time zone $3)::date = (now() at time zone $3)::date
+       ) stats on true
+       where library.user_id = $1 and library.assigned_profile = $2`,
+      [userId, profile, PROJECT200_TIME_ZONE]
+    );
+    rows = result.rows;
+  }
+  if (!rows.length) return null;
+  const percent = exerciseLibraryCompletionPercent(rows);
+  const dateKey = project200DateKey();
+  const scheduleConfig = { nativeType: "exercise_plan", locked: true, frequency: "daily", interval: 1, intervalUnit: "day", weekDays: [0,1,2,3,4,5,6], startsOn: dateKey, endMode: "never", notification: { mode: "at_time", customAmount: 10, customUnit: "minutes" } };
+  const existing = await query(
+    `select id from extra_goals where user_id=$1 and assigned_profile=$2 and schedule_config->>'nativeType'='exercise_plan' order by created_at asc limit 1`,
+    [userId, profile]
+  );
+  let goalId = existing.rows[0]?.id || null;
+  if (goalId) {
+    await query(
+      `update extra_goals set title='Exercícios', category_id='exercicios', goal_kind='goal', target_value=100,
+         progress_value=$4, progress_date=$3::date, last_progress_at=now(), is_folder=false,
+         repeat_days='[0,1,2,3,4,5,6]'::jsonb, schedule_config=$5::jsonb,
+         svg_icon_url='/200/apps/exercicios.png', svg_icon_label='Exercícios', updated_at=now()
+       where id=$6 and user_id=$1 and assigned_profile=$2`,
+      [userId, profile, dateKey, percent, JSON.stringify(scheduleConfig), goalId]
+    );
+  } else {
+    const inserted = await query(
+      `insert into extra_goals (user_id,assigned_profile,title,category_id,goal_kind,target_value,progress_value,progress_date,last_progress_at,is_folder,repeat_days,schedule_config,svg_icon_url,svg_icon_label)
+       values ($1,$2,'Exercícios','exercicios','goal',100,$4,$3::date,now(),false,'[0,1,2,3,4,5,6]'::jsonb,$5::jsonb,'/200/apps/exercicios.png','Exercícios') returning id`,
+      [userId, profile, dateKey, percent, JSON.stringify(scheduleConfig)]
+    );
+    goalId = inserted.rows[0]?.id || null;
+  }
+  if (goalId) {
+    await query(
+      `insert into extra_goal_progress_history (user_id,goal_id,assigned_profile,scope_date,progress_value,target_value,updated_at)
+       values ($1,$2,$3,$4::date,$5,100,now())
+       on conflict (user_id,goal_id,scope_date) do update set assigned_profile=excluded.assigned_profile,progress_value=excluded.progress_value,target_value=100,updated_at=now()`,
+      [userId, goalId, profile, dateKey, percent]
+    );
+  }
+  return { goalId: goalId ? String(goalId) : "", percent };
 }
 
 export async function getProject200WellnessDashboard(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME) {
@@ -248,6 +342,8 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
   normalizedMeals.forEach((meal) => { if (meal.mealSlot && !latestMealBySlot.has(meal.mealSlot)) latestMealBySlot.set(meal.mealSlot, meal); });
   const mealMissionQuality = Math.round(enabledMealSlotKeys.reduce((sum, key) => sum + Number(latestMealBySlot.get(key)?.qualityScore || 0), 0) / Math.max(1, enabledMealSlotKeys.length));
   const completedMealSlots = enabledMealSlotKeys.filter((key) => latestMealBySlot.has(key)).length;
+  const exerciseCompletionPercent = exerciseLibraryCompletionPercent(libraryResult.rows);
+  await syncProject200ExerciseMission(userId, profile, libraryResult.rows);
   const weights = weightResult.rows.map(normalizeWeightRow);
   const heightCm = preference.height_cm ? Number(preference.height_cm) : null;
   const currentWeight = weights[0] || null;
@@ -260,7 +356,8 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
       mealCount: Math.max(0, Math.trunc(Number(summary.meal_count || 0) || 0)),
       completedMealSlots,
       enabledMealSlots: enabledMealSlotKeys.length,
-      mealCompletionPercent: Math.round((completedMealSlots / Math.max(1, enabledMealSlotKeys.length)) * 100)
+      mealCompletionPercent: Math.round((completedMealSlots / Math.max(1, enabledMealSlotKeys.length)) * 100),
+      exerciseCompletionPercent
     },
     meals: normalizedMeals,
     mealSlots: PROJECT200_MEAL_SLOTS.map((slot) => ({ ...slot, enabled: enabledMealSlotKeys.includes(slot.key), meal: latestMealBySlot.get(slot.key) || null })),
@@ -348,19 +445,21 @@ export async function addProject200ExerciseToLibrary(userId, payload = {}) {
   const targetMinutes = trackingType === "minutes" ? Math.max(1, Math.min(1440, Number(payload.targetMinutes || 30) || 30)) : 0;
   const targetDistanceMeters = trackingType === "gps" ? clampInteger(payload.targetDistanceMeters || 3000, 100, 10000000) : 0;
   const dailyGoal = trackingType === "series" ? targetSeries * targetReps : trackingType === "gps" ? targetDistanceMeters : targetMinutes;
+  const scheduleConfig = normalizeExerciseSchedule(payload.scheduleConfig);
   const result = await query(
     `insert into project200_exercise_library (
        user_id, assigned_profile, exercise_id, exercise_name, category, tracking_type, equipment,
-       daily_goal, target_series, target_reps, target_minutes, target_distance_meters
-     ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       daily_goal, target_series, target_reps, target_minutes, target_distance_meters, schedule_config
+     ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, coalesce($13::jsonb, '{"frequency":"daily","interval":1,"intervalUnit":"day"}'::jsonb))
      on conflict (user_id, assigned_profile, exercise_id) do update
      set exercise_name = excluded.exercise_name, category = excluded.category, tracking_type = excluded.tracking_type,
        equipment = excluded.equipment, daily_goal = excluded.daily_goal, target_series = excluded.target_series,
        target_reps = excluded.target_reps, target_minutes = excluded.target_minutes,
-       target_distance_meters = excluded.target_distance_meters, updated_at = now()
+       target_distance_meters = excluded.target_distance_meters,
+       schedule_config = case when $13::jsonb is null then project200_exercise_library.schedule_config else excluded.schedule_config end, updated_at = now()
      returning *, 0::integer as today_total_reps, 0::numeric as today_duration_minutes, 0::integer as today_distance_meters`,
     [userId, profile, exerciseId, exerciseName, category, trackingType, String(payload.equipment || "").trim().slice(0, 120),
-      dailyGoal, targetSeries, targetReps, targetMinutes, targetDistanceMeters]
+      dailyGoal, targetSeries, targetReps, targetMinutes, targetDistanceMeters, scheduleConfig ? JSON.stringify(scheduleConfig) : null]
   );
   return normalizeExerciseLibraryRow(result.rows[0]);
 }
