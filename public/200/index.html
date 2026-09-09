@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
   <link rel="stylesheet" href="/200/quality.css?v=20260906-1" />
   <link rel="stylesheet" href="/200/books.css?v=20260904-biblia-plano-v6" />
-  <link rel="stylesheet" href="/200/wellness.css?v=20260909-exercise-flow-v2" />
+  <link rel="stylesheet" href="/200/wellness.css?v=20260909-exercise-flow-v4" />
   <link rel="stylesheet" href="/200/performance.css?v=20260906-scroll-v1" />
 </head>
 <body data-background-theme="edge">
@@ -2142,15 +2142,16 @@
           <button class="wellness-phase-close" type="button" id="wellnessGoalClose" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
           <span class="wellness-phase-kicker">Sua meta</span><h2 id="wellnessGoalTitle">Quantas séries?</h2>
           <div class="wellness-goal-fields" id="wellnessSeriesGoalFields">
-            <label><span>Séries</span><input type="number" id="wellnessTargetSeries" min="1" max="100" inputmode="numeric" value="3" /></label>
-            <label><span>Movimentos por série</span><input type="number" id="wellnessTargetReps" min="1" max="10000" inputmode="numeric" value="12" /></label>
+            <div class="wellness-goal-counter"><span>Séries</span><div class="wellness-goal-stepper"><button type="button" data-goal-adjust="series" data-direction="-1" aria-label="Diminuir séries"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><input type="number" id="wellnessTargetSeries" min="1" max="100" inputmode="none" value="3" aria-label="Séries" readonly /><button type="button" data-goal-adjust="series" data-direction="1" aria-label="Aumentar séries"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div></div>
+            <div class="wellness-goal-counter"><span>Movimentos por série</span><div class="wellness-goal-stepper"><button type="button" data-goal-adjust="reps" data-direction="-1" aria-label="Diminuir movimentos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><input type="number" id="wellnessTargetReps" min="1" max="10000" inputmode="none" value="12" aria-label="Movimentos por série" readonly /><button type="button" data-goal-adjust="reps" data-direction="1" aria-label="Aumentar movimentos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div></div>
           </div>
           <div class="wellness-goal-fields" id="wellnessMinutesGoalFields" hidden>
-            <label><span>Minutos</span><input type="number" id="wellnessTargetMinutes" min="1" max="1440" inputmode="numeric" value="30" /></label>
+            <div class="wellness-goal-counter"><span>Minutos</span><div class="wellness-goal-stepper"><button type="button" data-goal-adjust="minutes" data-direction="-1" aria-label="Diminuir minutos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><input type="number" id="wellnessTargetMinutes" min="1" max="1440" inputmode="none" value="30" aria-label="Minutos" readonly /><button type="button" data-goal-adjust="minutes" data-direction="1" aria-label="Aumentar minutos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div></div>
           </div>
           <div class="wellness-goal-fields" id="wellnessDistanceGoalFields" hidden>
-            <label><span>Quilômetros</span><input type="number" id="wellnessTargetDistanceKm" min="0.1" max="10000" step="0.1" inputmode="decimal" value="3" /></label>
+            <div class="wellness-goal-counter"><span>Quilômetros</span><div class="wellness-goal-stepper"><button type="button" data-goal-adjust="distance" data-direction="-1" aria-label="Diminuir quilômetros"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><input type="number" id="wellnessTargetDistanceKm" min="0.1" max="10000" step="0.1" inputmode="none" value="3" aria-label="Quilômetros" readonly /><button type="button" data-goal-adjust="distance" data-direction="1" aria-label="Aumentar quilômetros"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div></div>
           </div>
+          <section class="wellness-exercise-weekday-picker"><span>Dias do treino</span><div id="wellnessExerciseWeekdays" role="group" aria-label="Dias do treino"><button type="button" data-exercise-weekday="1" aria-label="Segunda-feira">S</button><button type="button" data-exercise-weekday="2" aria-label="Terça-feira">T</button><button type="button" data-exercise-weekday="3" aria-label="Quarta-feira">Q</button><button type="button" data-exercise-weekday="4" aria-label="Quinta-feira">Q</button><button type="button" data-exercise-weekday="5" aria-label="Sexta-feira">S</button><button type="button" data-exercise-weekday="6" aria-label="Sábado">S</button><button type="button" data-exercise-weekday="0" aria-label="Domingo">D</button></div></section>
           <p id="wellnessGoalHelp">Você pode fazer em várias etapas ao longo do dia ou encerrar antes. Tudo realizado será somado na sua tabela.</p>
           <button class="wellness-phase-primary" type="submit" id="wellnessGoalStart">Iniciar treino</button>
         </form>
@@ -2220,7 +2221,7 @@
   <script src="/200/offline-data.js?v=1.10-offline-refresh-v1"></script>
   <script type="module" src="/200/project.js?v=20260909-exercise-mission-v1"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
-  <script type="module" src="/200/wellness.js?v=20260909-exercise-flow-v2"></script>
+  <script type="module" src="/200/wellness.js?v=20260909-exercise-flow-v4"></script>
   <script src="/200/books.js?v=20260904-biblia-plano-v7"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260908-readonly-v1"></script>

@@ -236,6 +236,7 @@ export async function syncProject200ExerciseMission(userId, profileName = PROJEC
          from project200_exercise_sessions session
          where session.user_id = library.user_id and session.assigned_profile = library.assigned_profile
            and session.exercise_id = library.exercise_id
+           and session.status = 'completed'
            and (session.started_at at time zone $3)::date = (now() at time zone $3)::date
        ) stats on true
        where library.user_id = $1 and library.assigned_profile = $2`,
@@ -324,6 +325,7 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
          from project200_exercise_sessions session
          where session.user_id = library.user_id and session.assigned_profile = library.assigned_profile
            and session.exercise_id = library.exercise_id
+           and session.status = 'completed'
            and (session.started_at at time zone $3)::date = (now() at time zone $3)::date
        ) stats on true
        where library.user_id = $1 and library.assigned_profile = $2
