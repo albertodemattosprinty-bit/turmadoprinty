@@ -108,6 +108,9 @@ function normalizeExerciseAssetRow(row) {
     startImageUrl: String(row?.start_image_url || ""),
     finishImageUrl: String(row?.finish_image_url || ""),
     muscleImageUrl: String(row?.muscle_image_url || ""),
+    videoUrl: String(row?.video_url || ""),
+    videoPosterUrl: String(row?.video_poster_url || ""),
+    videoDurationSeconds: Math.max(0, Number(row?.video_duration_seconds || 0)),
     generatedModel: String(row?.generated_model || ""),
     updatedAt: row?.updated_at ? new Date(row.updated_at).toISOString() : null
   };
@@ -168,6 +171,9 @@ export async function ensureProject200WellnessSchema() {
     created_at timestamptz not null default now(), updated_at timestamptz not null default now()
   )`);
   await query(`alter table project200_exercise_assets add column if not exists muscle_image_url text not null default ''`);
+  await query(`alter table project200_exercise_assets add column if not exists video_url text not null default ''`);
+  await query(`alter table project200_exercise_assets add column if not exists video_poster_url text not null default ''`);
+  await query(`alter table project200_exercise_assets add column if not exists video_duration_seconds numeric(6,2) not null default 0`);
   await query(`create table if not exists project200_wellness_preferences (
     user_id uuid not null references users(id) on delete cascade, assigned_profile text not null default 'Usuario',
     height_cm numeric(6,2) null, askagain1 text not null default 'yes' check (askagain1 in ('yes','no')),
@@ -202,8 +208,38 @@ async function getActiveWorkoutRow(userId, profileName) {
   return result.rows[0] || null;
 }
 
-function exerciseLibraryCompletionPercent(rows = []) {
-  const items = Array.isArray(rows) ? rows : [];
+function project200Weekday(dateKey = project200DateKey()) {
+  const match = String(dateKey || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return 0;
+  return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12)).getUTCDay();
+}
+
+export function isProject200ExerciseScheduledForDate(row, dateKey = project200DateKey()) {
+  const schedule = row?.schedule_config ?? row?.scheduleConfig;
+  if (!schedule || typeof schedule !== "object" || Array.isArray(schedule)) return true;
+  if (schedule.frequency === "none") return false;
+  const startsOn = String(schedule.startsOn || "").slice(0, 10);
+  if (startsOn && startsOn > dateKey) return false;
+  const weekDays = [...new Set((Array.isArray(schedule.weekDays) ? schedule.weekDays : [])
+    .map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))];
+  return !weekDays.length || weekDays.includes(project200Weekday(dateKey));
+}
+
+function project200ExerciseScheduleWeekDays(rows = []) {
+  const allDays = [0, 1, 2, 3, 4, 5, 6];
+  const selected = new Set();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const schedule = row?.schedule_config ?? row?.scheduleConfig;
+    if (schedule?.frequency === "none") continue;
+    const weekDays = [...new Set((Array.isArray(schedule?.weekDays) ? schedule.weekDays : [])
+      .map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))];
+    (weekDays.length ? weekDays : allDays).forEach((day) => selected.add(day));
+  }
+  return [...selected].sort((left, right) => left - right);
+}
+
+export function project200ExerciseLibraryCompletionPercent(rows = [], dateKey = project200DateKey()) {
+  const items = (Array.isArray(rows) ? rows : []).filter((row) => isProject200ExerciseScheduledForDate(row, dateKey));
   if (!items.length) return 0;
   const total = items.reduce((sum, row) => {
     const trackingType = TRACKING_TYPES.has(row?.tracking_type) ? row.tracking_type : "minutes";
@@ -245,9 +281,10 @@ export async function syncProject200ExerciseMission(userId, profileName = PROJEC
     rows = result.rows;
   }
   if (!rows.length) return null;
-  const percent = exerciseLibraryCompletionPercent(rows);
   const dateKey = project200DateKey();
-  const scheduleConfig = { nativeType: "exercise_plan", locked: true, frequency: "daily", interval: 1, intervalUnit: "day", weekDays: [0,1,2,3,4,5,6], startsOn: dateKey, endMode: "never", notification: { mode: "at_time", customAmount: 10, customUnit: "minutes" } };
+  const percent = project200ExerciseLibraryCompletionPercent(rows, dateKey);
+  const repeatDays = project200ExerciseScheduleWeekDays(rows);
+  const scheduleConfig = { nativeType: "exercise_plan", locked: true, frequency: "weekly", interval: 1, intervalUnit: "week", weekDays: repeatDays, startsOn: dateKey, endMode: "never", notification: { mode: "at_time", customAmount: 10, customUnit: "minutes" } };
   const existing = await query(
     `select id from extra_goals where user_id=$1 and assigned_profile=$2 and schedule_config->>'nativeType'='exercise_plan' order by created_at asc limit 1`,
     [userId, profile]
@@ -257,16 +294,16 @@ export async function syncProject200ExerciseMission(userId, profileName = PROJEC
     await query(
       `update extra_goals set title='Exercícios', category_id='exercicios', goal_kind='goal', target_value=100,
          progress_value=$4, progress_date=$3::date, last_progress_at=now(), is_folder=false,
-         repeat_days='[0,1,2,3,4,5,6]'::jsonb, schedule_config=$5::jsonb,
+         repeat_days=$5::jsonb, schedule_config=$6::jsonb,
          svg_icon_url='/200/apps/exercicios.png', svg_icon_label='Exercícios', updated_at=now()
-       where id=$6 and user_id=$1 and assigned_profile=$2`,
-      [userId, profile, dateKey, percent, JSON.stringify(scheduleConfig), goalId]
+       where id=$7 and user_id=$1 and assigned_profile=$2`,
+      [userId, profile, dateKey, percent, JSON.stringify(repeatDays), JSON.stringify(scheduleConfig), goalId]
     );
   } else {
     const inserted = await query(
       `insert into extra_goals (user_id,assigned_profile,title,category_id,goal_kind,target_value,progress_value,progress_date,last_progress_at,is_folder,repeat_days,schedule_config,svg_icon_url,svg_icon_label)
-       values ($1,$2,'Exercícios','exercicios','goal',100,$4,$3::date,now(),false,'[0,1,2,3,4,5,6]'::jsonb,$5::jsonb,'/200/apps/exercicios.png','Exercícios') returning id`,
-      [userId, profile, dateKey, percent, JSON.stringify(scheduleConfig)]
+       values ($1,$2,'Exercícios','exercicios','goal',100,$4,$3::date,now(),false,$5::jsonb,$6::jsonb,'/200/apps/exercicios.png','Exercícios') returning id`,
+      [userId, profile, dateKey, percent, JSON.stringify(repeatDays), JSON.stringify(scheduleConfig)]
     );
     goalId = inserted.rows[0]?.id || null;
   }
@@ -344,7 +381,7 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
   normalizedMeals.forEach((meal) => { if (meal.mealSlot && !latestMealBySlot.has(meal.mealSlot)) latestMealBySlot.set(meal.mealSlot, meal); });
   const mealMissionQuality = Math.round(enabledMealSlotKeys.reduce((sum, key) => sum + Number(latestMealBySlot.get(key)?.qualityScore || 0), 0) / Math.max(1, enabledMealSlotKeys.length));
   const completedMealSlots = enabledMealSlotKeys.filter((key) => latestMealBySlot.has(key)).length;
-  const exerciseCompletionPercent = exerciseLibraryCompletionPercent(libraryResult.rows);
+  const exerciseCompletionPercent = project200ExerciseLibraryCompletionPercent(libraryResult.rows);
   await syncProject200ExerciseMission(userId, profile, libraryResult.rows);
   const weights = weightResult.rows.map(normalizeWeightRow);
   const heightCm = preference.height_cm ? Number(preference.height_cm) : null;
@@ -395,6 +432,28 @@ export async function saveProject200ExerciseAssets(userId, payload = {}) {
        muscle_image_url=excluded.muscle_image_url, generated_model=excluded.generated_model, generated_by=excluded.generated_by, updated_at=now()
      returning *`,
     [exerciseId, exerciseName, JSON.stringify(muscles), startImageUrl, finishImageUrl, muscleImageUrl, generatedModel, userId]
+  );
+  return normalizeExerciseAssetRow(result.rows[0]);
+}
+
+export async function saveProject200ExerciseVideoAsset(userId, payload = {}) {
+  await ensureProject200WellnessSchema();
+  const exerciseId = String(payload.exerciseId || "").trim().slice(0, 120);
+  const exerciseName = String(payload.exerciseName || "").trim().slice(0, 160);
+  const videoUrl = String(payload.videoUrl || "").trim().slice(0, 2000);
+  const videoPosterUrl = String(payload.videoPosterUrl || "").trim().slice(0, 2000);
+  const durationSeconds = Math.max(0, Math.min(15, Number(payload.durationSeconds || 0) || 0));
+  if (!exerciseId || !exerciseName || !videoUrl || !videoPosterUrl || !durationSeconds) throw new Error("Dados do vídeo do exercício incompletos.");
+  const result = await query(
+    `insert into project200_exercise_assets (
+       exercise_id, exercise_name, muscles, start_image_url, finish_image_url, muscle_image_url,
+       video_url, video_poster_url, video_duration_seconds, generated_model, generated_by
+     ) values ($1,$2,'[]'::jsonb,$4,$4,$4,$3,$4,$5,'admin-video',$6)
+     on conflict (exercise_id) do update set exercise_name=excluded.exercise_name,
+       video_url=excluded.video_url, video_poster_url=excluded.video_poster_url,
+       video_duration_seconds=excluded.video_duration_seconds, generated_by=excluded.generated_by, updated_at=now()
+     returning *`,
+    [exerciseId, exerciseName, videoUrl, videoPosterUrl, durationSeconds, userId]
   );
   return normalizeExerciseAssetRow(result.rows[0]);
 }

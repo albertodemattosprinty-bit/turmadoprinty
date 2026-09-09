@@ -57,13 +57,14 @@ import { updateLatestTermCouponByUserId } from "./src/all-terms.js";
 import { archiveAdminEventFlow, createEventCoupon, deleteEventCoupon, ensureEventFlowSchema, getEventPresentations, listAdminEventFlow, listEventCoupons, markContractorPanelReached, normalizeEventPageSlug, recordProposalActivity, recordProposalVisit, resolveEventPage, resolveEventPricing, updateEventCoupon } from "./src/event-flow.js";
 import { confirmEventLodging, confirmEventPayment, createEventExpenseNote, ensureEventContractingSchema, getEventContractWorkflow, getEventExpenseNoteFile, getEventPromoVideoFile, listUnreadEventUserIds, markEventUpdatesViewed, reportEventPayment, saveEventLodging, saveEventPromoVideo } from "./src/event-contracting.js";
 import { buildEventPromoNarration, composeEventPromoVideo, synthesizeEventPromoNarration } from "./src/event-promo-video.js";
+import { compileProject200ExerciseVideo } from "./src/project200-exercise-video.js";
 import { EVENT_CHURCH_IMAGE_DEFAULTS, generateEventChurchArtwork } from "./src/event-church-artwork.js";
 import { getEventChurchArtworkFile, saveEventChurchArtwork } from "./src/event-church-artwork-store.js";
 import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, getUserActionById, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
 import { clearProject200CurrentTaskState, getProject200CurrentTaskState, saveProject200CurrentTaskState } from "./src/project200-current-task-state.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
-import { addProject200ExerciseSeries, addProject200ExerciseToLibrary, approveProject200ExercisePlan, createProject200NutritionEntry, createProject200WeightEntry, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, removeProject200ExerciseFromLibrary, saveProject200ExerciseAssets, startProject200ExerciseSession, syncProject200ExerciseMission, updateProject200ExerciseProgress, updateProject200MealSlots, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
+import { addProject200ExerciseSeries, addProject200ExerciseToLibrary, approveProject200ExercisePlan, createProject200NutritionEntry, createProject200WeightEntry, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, removeProject200ExerciseFromLibrary, saveProject200ExerciseAssets, saveProject200ExerciseVideoAsset, startProject200ExerciseSession, syncProject200ExerciseMission, updateProject200ExerciseProgress, updateProject200MealSlots, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, getProject200HistorySpan, listProject200History } from "./src/project200-history.js";
@@ -155,6 +156,7 @@ const MIDIA_PLAYBACK_HEARTBEAT_MS = 15 * 1000;
 const MAX_MINI_MEDIA_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_TRACK_BYTES = 40 * 1024 * 1024;
 const MAX_EVENT_PROMO_VIDEO_BYTES = 250 * 1024 * 1024;
+const MAX_PROJECT200_EXERCISE_VIDEO_BYTES = 80 * 1024 * 1024;
 const MAX_EVENT_CHURCH_PHOTO_BYTES = 15 * 1024 * 1024;
 const MAX_EVENT_EXPENSE_NOTE_BYTES = 20 * 1024 * 1024;
 const MAX_MINI_MEDIA_SCORE_BYTES = 30 * 1024 * 1024;
@@ -4727,6 +4729,41 @@ async function handleProject200ExerciseImagesRequest(request, response, exercise
     sendJson(response, 201, { ok: true, asset });
   } catch (error) {
     sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível gerar as imagens do exercício." });
+  }
+}
+
+async function handleProject200ExerciseVideoRequest(request, response, exerciseId) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+  try {
+    const safeExerciseId = String(exerciseId || "").trim().slice(0, 120);
+    const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+    const exerciseName = String(requestUrl.searchParams.get("exerciseName") || "").trim().slice(0, 160);
+    const contentType = String(request.headers["content-type"] || "").toLowerCase();
+    const declaredBytes = Math.max(0, Number(request.headers["content-length"] || 0));
+    if (!safeExerciseId || !exerciseName) throw new Error("Exercício inválido para envio do vídeo.");
+    if (contentType && !contentType.startsWith("video/") && contentType !== "application/octet-stream") throw new Error("Escolha um arquivo de vídeo válido.");
+    if (declaredBytes > MAX_PROJECT200_EXERCISE_VIDEO_BYTES) throw new Error("O vídeo deve ter no máximo 80 MB antes da otimização.");
+    const sourceBuffer = await readBinaryBody(request, MAX_PROJECT200_EXERCISE_VIDEO_BYTES);
+    const compiled = await compileProject200ExerciseVideo(sourceBuffer);
+    const safeKeyId = safeExerciseId.replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "") || "exercise";
+    const generationId = `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+    const videoKey = `project200/exercises/${safeKeyId}/video-${generationId}.mp4`;
+    const posterKey = `project200/exercises/${safeKeyId}/video-poster-${generationId}.webp`;
+    await Promise.all([
+      getR2Client().send(new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: videoKey, Body: compiled.videoBuffer, ContentType: "video/mp4", CacheControl: "public, max-age=31536000, immutable" })),
+      getR2Client().send(new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: posterKey, Body: compiled.posterBuffer, ContentType: "image/webp", CacheControl: "public, max-age=31536000, immutable" }))
+    ]);
+    const asset = await saveProject200ExerciseVideoAsset(admin.id, {
+      exerciseId: safeExerciseId,
+      exerciseName,
+      videoUrl: buildPublicR2UrlFromKey(videoKey),
+      videoPosterUrl: buildPublicR2UrlFromKey(posterKey),
+      durationSeconds: compiled.durationSeconds
+    });
+    sendJson(response, 201, { ok: true, asset });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível salvar o vídeo do exercício." });
   }
 }
 
@@ -16455,6 +16492,12 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "POST" && pathname.match(/^\/api\/admin\/200\/exercises\/[^/]+\/images$/)) {
     const exerciseId = decodeURIComponent(pathname.replace(/^\/api\/admin\/200\/exercises\/([^/]+)\/images$/, "$1"));
     await handleProject200ExerciseImagesRequest(request, response, exerciseId);
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/admin\/200\/exercises\/[^/]+\/video$/)) {
+    const exerciseId = decodeURIComponent(pathname.replace(/^\/api\/admin\/200\/exercises\/([^/]+)\/video$/, "$1"));
+    await handleProject200ExerciseVideoRequest(request, response, exerciseId);
     return;
   }
 
