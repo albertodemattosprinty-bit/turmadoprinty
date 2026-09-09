@@ -464,6 +464,19 @@ export async function addProject200ExerciseToLibrary(userId, payload = {}) {
   return normalizeExerciseLibraryRow(result.rows[0]);
 }
 
+export async function removeProject200ExerciseFromLibrary(userId, payload = {}) {
+  await ensureProject200WellnessSchema();
+  const profile = normalizeProfileName(payload.profileName);
+  const exerciseId = String(payload.exerciseId || "").trim().slice(0, 80);
+  if (!exerciseId) throw new Error("Escolha um exercicio valido.");
+  const result = await query(
+    `delete from project200_exercise_library where user_id = $1 and assigned_profile = $2 and exercise_id = $3 returning exercise_id, exercise_name`,
+    [userId, profile, exerciseId]
+  );
+  if (!result.rows[0]) throw new Error("Exercicio nao encontrado na sua lista.");
+  return { exerciseId: String(result.rows[0].exercise_id), exerciseName: String(result.rows[0].exercise_name || "Exercicio") };
+}
+
 export async function updateProject200MealSlots(userId, payload = {}) {
   await ensureProject200WellnessSchema();
   const profile = normalizeProfileName(payload.profileName);
@@ -567,9 +580,17 @@ export async function finishProject200ExerciseSession(userId, sessionId, payload
      where id = $1 and user_id = $2 and status = 'active' returning *`,
     [sessionId, userId, clampInteger(payload.steps, 0, 200000), clampInteger(payload.distanceMeters, 0, 10000000)]
   );
-  if (!result.rows[0]) throw new Error("Treino ativo nao encontrado.");
+  let workoutRow = result.rows[0];
+  if (!workoutRow) {
+    const completedResult = await query(
+      `select * from project200_exercise_sessions where id = $1 and user_id = $2 and status = 'completed' limit 1`,
+      [sessionId, userId]
+    );
+    workoutRow = completedResult.rows[0];
+  }
+  if (!workoutRow) throw new Error("Treino ativo nao encontrado.");
   const countResult = await query(`select count(*)::integer as series_count from project200_exercise_series where session_id = $1`, [sessionId]);
-  return normalizeWorkoutRow({ ...result.rows[0], series_count: countResult.rows[0]?.series_count || 0 });
+  return normalizeWorkoutRow({ ...workoutRow, series_count: countResult.rows[0]?.series_count || 0 });
 }
 
 export async function discardProject200ExerciseSession(userId, sessionId) {

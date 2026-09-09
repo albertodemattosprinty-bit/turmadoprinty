@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
   <link rel="stylesheet" href="/200/quality.css?v=20260906-1" />
   <link rel="stylesheet" href="/200/books.css?v=20260904-biblia-plano-v6" />
-  <link rel="stylesheet" href="/200/wellness.css?v=20260909-exercise-flow-v1" />
+  <link rel="stylesheet" href="/200/wellness.css?v=20260909-exercise-flow-v2" />
   <link rel="stylesheet" href="/200/performance.css?v=20260906-scroll-v1" />
 </head>
 <body data-background-theme="edge">
@@ -2103,7 +2103,7 @@
           <section class="wellness-list-section"><header><div><span>Hoje</span><h2>Suas refeições</h2></div></header><div class="wellness-meal-list" id="wellnessMealList"></div></section>
         </section>
         <section class="wellness-pane" data-wellness-pane="exercises">
-          <section class="wellness-exercise-daily-progress" aria-label="Progresso total do treino diário"><strong id="wellnessExerciseDailyPercent">0%</strong><span>do treino diário</span><div aria-hidden="true"><i id="wellnessExerciseDailyProgressFill"></i></div></section>
+          <section class="wellness-exercise-daily-progress" aria-label="Progresso total do treino diário"><div class="wellness-exercise-daily-copy"><span>Treino diário</span><strong id="wellnessExerciseDailyPercent">0%</strong><small>progresso total de hoje</small></div><div class="wellness-exercise-daily-track" aria-hidden="true"><i id="wellnessExerciseDailyProgressFill"></i></div></section>
           <section class="wellness-active-workout" id="wellnessActiveWorkout" hidden>
             <div class="wellness-active-workout-main"><img id="wellnessActiveWorkoutImage" src="/200/apps/exercicios.png" alt="" /><div><span>Treino em andamento</span><h2 id="wellnessWorkoutName">Caminhar</h2><div class="wellness-workout-counter" id="wellnessWorkoutCounter">00:00</div><small id="wellnessWorkoutDetail">Progresso salvo no seu perfil</small></div></div>
             <button type="button" class="wellness-start-button" id="wellnessWorkoutResume">Retomar em tela cheia</button>
@@ -2133,7 +2133,7 @@
           <p id="wellnessExerciseEquipment"></p>
           <section class="wellness-exercise-progress" id="wellnessExerciseProgress" hidden><strong id="wellnessExerciseProgressText">0% completo hoje</strong><div class="wellness-exercise-progress-track"><i id="wellnessExerciseProgressFill"></i></div><span id="wellnessExerciseTotal">0 movimentos totais</span></section>
           <ol class="wellness-instruction-list" id="wellnessExerciseInstructions"></ol>
-          <button class="wellness-phase-primary" type="button" id="wellnessExerciseStart">Definir meta</button><button class="wellness-phase-secondary wellness-exercise-generate" type="button" id="wellnessExerciseGenerate" hidden>Adicionar imagens com IA</button><p class="wellness-status" id="wellnessExerciseGenerateStatus" aria-live="polite"></p><button class="wellness-phase-secondary wellness-exercise-goal" type="button" id="wellnessExerciseGoal" hidden>Alterar meta</button>
+          <button class="wellness-phase-primary" type="button" id="wellnessExerciseStart">Definir meta</button><button class="wellness-phase-secondary wellness-exercise-generate" type="button" id="wellnessExerciseGenerate" hidden>Adicionar imagens com IA</button><p class="wellness-status" id="wellnessExerciseGenerateStatus" aria-live="polite"></p><div class="wellness-exercise-library-actions"><button class="wellness-phase-secondary wellness-exercise-goal" type="button" id="wellnessExerciseGoal" hidden>Alterar meta</button><button class="wellness-exercise-delete" type="button" id="wellnessExerciseDelete" aria-label="Excluir exercício" title="Excluir exercício" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg></button></div>
         </article>
       </div>
 
@@ -2220,7 +2220,7 @@
   <script src="/200/offline-data.js?v=1.10-offline-refresh-v1"></script>
   <script type="module" src="/200/project.js?v=20260909-exercise-mission-v1"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
-  <script type="module" src="/200/wellness.js?v=20260909-exercise-flow-v1"></script>
+  <script type="module" src="/200/wellness.js?v=20260909-exercise-flow-v2"></script>
   <script src="/200/books.js?v=20260904-biblia-plano-v7"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260908-readonly-v1"></script>
