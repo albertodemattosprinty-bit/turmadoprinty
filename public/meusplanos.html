@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turma do Printy | Meus planos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-page="meusplanos">
+  <header class="site-header">
+    <a class="brand" href="/index.html"><span class="brand-mark">P</span><span class="brand-text">Turma do Printy</span></a>
+  </header>
+
+  <main class="page-shell subscriptions-page">
+    <section class="section-card subscriptions-shell">
+      <div class="section-head subscriptions-head">
+        <div>
+          <p class="eyebrow" id="subscriptions-eyebrow">Minha conta</p>
+          <h1 class="section-title" id="subscriptions-title">Meus planos</h1>
+          <p class="section-muted subscriptions-intro" id="subscriptions-intro">Consulte suas assinaturas e escolha quando uma renovação deve parar.</p>
+        </div>
+        <a class="ghost-button" href="/planos.html">Ver planos disponíveis</a>
+      </div>
+
+      <div class="subscriptions-toolbar" id="subscriptions-toolbar" hidden>
+        <label class="subscriptions-search">
+          <span>Buscar assinatura</span>
+          <input id="subscriptions-search" type="search" placeholder="Nome, e-mail, plano ou status" autocomplete="off">
+        </label>
+        <p class="section-muted" id="subscriptions-count"></p>
+      </div>
+
+      <p class="subscriptions-feedback" id="subscriptions-feedback" role="status" aria-live="polite" hidden></p>
+
+      <div class="subscriptions-loading" id="subscriptions-loading">
+        <span class="subscriptions-spinner" aria-hidden="true"></span>
+        <span>Carregando assinaturas...</span>
+      </div>
+
+      <div class="subscriptions-grid" id="subscriptions-grid" hidden></div>
+
+      <div class="subscriptions-empty" id="subscriptions-empty" hidden>
+        <h2>Nenhuma assinatura encontrada</h2>
+        <p id="subscriptions-empty-copy">Quando você assinar um plano, ele aparecerá aqui.</p>
+        <a class="primary-button" href="/planos.html">Conhecer os planos</a>
+      </div>
+    </section>
+  </main>
+
+  <nav class="site-footer-nav site-nav" aria-label="Navegação principal">
+    <a class="nav-link" href="/index.html"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5v8a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></a>
+    <a class="nav-link" href="/produtos.html"><svg viewBox="0 0 24 24"><path d="m8 5 10 7-10 7z"/></svg><span>Produtos</span></a>
+    <a class="nav-link active" href="/meusplanos" aria-current="page"><svg viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2m0 4h14V7H5zm2 6h5v-2H7z"/></svg><span>Planos</span></a>
+    <a class="nav-link" href="/explorar.html"><svg viewBox="0 0 24 24"><path d="m12 3 2.45 4.96 5.48.8-3.97 3.87.94 5.47L12 15.52 7.1 18.1l.94-5.47-3.97-3.87 5.48-.8z"/></svg><span>Explorar</span></a>
+  </nav>
+
+  <script type="module" src="/meusplanos.js"></script>
+</body>
+</html>

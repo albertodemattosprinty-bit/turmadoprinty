@@ -70,13 +70,18 @@ export async function ensurePaymentSchema() {
           created_at timestamptz not null default now(),
           updated_at timestamptz not null default now(),
           activated_at timestamptz,
-          canceled_at timestamptz
+          canceled_at timestamptz,
+          cancel_at_period_end boolean not null default false,
+          current_period_end timestamptz
         );
       `);
 
+      await query("alter table user_plan_subscriptions add column if not exists cancel_at_period_end boolean not null default false;");
+      await query("alter table user_plan_subscriptions add column if not exists current_period_end timestamptz;");
       await query("create index if not exists idx_user_plan_subscriptions_user_id on user_plan_subscriptions(user_id);");
       await query("create index if not exists idx_user_plan_subscriptions_plan_id on user_plan_subscriptions(plan_id);");
       await query("create index if not exists idx_user_plan_subscriptions_status on user_plan_subscriptions(status);");
+      await query("create index if not exists idx_user_plan_subscriptions_subscription_id on user_plan_subscriptions(subscription_id);");
 
       await query(`
         create table if not exists payment_webhook_events (
@@ -314,8 +319,12 @@ export async function markPlanSubscriptionStatus({
   subscriptionId,
   payload,
   activatedAt,
-  canceledAt
+  canceledAt,
+  cancelAtPeriodEnd,
+  currentPeriodEnd
 }) {
+  await ensurePaymentSchema();
+
   const normalizedStatus = normalizeStatus(status);
   const result = await query(
     `
@@ -333,11 +342,28 @@ export async function markPlanSubscriptionStatus({
             when $6::timestamptz is not null then $6::timestamptz
             when $2 in ('CANCELED', 'CANCELLED', 'SUSPENDED', 'EXPIRED', 'OVERDUE', 'DECLINED', 'INACTIVE') and canceled_at is null then now()
             else canceled_at
+          end,
+          cancel_at_period_end = case
+            when $7::boolean is not null then $7::boolean
+            else cancel_at_period_end
+          end,
+          current_period_end = case
+            when $8::timestamptz is not null then $8::timestamptz
+            else current_period_end
           end
       where reference_id = $1
       returning *
     `,
-    [referenceId, normalizedStatus, subscriptionId || null, JSON.stringify(payload || {}), activatedAt || null, canceledAt || null]
+    [
+      referenceId,
+      normalizedStatus,
+      subscriptionId || null,
+      JSON.stringify(payload || {}),
+      activatedAt || null,
+      canceledAt || null,
+      typeof cancelAtPeriodEnd === "boolean" ? cancelAtPeriodEnd : null,
+      currentPeriodEnd || null
+    ]
   );
 
   const row = result.rows[0] || null;
@@ -358,6 +384,63 @@ export async function markPlanSubscriptionStatus({
   }
 
   return row;
+}
+
+export async function listPlanSubscriptions({ userId, includeAll = false }) {
+  await ensurePaymentSchema();
+
+  const result = await query(
+    `
+      select
+        subscription.id,
+        subscription.user_id,
+        subscription.plan_id,
+        subscription.reference_id,
+        subscription.checkout_id,
+        subscription.subscription_id,
+        subscription.status,
+        subscription.amount_cents,
+        subscription.pagbank_environment,
+        subscription.created_at,
+        subscription.updated_at,
+        subscription.activated_at,
+        subscription.canceled_at,
+        subscription.cancel_at_period_end,
+        subscription.current_period_end,
+        account.name as user_name,
+        account.username as user_username,
+        account.email as user_email
+      from user_plan_subscriptions subscription
+      join users account on account.id = subscription.user_id
+      where $1::boolean or subscription.user_id = $2
+      order by
+        case
+          when subscription.status in ('ACTIVE', 'PAID', 'AUTHORIZED', 'OVERDUE') then 0
+          when subscription.status = 'PENDING' then 1
+          else 2
+        end,
+        subscription.updated_at desc
+    `,
+    [Boolean(includeAll), userId]
+  );
+
+  return result.rows;
+}
+
+export async function getPlanSubscriptionById(subscriptionRecordId) {
+  await ensurePaymentSchema();
+
+  const result = await query(
+    `
+      select *
+      from user_plan_subscriptions
+      where id = $1
+      limit 1
+    `,
+    [subscriptionRecordId]
+  );
+
+  return result.rows[0] || null;
 }
 
 export async function getUserAccessState(userId) {

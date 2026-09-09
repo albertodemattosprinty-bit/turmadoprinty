@@ -10,6 +10,8 @@ const userDetailTitle = document.getElementById("user-detail-title");
 const userDetailSubtitle = document.getElementById("user-detail-subtitle");
 const userDetailTextConsumption = document.getElementById("user-detail-text-consumption");
 const userDetailNarrationConsumption = document.getElementById("user-detail-narration-consumption");
+const userSubscriptionList = document.getElementById("user-subscription-list");
+const userSubscriptionFeedback = document.getElementById("user-subscription-feedback");
 const userPlanSelect = document.getElementById("user-plan-select");
 const userContractorSelect = document.getElementById("user-contractor-select");
 const userEventLabel = document.getElementById("user-event-label");
@@ -35,6 +37,9 @@ let users = [];
 let plans = [];
 let schedule = [];
 let albums = [];
+let subscriptions = [];
+let subscriptionsLoadError = "";
+let subscriptionBusyId = "";
 let selectedUserId = "";
 let messageComposerUserId = "";
 let isDetailModalOpen = false;
@@ -62,6 +67,231 @@ function formatNarrationDuration(totalSeconds) {
   return `${(safeSeconds / 3600).toFixed(1).replace(".", ",")} horas`;
 }
 
+const inactiveSubscriptionStatuses = new Set([
+  "CANCELED",
+  "CANCELLED",
+  "SUSPENDED",
+  "EXPIRED",
+  "DECLINED",
+  "INACTIVE",
+  "REPLACED"
+]);
+
+const subscriptionStatusLabels = {
+  ACTIVE: "Ativa",
+  PAID: "Ativa",
+  AUTHORIZED: "Ativa",
+  PENDING: "Aguardando confirmacao",
+  OVERDUE: "Pagamento pendente",
+  CANCELED: "Cancelada",
+  CANCELLED: "Cancelada",
+  SUSPENDED: "Suspensa",
+  EXPIRED: "Encerrada",
+  DECLINED: "Pagamento recusado",
+  INACTIVE: "Inativa",
+  REPLACED: "Substituida"
+};
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function formatCurrency(valueInCents) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  }).format((Number(valueInCents) || 0) / 100);
+}
+
+function formatDate(value) {
+  if (!value) {
+    return "—";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(date);
+}
+
+function getPlanLabel(planId) {
+  const normalizedPlanId = String(planId || "").trim().toLowerCase();
+  const plan = plans.find((item) => item.id === normalizedPlanId);
+  return plan?.name || normalizedPlanId || "Plano";
+}
+
+function getSubscriptionStatus(subscription) {
+  return String(subscription?.status || "PENDING").trim().toUpperCase();
+}
+
+function getSubscriptionStatusLabel(subscription) {
+  const status = getSubscriptionStatus(subscription);
+
+  if (subscription?.cancelAtPeriodEnd && !inactiveSubscriptionStatuses.has(status)) {
+    return "Cancela no fim do periodo";
+  }
+
+  return subscriptionStatusLabels[status] || status;
+}
+
+function getSubscriptionStatusClass(subscription) {
+  const status = getSubscriptionStatus(subscription);
+
+  if (subscription?.cancelAtPeriodEnd && !inactiveSubscriptionStatuses.has(status)) {
+    return "scheduled";
+  }
+
+  if (["ACTIVE", "PAID", "AUTHORIZED"].includes(status)) {
+    return "active";
+  }
+
+  if (["PENDING", "OVERDUE"].includes(status)) {
+    return "pending";
+  }
+
+  return "inactive";
+}
+
+function getSubscriptionPeriodCopy(subscription) {
+  if (subscription.cancelAtPeriodEnd && subscription.currentPeriodEnd) {
+    return `Acesso disponivel ate ${formatDate(subscription.currentPeriodEnd)}. Nao havera nova cobranca.`;
+  }
+
+  if (subscription.cancelAtPeriodEnd) {
+    return "A renovacao foi desativada. O acesso permanece ate o fim do periodo pago.";
+  }
+
+  if (subscription.currentPeriodEnd) {
+    return `Proxima renovacao prevista para ${formatDate(subscription.currentPeriodEnd)}.`;
+  }
+
+  return "A situacao e sincronizada diretamente com o Stripe.";
+}
+
+function getSubscriptionsForUser(userId) {
+  return subscriptions.filter((subscription) => String(subscription?.user?.id || "") === String(userId || ""));
+}
+
+function getCurrentSubscriptionsForUser(userId) {
+  return getSubscriptionsForUser(userId).filter((subscription) => {
+    const status = getSubscriptionStatus(subscription);
+    return Boolean(subscription.subscriptionId) && !inactiveSubscriptionStatuses.has(status);
+  });
+}
+
+function setSubscriptionFeedback(message = "", type = "") {
+  if (!userSubscriptionFeedback) {
+    return;
+  }
+
+  userSubscriptionFeedback.textContent = message;
+  userSubscriptionFeedback.className = `subscriptions-feedback user-subscription-feedback${type ? ` is-${type}` : ""}`;
+  userSubscriptionFeedback.hidden = !message;
+}
+
+function renderSubscriptionSummary(user) {
+  const currentSubscriptions = getCurrentSubscriptionsForUser(user.id);
+  const currentSubscription = currentSubscriptions[0] || null;
+
+  if (currentSubscription) {
+    return `<span class="users-subscription-summary is-${getSubscriptionStatusClass(currentSubscription)}">Assinatura ${escapeHtml(getPlanLabel(currentSubscription.planId))} · ${escapeHtml(getSubscriptionStatusLabel(currentSubscription))}</span>`;
+  }
+
+  if (user.assignedPlanId) {
+    return `<span class="users-subscription-summary is-manual">Plano manual ${escapeHtml(getPlanLabel(user.assignedPlanId))}</span>`;
+  }
+
+  return '<span class="users-subscription-summary is-empty">Sem assinatura ativa</span>';
+}
+
+function renderUserSubscriptions(user) {
+  if (!userSubscriptionList) {
+    return;
+  }
+
+  if (subscriptionsLoadError) {
+    userSubscriptionList.innerHTML = `
+      <div class="user-subscription-empty is-error">
+        <strong>Nao foi possivel carregar as assinaturas</strong>
+        <span>${escapeHtml(subscriptionsLoadError)}</span>
+      </div>
+    `;
+    return;
+  }
+
+  const allUserSubscriptions = getSubscriptionsForUser(user.id);
+  const currentSubscriptions = getCurrentSubscriptionsForUser(user.id);
+  const pendingCheckoutCount = allUserSubscriptions.filter((subscription) => (
+    getSubscriptionStatus(subscription) === "PENDING" && !subscription.subscriptionId
+  )).length;
+
+  if (!currentSubscriptions.length) {
+    const pendingCopy = pendingCheckoutCount
+      ? `${pendingCheckoutCount} tentativa(s) de checkout ainda sem assinatura confirmada.`
+      : "Este usuario nao possui uma assinatura ativa no Stripe.";
+    userSubscriptionList.innerHTML = `
+      <div class="user-subscription-empty">
+        <strong>Nenhuma assinatura ativa</strong>
+        <span>${escapeHtml(pendingCopy)}</span>
+      </div>
+    `;
+    return;
+  }
+
+  userSubscriptionList.innerHTML = currentSubscriptions.map((subscription) => {
+    const busy = subscriptionBusyId === subscription.id;
+    const stopRenewalButton = subscription.cancelAtPeriodEnd
+      ? ""
+      : `
+        <button class="ghost-button user-subscription-action" type="button" data-subscription-id="${escapeHtml(subscription.id)}" data-mode="period_end" ${busy ? "disabled" : ""}>
+          ${busy ? "Processando..." : "Parar renovacao"}
+        </button>
+      `;
+
+    return `
+      <article class="subscription-card user-subscription-card">
+        <div class="subscription-card-head">
+          <div>
+            <p class="eyebrow">Plano ${escapeHtml(getPlanLabel(subscription.planId))}</p>
+            <h2>${escapeHtml(formatCurrency(subscription.amountCents))}<small>/mes</small></h2>
+          </div>
+          <span class="subscription-status is-${getSubscriptionStatusClass(subscription)}">${escapeHtml(getSubscriptionStatusLabel(subscription))}</span>
+        </div>
+        <dl class="subscription-details">
+          <div><dt>Inicio</dt><dd>${escapeHtml(formatDate(subscription.activatedAt || subscription.createdAt))}</dd></div>
+          <div><dt>Fim do periodo</dt><dd>${escapeHtml(formatDate(subscription.currentPeriodEnd))}</dd></div>
+          <div><dt>Origem</dt><dd>Stripe</dd></div>
+        </dl>
+        <p class="subscription-period-copy">${escapeHtml(getSubscriptionPeriodCopy(subscription))}</p>
+        <div class="subscription-actions">
+          ${stopRenewalButton}
+          <button class="subscription-danger-button user-subscription-action" type="button" data-subscription-id="${escapeHtml(subscription.id)}" data-mode="immediate" ${busy ? "disabled" : ""}>
+            ${busy ? "Processando..." : "Cancelar agora"}
+          </button>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  userSubscriptionList.querySelectorAll(".user-subscription-action").forEach((button) => {
+    button.addEventListener("click", () => {
+      void cancelSelectedUserSubscription(button.dataset.subscriptionId, button.dataset.mode);
+    });
+  });
+}
+
 function getSelectedUser() {
   return users.find((item) => item.id === selectedUserId) || null;
 }
@@ -78,6 +308,7 @@ function syncUserDetailModalState() {
 function openUserDetailModal(userId) {
   selectedUserId = userId;
   isDetailModalOpen = true;
+  setSubscriptionFeedback();
   syncUserDetailModalState();
   renderUsersTable();
   renderDetailPanel();
@@ -157,6 +388,7 @@ function renderDetailPanel() {
   userDetailSubtitle.textContent = user.username ? `@${user.username}` : "Sem username";
   userDetailTextConsumption.textContent = formatTextTokens(user.textTokensTotal);
   userDetailNarrationConsumption.textContent = formatNarrationDuration(user.narrationSecondsTotal);
+  renderUserSubscriptions(user);
   userPlanSelect.value = user.assignedPlanId || "gratis";
   userContractorSelect.value = user.isContractor ? "true" : "false";
   userEventSelect.value = user.contractorEventId || "";
@@ -205,6 +437,7 @@ function renderUsersTable() {
               <span>${user.name || user.username || "Usuario"}</span>
             </strong>
             <small>${user.username ? `@${user.username}` : ""}</small>
+            ${renderSubscriptionSummary(user)}
           </span>
         </button>
         <button class="users-message-button" type="button" aria-label="Abrir mensagem de ${user.name || user.username || "usuario"}" title="Abrir mensagem">
@@ -285,6 +518,8 @@ async function loadUsers() {
   schedule = Array.isArray(data.schedule) ? data.schedule : [];
   albums = Array.isArray(data.albums) ? data.albums : [];
 
+  await loadSubscriptionsForUsers();
+
   if (!selectedUserId && users[0]) {
     selectedUserId = users[0].id;
   }
@@ -295,6 +530,95 @@ async function loadUsers() {
   renderUsersTable();
   renderDetailPanel();
   usersStatus.textContent = `${users.length} usuarios carregados.`;
+}
+
+async function loadSubscriptionsForUsers() {
+  subscriptionsLoadError = "";
+
+  try {
+    const response = await fetch(getApiUrl("/api/account/subscriptions"), {
+      headers: {
+        Authorization: `Bearer ${getToken()}`
+      }
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (response.status === 401) {
+      redirectToAuth();
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(data.error || "Falha ao carregar assinaturas.");
+    }
+
+    subscriptions = Array.isArray(data.subscriptions) ? data.subscriptions : [];
+  } catch (error) {
+    subscriptions = [];
+    subscriptionsLoadError = error instanceof Error ? error.message : "Erro ao carregar assinaturas.";
+  }
+}
+
+async function cancelSelectedUserSubscription(subscriptionRecordId, mode) {
+  const user = getSelectedUser();
+  const subscription = getCurrentSubscriptionsForUser(user?.id).find((item) => item.id === subscriptionRecordId);
+
+  if (!user || !subscription) {
+    return;
+  }
+
+  const immediate = mode === "immediate";
+  const userLabel = user.name || user.username || "este usuario";
+  const planLabel = getPlanLabel(subscription.planId);
+  const confirmation = immediate
+    ? `Cancelar o plano ${planLabel} de ${userLabel} agora? O acesso sera encerrado imediatamente.`
+    : `Parar a renovacao do plano ${planLabel} de ${userLabel}? O acesso continuara ate o fim do periodo pago.`;
+
+  if (!window.confirm(confirmation)) {
+    return;
+  }
+
+  subscriptionBusyId = subscription.id;
+  setSubscriptionFeedback(immediate ? "Cancelando assinatura no Stripe..." : "Desativando renovacao no Stripe...");
+  renderUserSubscriptions(user);
+
+  try {
+    const response = await fetch(getApiUrl(`/api/account/subscriptions/${encodeURIComponent(subscription.id)}/cancel`), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`
+      },
+      body: JSON.stringify({
+        mode: immediate ? "immediate" : "period_end"
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (response.status === 401) {
+      redirectToAuth();
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(data.error || "Nao foi possivel alterar a assinatura.");
+    }
+
+    await loadSubscriptionsForUsers();
+    subscriptionBusyId = "";
+    renderUsersTable();
+    renderUserSubscriptions(getSelectedUser());
+    setSubscriptionFeedback(
+      immediate
+        ? "Assinatura cancelada imediatamente no Stripe."
+        : "Renovacao desativada. O acesso continuara ate o fim do periodo pago.",
+      "success"
+    );
+  } catch (error) {
+    subscriptionBusyId = "";
+    renderUserSubscriptions(getSelectedUser());
+    setSubscriptionFeedback(error instanceof Error ? error.message : "Erro ao alterar a assinatura.", "error");
+  }
 }
 
 async function sendMessageToSelectedUser() {

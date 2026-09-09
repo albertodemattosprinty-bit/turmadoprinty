@@ -321,8 +321,8 @@ function buildLoggedInMenu(user) {
       <strong>${name}</strong>
       <span>${username}</span>
     </div>
-    <a class="site-user-menu-item" href="/planos.html">Gerenciar assinatura</a>
-    <a class="site-user-menu-item" href="/planos.html">Cancelar plano</a>
+    <a class="site-user-menu-item" href="/meusplanos">Gerenciar assinatura</a>
+    <a class="site-user-menu-item" href="/meusplanos">Cancelar plano</a>
     <button class="site-user-menu-item" type="button" data-action="delete-account" disabled>Excluir conta</button>
     <button class="site-user-menu-item danger" type="button" data-action="logout">Sair da conta</button>
   `;

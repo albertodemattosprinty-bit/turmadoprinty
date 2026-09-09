@@ -32,6 +32,8 @@ Depois abra `http://localhost:3000`.
 - `POST /api/payments/stripe/checkout`
 - `POST /api/payments/stripe/subscription-checkout`
 - `POST /api/payments/stripe/webhook`
+- `GET /api/account/subscriptions`
+- `POST /api/account/subscriptions/:id/cancel`
 - `GET /api/db/health`
 - `POST /api/auth/register`
 - `POST /api/auth/verify-code`
@@ -66,6 +68,8 @@ Se `system` vier vazio, o backend usa um contexto cristao protestante amigavel e
 
 - A pagina [public/produtos.html](C:/Users/Lucas/Desktop/Turma%20do%20Printy%20Database/public/produtos.html) abre o Stripe Checkout para compra avulsa
 - A pagina [public/planos.html](C:/Users/Lucas/Desktop/Turma%20do%20Printy%20Database/public/planos.html) abre o Stripe Checkout em modo assinatura
+- A pagina [public/meusplanos.html](C:/Users/Lucas/Desktop/Turma%20do%20Printy%20Database/public/meusplanos.html) lista apenas as assinaturas do usuario; para administradores, lista as assinaturas de todos os usuarios
+- O cancelamento comum usa `cancel_at_period_end`; o cancelamento imediato e restrito ao administrador no servidor
 - O webhook atual fica em `POST /api/payments/stripe/webhook`
 - Para desenvolvimento local, rode `stripe listen --forward-to localhost:3000/api/payments/stripe/webhook` e copie o segredo gerado para `STRIPE_WEBHOOK_SECRET`
 

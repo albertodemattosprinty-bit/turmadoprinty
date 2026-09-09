@@ -138,12 +138,17 @@ create table if not exists user_plan_subscriptions (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   activated_at timestamptz,
-  canceled_at timestamptz
+  canceled_at timestamptz,
+  cancel_at_period_end boolean not null default false,
+  current_period_end timestamptz
 );
 
+alter table user_plan_subscriptions add column if not exists cancel_at_period_end boolean not null default false;
+alter table user_plan_subscriptions add column if not exists current_period_end timestamptz;
 create index if not exists idx_user_plan_subscriptions_user_id on user_plan_subscriptions(user_id);
 create index if not exists idx_user_plan_subscriptions_plan_id on user_plan_subscriptions(plan_id);
 create index if not exists idx_user_plan_subscriptions_status on user_plan_subscriptions(status);
+create index if not exists idx_user_plan_subscriptions_subscription_id on user_plan_subscriptions(subscription_id);
 
 create table if not exists payment_webhook_events (
   id uuid primary key default gen_random_uuid(),

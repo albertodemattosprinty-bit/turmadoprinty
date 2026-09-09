@@ -48,7 +48,7 @@ import { clearMiniMediaSongPlayback, createMiniMediaSongAsset, deleteMiniMediaAl
 import { ensureMiniDocumentExists, insertMiniDocumentLinesAfter, replaceMiniDocumentLineRange, updateMiniDocumentLine } from "./src/mini-docs.js";
 import { createEscreverParagraph, deleteEscreverParagraph, ensureEscreverSchema, listEscreverParagraphs } from "./src/escrever.js";
 import { buildMiniSystemPrompt, MINI_MINISTRY_CONTEXT } from "./src/mini-prompts.js";
-import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getAlbumRehearsalCodeForOwner, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent, redeemAlbumRehearsalCode } from "./src/payments.js";
+import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getAlbumRehearsalCodeForOwner, getPlanSubscriptionById, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, listPlanSubscriptions, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent, redeemAlbumRehearsalCode } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
 import { createScheduleEntry, deleteScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
@@ -2851,10 +2851,10 @@ async function syncFinanceSubscriptionsWithStripe() {
 
     const nextStatus = normalizeStripeSubscriptionStatus(subscription?.status);
     const activatedAt = isActiveSubscriptionStatus(nextStatus)
-      ? toIsoDateFromUnix(subscription?.current_period_start) || toIsoDateFromUnix(subscription?.start_date)
+      ? getStripeSubscriptionPeriodDate(subscription, "current_period_start") || toIsoDateFromUnix(subscription?.start_date)
       : null;
     const canceledAt = isInactiveSubscriptionStatus(nextStatus)
-      ? toIsoDateFromUnix(subscription?.canceled_at) || new Date().toISOString()
+      ? toIsoDateFromUnix(subscription?.ended_at) || toIsoDateFromUnix(subscription?.canceled_at) || new Date().toISOString()
       : null;
 
     await markPlanSubscriptionStatus({
@@ -2863,7 +2863,9 @@ async function syncFinanceSubscriptionsWithStripe() {
       subscriptionId,
       payload: subscription,
       activatedAt,
-      canceledAt
+      canceledAt,
+      cancelAtPeriodEnd: Boolean(subscription?.cancel_at_period_end),
+      currentPeriodEnd: getStripeSubscriptionPeriodDate(subscription, "current_period_end")
     });
   }
 }
@@ -3040,6 +3042,40 @@ function getStripeInvoiceReferenceId(invoice) {
 
 function toIsoDateFromUnix(value) {
   return Number.isFinite(value) ? new Date(value * 1000).toISOString() : null;
+}
+
+function readStripeSubscriptionPeriodUnix(subscription, field) {
+  const normalizeUnix = (value) => {
+    if (value === null || value === undefined || value === "") {
+      return null;
+    }
+
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue : null;
+  };
+  const directValue = normalizeUnix(subscription?.[field]);
+
+  if (directValue !== null) {
+    return directValue;
+  }
+
+  const itemValues = Array.isArray(subscription?.items?.data)
+    ? subscription.items.data
+        .map((item) => normalizeUnix(item?.[field]))
+        .filter((value) => value !== null)
+    : [];
+
+  if (!itemValues.length) {
+    return null;
+  }
+
+  return field === "current_period_start"
+    ? Math.min(...itemValues)
+    : Math.max(...itemValues);
+}
+
+function getStripeSubscriptionPeriodDate(subscription, field) {
+  return toIsoDateFromUnix(readStripeSubscriptionPeriodUnix(subscription, field));
 }
 
 function extractChatUsageTokens(payload) {
@@ -12028,6 +12064,8 @@ async function handleStripeWebhook(request, response) {
           let activatedAt = null;
           let canceledAt = null;
           let subscriptionId = null;
+          let cancelAtPeriodEnd = null;
+          let currentPeriodEnd = null;
 
           if (payload?.type === "checkout.session.completed") {
             nextStatus = resource?.mode === "subscription"
@@ -12053,9 +12091,13 @@ async function handleStripeWebhook(request, response) {
             subscriptionId = resource?.subscription || null;
           } else if (payload?.type === "customer.subscription.updated" || payload?.type === "customer.subscription.deleted") {
             nextStatus = normalizeStripeSubscriptionStatus(resource?.status);
-            activatedAt = isActiveSubscriptionStatus(nextStatus) ? toIsoDateFromUnix(resource?.current_period_start) : null;
-            canceledAt = isInactiveSubscriptionStatus(nextStatus) ? toIsoDateFromUnix(resource?.canceled_at) || new Date().toISOString() : null;
+            activatedAt = isActiveSubscriptionStatus(nextStatus) ? getStripeSubscriptionPeriodDate(resource, "current_period_start") : null;
+            canceledAt = isInactiveSubscriptionStatus(nextStatus)
+              ? toIsoDateFromUnix(resource?.ended_at) || toIsoDateFromUnix(resource?.canceled_at) || new Date().toISOString()
+              : null;
             subscriptionId = resource?.id || null;
+            cancelAtPeriodEnd = Boolean(resource?.cancel_at_period_end);
+            currentPeriodEnd = getStripeSubscriptionPeriodDate(resource, "current_period_end");
           }
 
           await markPlanSubscriptionStatus({
@@ -12064,7 +12106,9 @@ async function handleStripeWebhook(request, response) {
             subscriptionId,
             payload,
             activatedAt,
-            canceledAt
+            canceledAt,
+            cancelAtPeriodEnd,
+            currentPeriodEnd
           });
         } else {
           const paymentStatus = payload?.type === "checkout.session.async_payment_failed"
@@ -12111,6 +12155,188 @@ async function handleAccessStateRequest(request, response) {
   } catch (error) {
     sendJson(response, 500, {
       error: error instanceof Error ? error.message : "Erro ao carregar acessos do usuario."
+    });
+  }
+}
+
+function serializePlanSubscription(row, includeUser = false) {
+  const serialized = {
+    id: row.id,
+    planId: row.plan_id,
+    referenceId: row.reference_id,
+    checkoutId: row.checkout_id,
+    subscriptionId: row.subscription_id,
+    status: String(row.status || "PENDING").toUpperCase(),
+    amountCents: Number(row.amount_cents) || 0,
+    environment: row.pagbank_environment,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    activatedAt: row.activated_at,
+    canceledAt: row.canceled_at,
+    cancelAtPeriodEnd: Boolean(row.cancel_at_period_end),
+    currentPeriodEnd: row.current_period_end
+  };
+
+  if (includeUser) {
+    serialized.user = {
+      id: row.user_id,
+      name: row.user_name || "",
+      username: row.user_username || "",
+      email: row.user_email || ""
+    };
+  }
+
+  return serialized;
+}
+
+async function handlePlanSubscriptionsListRequest(request, response) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAuth(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  const admin = isAdminUser(user);
+
+  try {
+    await syncFinanceSubscriptionsWithStripeIfNeeded();
+    const subscriptions = await listPlanSubscriptions({
+      userId: user.id,
+      includeAll: admin
+    });
+
+    sendJson(response, 200, {
+      ok: true,
+      isAdmin: admin,
+      subscriptions: subscriptions.map((subscription) => serializePlanSubscription(subscription, admin))
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao carregar assinaturas."
+    });
+  }
+}
+
+async function handlePlanSubscriptionCancelRequest(request, response, subscriptionRecordId) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAuth(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(subscriptionRecordId)) {
+    sendJson(response, 404, { error: "Assinatura nao encontrada." });
+    return;
+  }
+
+  let body = {};
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const admin = isAdminUser(user);
+  const immediate = body?.mode === "immediate";
+
+  if (immediate && !admin) {
+    sendJson(response, 403, { error: "Somente o administrador pode cancelar uma assinatura imediatamente." });
+    return;
+  }
+
+  try {
+    const subscriptionRecord = await getPlanSubscriptionById(subscriptionRecordId);
+
+    if (!subscriptionRecord) {
+      sendJson(response, 404, { error: "Assinatura nao encontrada." });
+      return;
+    }
+
+    if (!admin && String(subscriptionRecord.user_id) !== String(user.id)) {
+      sendJson(response, 403, { error: "Voce nao pode alterar a assinatura de outro usuario." });
+      return;
+    }
+
+    const stripe = getStripeClient();
+    let subscriptionId = String(subscriptionRecord.subscription_id || "").trim();
+
+    if (!subscriptionId) {
+      subscriptionId = readSubscriptionIdFromPayload(subscriptionRecord.raw_payload || {}) || "";
+    }
+
+    if (!subscriptionId) {
+      subscriptionId = await resolveSubscriptionIdFromCheckout(stripe, subscriptionRecord.checkout_id) || "";
+    }
+
+    if (!subscriptionId) {
+      sendJson(response, 409, {
+        error: "Esta assinatura ainda nao possui um identificador confirmado pelo Stripe. Aguarde a confirmacao do pagamento e tente novamente."
+      });
+      return;
+    }
+
+    let stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const stripeSubscriptionEnded = ["canceled", "incomplete_expired"].includes(
+      String(stripeSubscription?.status || "").trim().toLowerCase()
+    );
+
+    if (immediate) {
+      if (!stripeSubscriptionEnded) {
+        stripeSubscription = await stripe.subscriptions.cancel(subscriptionId);
+      }
+    } else if (!stripeSubscriptionEnded && !stripeSubscription?.cancel_at_period_end) {
+      stripeSubscription = await stripe.subscriptions.update(subscriptionId, {
+        cancel_at_period_end: true
+      });
+    }
+
+    const nextStatus = normalizeStripeSubscriptionStatus(stripeSubscription?.status);
+    const activatedAt = isActiveSubscriptionStatus(nextStatus)
+      ? getStripeSubscriptionPeriodDate(stripeSubscription, "current_period_start") || toIsoDateFromUnix(stripeSubscription?.start_date)
+      : null;
+    const canceledAt = isInactiveSubscriptionStatus(nextStatus)
+      ? toIsoDateFromUnix(stripeSubscription?.ended_at) || toIsoDateFromUnix(stripeSubscription?.canceled_at) || new Date().toISOString()
+      : null;
+
+    await markPlanSubscriptionStatus({
+      referenceId: subscriptionRecord.reference_id,
+      status: nextStatus,
+      subscriptionId,
+      payload: stripeSubscription,
+      activatedAt,
+      canceledAt,
+      cancelAtPeriodEnd: Boolean(stripeSubscription?.cancel_at_period_end),
+      currentPeriodEnd: getStripeSubscriptionPeriodDate(stripeSubscription, "current_period_end")
+    });
+
+    console.log("[Stripe subscription cancellation]", JSON.stringify({
+      actorUserId: user.id,
+      subscriptionRecordId,
+      subscriptionId,
+      mode: immediate ? "immediate" : "period_end",
+      status: nextStatus
+    }));
+
+    const updatedRecord = await getPlanSubscriptionById(subscriptionRecordId);
+    sendJson(response, 200, {
+      ok: true,
+      mode: immediate ? "immediate" : "period_end",
+      subscription: serializePlanSubscription(updatedRecord)
+    });
+  } catch (error) {
+    console.error("[Stripe subscription cancellation error]", error);
+    sendJson(response, 502, {
+      error: error instanceof Error ? error.message : "Nao foi possivel cancelar a assinatura no Stripe."
     });
   }
 }
@@ -14945,6 +15171,17 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "GET" && pathname === "/api/account/access") {
     await handleAccessStateRequest(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/account/subscriptions") {
+    await handlePlanSubscriptionsListRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/account\/subscriptions\/[^/]+\/cancel$/)) {
+    const subscriptionRecordId = decodeURIComponent(pathname.replace(/^\/api\/account\/subscriptions\/([^/]+)\/cancel$/, "$1"));
+    await handlePlanSubscriptionCancelRequest(request, response, subscriptionRecordId);
     return;
   }
 
