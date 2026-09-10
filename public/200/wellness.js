@@ -603,10 +603,32 @@ function elapsedSeconds(workout=state.workout){ const started=new Date(workout?.
 function formatTimer(seconds){ const total=Math.max(0,Math.trunc(seconds||0)), hours=Math.floor(total/3600), minutes=Math.floor((total%3600)/60), secs=total%60; return hours?`${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:${String(secs).padStart(2,"0")}`:`${String(minutes).padStart(2,"0")}:${String(secs).padStart(2,"0")}`; }
 function currentGpsDistance(){ return Math.max(0,Math.round(Math.max(Number(state.workout?.distanceMeters||0),Number(state.gpsDistanceMeters||0)))); }
 function formatDistance(meters){ const value=Math.max(0,Number(meters||0)); return value<1000?`${Math.round(value)} m`:`${(value/1000).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})} km`; }
+function relativeWorkoutTime(value,now=Date.now()){
+  const timestamp=new Date(value||"").getTime();if(!Number.isFinite(timestamp))return "agora mesmo";
+  const elapsed=Math.max(0,Math.floor((now-timestamp)/1000));if(elapsed<60)return "agora mesmo";
+  const minutes=Math.floor(elapsed/60);if(minutes<60)return `há ${minutes} ${minutes===1?"minuto":"minutos"}`;
+  const hours=Math.floor(minutes/60);if(hours<24)return `há ${hours} ${hours===1?"hora":"horas"}`;
+  const days=Math.floor(hours/24),remainingHours=hours%24;
+  if(days<30)return `há ${days} ${days===1?"dia":"dias"}${remainingHours?` e ${remainingHours} ${remainingHours===1?"hora":"horas"}`:""}`;
+  const months=Math.floor(days/30),remainingDays=days%30;
+  if(months<12)return `há ${months} ${months===1?"mês":"meses"}${remainingDays?` e ${remainingDays} ${remainingDays===1?"dia":"dias"}`:""}`;
+  const years=Math.floor(months/12),remainingMonths=months%12;
+  return `há ${years} ${years===1?"ano":"anos"}${remainingMonths?` e ${remainingMonths} ${remainingMonths===1?"mês":"meses"}`:""}`;
+}
+function refreshWorkoutRelativeTimes(){ elements.workoutHistory?.querySelectorAll("time[data-workout-time]").forEach((time)=>{time.textContent=relativeWorkoutTime(time.dataset.workoutTime);}); }
 function averageSpeedKmh(){ const elapsed=elapsedSeconds(state.workout); return elapsed>0?(currentGpsDistance()/1000)/(elapsed/3600):0; }
 function formatAverageSpeed(){ return `${averageSpeedKmh().toLocaleString("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1})} km/h`; }
 function haversineMeters(a,b){ const radians=(value)=>value*Math.PI/180, earth=6371000, lat=radians(b.latitude-a.latitude), lon=radians(b.longitude-a.longitude), x=Math.sin(lat/2)**2+Math.cos(radians(a.latitude))*Math.cos(radians(b.latitude))*Math.sin(lon/2)**2; return earth*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x)); }
-function renderWorkoutHistory(){ if(!elements.workoutHistory)return; const workouts=Array.isArray(state.dashboard?.recentWorkouts)?state.dashboard.recentWorkouts:[]; elements.workoutHistory.innerHTML=""; if(!workouts.length){ elements.workoutHistory.innerHTML="<div class=\"wellness-meal-empty\">Nenhum treino concluído.</div>"; return; } workouts.forEach((workout)=>{ const row=document.createElement("div"); row.className="wellness-workout-history-entry"; const result=workout.trackingType==="series"?`${Number(workout.seriesCount||0)} séries · ${Number(workout.totalReps||0)} movimentos`:workout.trackingType==="gps"?`${formatDistance(Number(workout.distanceMeters||0))} · ${Math.round(Number(workout.durationMinutes||0))} min`:`${Math.round(Number(workout.durationMinutes||0))} minutos`; row.innerHTML=`<div><strong></strong><small>${result}</small></div><time>${new Date(workout.completedAt||workout.startedAt).toLocaleDateString("pt-BR")}</time>`; row.querySelector("strong").textContent=workout.exerciseName||"Treino"; elements.workoutHistory.appendChild(row); }); }
+function renderWorkoutHistory(){ if(!elements.workoutHistory)return; const workouts=Array.isArray(state.dashboard?.recentWorkouts)?state.dashboard.recentWorkouts:[]; elements.workoutHistory.innerHTML=""; if(!workouts.length){ elements.workoutHistory.innerHTML="<div class=\"wellness-meal-empty\">Nenhum treino concluído.</div>"; return; } workouts.forEach((workout)=>{ const row=document.createElement("div"); row.className="wellness-workout-history-entry"; const result=workout.trackingType==="series"?`${Number(workout.seriesCount||0)} séries · ${Number(workout.totalReps||0)} movimentos`:workout.trackingType==="gps"?`${formatDistance(Number(workout.distanceMeters||0))} · ${Math.round(Number(workout.durationMinutes||0))} min`:`${Math.round(Number(workout.durationMinutes||0))} minutos`,completedAt=workout.completedAt||workout.startedAt||new Date().toISOString(); row.innerHTML=`<div class="wellness-workout-history-copy"><strong></strong><small>${result}</small></div><div class="wellness-workout-history-meta"><button class="wellness-workout-history-delete" type="button" data-delete-workout-id="${escapeHtml(workout.id)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg></button><time datetime="${escapeHtml(new Date(completedAt).toISOString())}" data-workout-time="${escapeHtml(completedAt)}">${relativeWorkoutTime(completedAt)}</time></div>`; row.querySelector("strong").textContent=workout.exerciseName||"Treino"; row.querySelector("button").setAttribute("aria-label",`Excluir treino ${workout.exerciseName||"Treino"}`); elements.workoutHistory.appendChild(row); }); }
+async function deleteWorkoutHistoryEntry(workout){
+  if(!workout||!window.confirm(`Excluir ${workout.exerciseName||"este treino"} do histórico? O progresso deste treino também será removido.`))return;
+  if(isOfflineWorkout(workout)){ removeOfflineWorkout(workout.id); state.dashboard={...(state.dashboard||{}),recentWorkouts:(state.dashboard?.recentWorkouts||[]).filter((item)=>String(item.id)!==String(workout.id))};cacheDashboard();renderWorkoutHistory();renderExerciseGrid();return; }
+  if(navigator.onLine===false){window.alert("Conecte-se à internet para excluir este treino.");return;}
+  const previous=state.dashboard;
+  state.dashboard={...(state.dashboard||{}),recentWorkouts:(state.dashboard?.recentWorkouts||[]).filter((item)=>String(item.id)!==String(workout.id))};renderWorkoutHistory();
+  try{const payload=await apiRequest(`/api/200/exercises/${encodeURIComponent(workout.id)}/history`,{method:"DELETE",forceNetwork:true,skipGlobalLoading:true,offlineInvalidates:["/api/200/wellness","/api/200/extra-goals"]});state.dashboard=payload.dashboard||state.dashboard;cacheDashboard();renderExerciseGrid();renderWorkoutHistory();renderMuscleProgressMap();window.dispatchEvent(new CustomEvent("project200:exercise-mission-updated"));}
+  catch(error){state.dashboard=previous;renderExerciseGrid();renderWorkoutHistory();window.alert(error instanceof Error?error.message:"Não foi possível excluir o treino.");}
+}
 function setWorkoutProgress(value){
   if(!elements.phaseProgress||!state.workout)return;
   const progress=Math.max(0,Math.min(100,Number(value||0))),workoutId=String(state.workout.id||""),sameWorkout=elements.phaseProgress.dataset.workoutId===workoutId,previous=Number(elements.phaseProgress.dataset.progress||0);
@@ -803,6 +825,7 @@ elements.detailStart?.addEventListener("click",()=>{ if(state.detailMode==="cata
 elements.detailGoal?.addEventListener("click",()=>openGoal({editing:true}));
 elements.detailDelete?.addEventListener("click",()=>void deleteSelectedExercise());
 elements.detailGenerate?.addEventListener("click",()=>void generateSelectedExerciseImages());
+elements.workoutHistory?.addEventListener("click",(event)=>{const button=event.target.closest("[data-delete-workout-id]");if(!button)return;const workout=(state.dashboard?.recentWorkouts||[]).find((item)=>String(item.id)===String(button.dataset.deleteWorkoutId));if(workout)void deleteWorkoutHistoryEntry(workout);});
 [elements.exerciseGrid,elements.catalogGrid].filter(Boolean).forEach((surface)=>{
   surface.addEventListener("pointerdown",beginAdminExerciseImageHold,{passive:true});
   surface.addEventListener("pointermove",moveAdminExerciseImageHold,{passive:true});
@@ -851,7 +874,9 @@ byId("wellnessMealAddClose")?.addEventListener("click",hideLayers);
 elements.mealList?.addEventListener("click",(event)=>{ if(event.target.closest("[data-configure-meals]")){openMealConfig();return;} const button=event.target.closest("[data-add-meal]"); if(!button)return; const slot=(state.dashboard?.mealSlots||[]).find((item)=>item.key===button.dataset.addMeal); if(slot)openMealAdd(slot); });
 elements.foodMic?.addEventListener("click",()=>void toggleWellnessVoice("meal"));
   state.ticker=window.setInterval(()=>{
-    if(document.hidden||!modal?.classList.contains("active")||!state.workout)return;
+    if(document.hidden||!modal?.classList.contains("active"))return;
+    refreshWorkoutRelativeTimes();
+    if(!state.workout)return;
     renderWorkout();
     refreshExerciseProgress();
     if(!elements.detail?.hidden&&state.detailMode==="selected")updateExerciseProgressDetail();

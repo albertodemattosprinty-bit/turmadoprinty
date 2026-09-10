@@ -1,9 +1,10 @@
-import { query } from "./db.js";
+import { db, query } from "./db.js";
 import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 import { ensureExtraGoalsSchema } from "./extra-goals.js";
 import { normalizeProject200MuscleSelections } from "../public/200/exercise-muscles.js";
 import {
   calculateProject200ExerciseMuscleGains,
+  project200DecayedMusclePoints,
   PROJECT200_MUSCLE_POINTS_PER_PERCENT
 } from "../public/200/exercise-muscle-progress.js";
 
@@ -865,6 +866,77 @@ export async function discardProject200ExerciseSession(userId, sessionId) {
     exerciseName: String(result.rows[0].exercise_name || "Treino"),
     profileName: normalizeProfileName(result.rows[0].assigned_profile)
   };
+}
+
+async function rebuildProject200ExerciseMuscleState(client, userId, profileName) {
+  const profile = normalizeProfileName(profileName);
+  const creditResult = await client.query(
+    `select session_id, muscle_id, points, credited_at
+     from project200_exercise_muscle_credits
+     where user_id = $1 and assigned_profile = $2
+     order by muscle_id asc, credited_at asc, session_id asc`,
+    [userId, profile]
+  );
+  const states = new Map();
+  for (const credit of creditResult.rows) {
+    const muscleId = String(credit.muscle_id || "");
+    const creditedAt = new Date(credit.credited_at);
+    if (!muscleId || Number.isNaN(creditedAt.getTime())) continue;
+    const previous = states.get(muscleId);
+    const elapsedMinutes = previous ? Math.max(0, creditedAt.getTime() - previous.updatedAt.getTime()) / 60000 : 0;
+    const points = project200DecayedMusclePoints(previous?.points || 0, elapsedMinutes) + Math.max(0, Number(credit.points || 0));
+    states.set(muscleId, { muscleId, points, updatedAt: creditedAt });
+  }
+  await client.query(
+    `delete from project200_exercise_muscle_state where user_id = $1 and assigned_profile = $2`,
+    [userId, profile]
+  );
+  const rows = [...states.values()].filter((item) => item.points > 0).map((item) => ({
+    muscle_id: item.muscleId,
+    points: item.points,
+    updated_at: item.updatedAt.toISOString()
+  }));
+  if (!rows.length) return;
+  await client.query(
+    `insert into project200_exercise_muscle_state (user_id, assigned_profile, muscle_id, points, updated_at)
+     select $1, $2, item.muscle_id, item.points, item.updated_at
+     from jsonb_to_recordset($3::jsonb) as item(muscle_id text, points numeric, updated_at timestamptz)`,
+    [userId, profile, JSON.stringify(rows)]
+  );
+}
+
+export async function deleteProject200CompletedExerciseSession(userId, sessionId) {
+  await ensureProject200WellnessSchema();
+  if (!db) throw new Error("DATABASE_URL nao configurada.");
+  const client = await db.connect();
+  try {
+    await client.query("begin");
+    const workoutResult = await client.query(
+      `select id, exercise_name, assigned_profile
+       from project200_exercise_sessions
+       where id = $1 and user_id = $2 and status = 'completed'
+       for update`,
+      [sessionId, userId]
+    );
+    const workout = workoutResult.rows[0];
+    if (!workout) throw new Error("Treino concluido nao encontrado.");
+    await client.query(
+      `delete from project200_exercise_sessions where id = $1 and user_id = $2 and status = 'completed'`,
+      [sessionId, userId]
+    );
+    await rebuildProject200ExerciseMuscleState(client, userId, workout.assigned_profile);
+    await client.query("commit");
+    return {
+      id: String(workout.id),
+      exerciseName: String(workout.exercise_name || "Treino"),
+      profileName: normalizeProfileName(workout.assigned_profile)
+    };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 export async function updateProject200WellnessPreferences(userId, payload = {}) {
   await ensureProject200WellnessSchema();
