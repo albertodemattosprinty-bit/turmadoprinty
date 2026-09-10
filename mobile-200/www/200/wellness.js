@@ -415,7 +415,7 @@ function renderExerciseGrid(){
   if(elements.exerciseCategoryName)elements.exerciseCategoryName.textContent=category.label;
   const visible=exerciseLibrary().filter((item)=>category.id==="all"||(item.category===category.id&&exerciseScheduledToday(item))).map(exerciseFromLibrary).filter(Boolean);
   if(!visible.length){ const hasOffDayExercises=category.id!=="all"&&exerciseLibrary().some((item)=>item.category===category.id); elements.exerciseGrid.innerHTML=hasOffDayExercises?'<button class="wellness-exercise-empty" type="button" data-show-all-exercises><strong>Nenhum exercício desta seção para hoje</strong><span>Ele continua disponível em Todos.</span></button>':'<button class="wellness-exercise-empty" type="button" data-open-catalog><strong>Adicione seu primeiro exercício</strong><span>Escolha no acervo sem poluir sua tela inicial.</span></button>'; return; }
-  elements.exerciseGrid.innerHTML=visible.map((exercise)=>{ const progress=exerciseProgress(libraryItem(exercise.id)); return `<article class="wellness-exercise-item"><button class="wellness-exercise-open" type="button" data-exercise-id="${escapeHtml(exercise.id)}">${exerciseImageMarkup(exercise)}<span class="wellness-exercise-copy"><strong title="${escapeHtml(exercise.name)}">${escapeHtml(exercise.name)}</strong>${exerciseMuscleMarkup(exercise)}<span class="wellness-exercise-list-progress" role="progressbar" aria-label="${progress.percent}% concluído hoje" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}"><i style="width:${progress.width}%"></i></span></span></button><button class="wellness-exercise-play" type="button" data-exercise-play-id="${escapeHtml(exercise.id)}" aria-label="Iniciar ${escapeHtml(exercise.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7 8 5-8 5V7Z"/></svg></button></article>`; }).join("");
+  elements.exerciseGrid.innerHTML=visible.map((exercise)=>{ const progress=exerciseProgress(libraryItem(exercise.id)); return `<article class="wellness-exercise-item" data-exercise-video-drop-id="${escapeHtml(exercise.id)}"><button class="wellness-exercise-open" type="button" data-exercise-id="${escapeHtml(exercise.id)}">${exerciseImageMarkup(exercise)}<span class="wellness-exercise-copy"><strong title="${escapeHtml(exercise.name)}">${escapeHtml(exercise.name)}</strong>${exerciseMuscleMarkup(exercise)}<span class="wellness-exercise-list-progress" role="progressbar" aria-label="${progress.percent}% concluído hoje" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}"><i style="width:${progress.width}%"></i></span></span></button><button class="wellness-exercise-play" type="button" data-exercise-play-id="${escapeHtml(exercise.id)}" aria-label="Iniciar ${escapeHtml(exercise.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7 8 5-8 5V7Z"/></svg></button></article>`; }).join("");
   refreshExerciseImages();
 }
 function refreshExerciseProgress(){ refreshExerciseImages(); renderDailyExerciseProgress(); }
@@ -423,7 +423,7 @@ function renderCatalog(){
   const category=currentExerciseCategory(), selectedIds=new Set(exerciseLibrary().map((item)=>item.exerciseId));
   const visible=exerciseCatalog().filter((item)=>(category.id==="all"||item.category===category.id)&&!selectedIds.has(item.id));
   elements.catalogTitle.textContent=category.label;
-  elements.catalogGrid.innerHTML=visible.length?visible.map((exercise)=>`<button class="wellness-catalog-item" type="button" data-catalog-exercise-id="${escapeHtml(exercise.id)}">${exerciseImageMarkup(exercise,"wellness-catalog-image")}<strong title="${escapeHtml(exercise.name)}">${escapeHtml(exercise.name)}</strong>${exerciseMuscleMarkup(exercise)}<span>Conhecer e adicionar ›</span></button>`).join(""):'<div class="wellness-catalog-empty">Você já adicionou todos os exercícios desta categoria.</div>';
+  elements.catalogGrid.innerHTML=visible.length?visible.map((exercise)=>`<button class="wellness-catalog-item" type="button" data-catalog-exercise-id="${escapeHtml(exercise.id)}" data-exercise-video-drop-id="${escapeHtml(exercise.id)}">${exerciseImageMarkup(exercise,"wellness-catalog-image")}<strong title="${escapeHtml(exercise.name)}">${escapeHtml(exercise.name)}</strong>${exerciseMuscleMarkup(exercise)}<span>Conhecer e adicionar ›</span></button>`).join(""):'<div class="wellness-catalog-empty">Você já adicionou todos os exercícios desta categoria.</div>';
   refreshExerciseImages();
 }
 function openCatalog(){ renderCatalog(); showLayer(elements.catalogLayer); }
@@ -515,18 +515,27 @@ async function generateSelectedExerciseImages({skipConfirmation=false}={}){
   finally{ state.generatingExerciseId=""; elements.detailGenerate.disabled=false; elements.detailFrame?.classList.remove("is-generating"); }
 }
 function readExerciseVideoDuration(file){ return new Promise((resolve,reject)=>{ const video=document.createElement("video"),url=URL.createObjectURL(file),cleanup=()=>{URL.revokeObjectURL(url);video.removeAttribute("src");}; video.preload="metadata"; video.onloadedmetadata=()=>{const duration=Number(video.duration||0);cleanup();Number.isFinite(duration)&&duration>0?resolve(duration):reject(new Error("Não foi possível medir a duração deste vídeo."));}; video.onerror=()=>{cleanup();reject(new Error("Escolha um arquivo de vídeo válido."));}; video.src=url; }); }
-async function uploadSelectedExerciseVideo(file){
-  const exercise=state.selectedExercise;if(!state.isAdmin||!exercise||!file||state.uploadingExerciseVideoId)return;
-  state.uploadingExerciseVideoId=exercise.id; elements.detailFrame?.classList.add("is-generating"); if(elements.detailMediaLoaderText)elements.detailMediaLoaderText.textContent="Verificando vídeo..."; elements.detailGenerateStatus.textContent="Preparando vídeo...";
+async function uploadExerciseVideo(exercise,file,{openDetailAfter=false,dropCard=null}={}){
+  if(!state.isAdmin||!exercise||!file||state.uploadingExerciseVideoId)return false;
+  const showDetail=String(state.selectedExercise?.id||"")===String(exercise.id)&&!elements.detail?.hidden;
+  state.uploadingExerciseVideoId=exercise.id;dropCard?.classList.add("is-video-uploading");dropCard?.classList.remove("is-video-drop-active");if(showDetail)elements.detailFrame?.classList.add("is-generating");if(showDetail&&elements.detailMediaLoaderText)elements.detailMediaLoaderText.textContent="Verificando vídeo...";if(showDetail)elements.detailGenerateStatus.textContent="Preparando vídeo...";
   try{
     if(file.size>80*1024*1024)throw new Error("Escolha um vídeo de até 80 MB.");
     const duration=await readExerciseVideoDuration(file); if(duration>15.05)throw new Error("Escolha um vídeo de no máximo 15 segundos.");
-    if(elements.detailMediaLoaderText)elements.detailMediaLoaderText.textContent="Otimizando 600×600..."; elements.detailGenerateStatus.textContent="Otimizando e enviando para o R2...";
+    if(showDetail&&elements.detailMediaLoaderText)elements.detailMediaLoaderText.textContent="Otimizando 600×600...";if(showDetail)elements.detailGenerateStatus.textContent="Otimizando e enviando para o R2...";
     const payload=await apiRequest(`/api/admin/200/exercises/${encodeURIComponent(exercise.id)}/video?exerciseName=${encodeURIComponent(exercise.name)}`,{method:"POST",headers:{"Content-Type":file.type||"application/octet-stream"},body:file,forceNetwork:true});
-    const assets=exerciseAssets().filter((item)=>String(item?.exerciseId||"")!==exercise.id); assets.push(payload.asset); state.dashboard={...(state.dashboard||{}),exerciseAssets:assets}; cacheDashboard(); renderExerciseGrid(); if(!elements.catalogLayer?.hidden)renderCatalog(); state.uploadingExerciseVideoId=""; openExerciseDetail(exercise,state.detailMode); elements.detailGenerateStatus.textContent="Vídeo 600×600 salvo. Toque para reproduzir em loop.";
-  }catch(error){ elements.detailGenerateStatus.textContent=error instanceof Error?error.message:"Não foi possível salvar o vídeo."; }
-  finally{ state.uploadingExerciseVideoId=""; elements.detailFrame?.classList.remove("is-generating"); if(elements.detailVideoInput)elements.detailVideoInput.value=""; }
+    const assets=exerciseAssets().filter((item)=>String(item?.exerciseId||"")!==exercise.id);assets.push(payload.asset);state.dashboard={...(state.dashboard||{}),exerciseAssets:assets};cacheDashboard();state.uploadingExerciseVideoId="";renderExerciseGrid();if(!elements.catalogLayer?.hidden)renderCatalog();if(openDetailAfter){openExerciseDetail(exercise,state.detailMode);elements.detailGenerateStatus.textContent="Vídeo 600×600 salvo. Toque para reproduzir em loop.";}return true;
+  }catch(error){const message=error instanceof Error?error.message:"Não foi possível salvar o vídeo.";if(showDetail)elements.detailGenerateStatus.textContent=message;else window.alert(message);return false;}
+  finally{state.uploadingExerciseVideoId="";dropCard?.classList.remove("is-video-uploading","is-video-drop-active");elements.detailFrame?.classList.remove("is-generating");if(elements.detailVideoInput)elements.detailVideoInput.value="";}
 }
+async function uploadSelectedExerciseVideo(file){return uploadExerciseVideo(state.selectedExercise,file,{openDetailAfter:true});}
+function desktopExerciseVideoDropEnabled(){return state.isAdmin&&window.matchMedia?.("(hover: hover) and (pointer: fine)")?.matches&&!state.uploadingExerciseVideoId;}
+function exerciseVideoDropCard(event){return event.target?.closest?.("[data-exercise-video-drop-id]")||null;}
+function exerciseVideoDragHasFiles(event){return Array.from(event.dataTransfer?.types||[]).includes("Files");}
+function beginExerciseVideoDrop(event){const card=exerciseVideoDropCard(event);if(!card||!desktopExerciseVideoDropEnabled()||!exerciseVideoDragHasFiles(event))return;event.preventDefault();if(event.dataTransfer)event.dataTransfer.dropEffect="copy";card.classList.add("is-video-drop-active");}
+function leaveExerciseVideoDrop(event){const card=exerciseVideoDropCard(event);if(!card||card.classList.contains("is-video-uploading"))return;if(event.relatedTarget instanceof Node&&card.contains(event.relatedTarget))return;card.classList.remove("is-video-drop-active");}
+function clearExerciseVideoDropHighlights(){document.querySelectorAll("[data-exercise-video-drop-id].is-video-drop-active").forEach((card)=>card.classList.remove("is-video-drop-active"));}
+async function finishExerciseVideoDrop(event){const card=exerciseVideoDropCard(event);if(!card||!desktopExerciseVideoDropEnabled())return;event.preventDefault();event.stopPropagation();const files=Array.from(event.dataTransfer?.files||[]),file=files.find((item)=>String(item.type||"").startsWith("video/")||/\.(mp4|mov|m4v|webm|avi)$/i.test(item.name||"")),exercise=exerciseCatalog().find((item)=>item.id===card.dataset.exerciseVideoDropId);if(!file||!exercise){card.classList.remove("is-video-drop-active");window.alert("Arraste um arquivo de vídeo válido.");return;}await uploadExerciseVideo(exercise,file,{dropCard:card});}
 function clearAdminExerciseImageHold(){ if(state.adminImageHoldTimer)window.clearTimeout(state.adminImageHoldTimer); state.adminImageHoldTimer=null; }
 function beginAdminExerciseImageHold(event){
   const image=event.target.closest?.("[data-exercise-image]"); if(!state.isAdmin||!image||state.generatingExerciseId)return;
@@ -852,12 +861,17 @@ elements.detailDelete?.addEventListener("click",()=>void deleteSelectedExercise(
 elements.detailGenerate?.addEventListener("click",()=>void generateSelectedExerciseImages());
 elements.workoutHistory?.addEventListener("click",(event)=>{const button=event.target.closest("[data-delete-workout-id]");if(!button)return;const workout=(state.dashboard?.recentWorkouts||[]).find((item)=>String(item.id)===String(button.dataset.deleteWorkoutId));if(workout)void deleteWorkoutHistoryEntry(workout);});
 [elements.exerciseGrid,elements.catalogGrid].filter(Boolean).forEach((surface)=>{
+  surface.addEventListener("dragenter",beginExerciseVideoDrop);
+  surface.addEventListener("dragover",beginExerciseVideoDrop);
+  surface.addEventListener("dragleave",leaveExerciseVideoDrop);
+  surface.addEventListener("drop",(event)=>void finishExerciseVideoDrop(event));
   surface.addEventListener("pointerdown",beginAdminExerciseImageHold,{passive:true});
   surface.addEventListener("pointermove",moveAdminExerciseImageHold,{passive:true});
   surface.addEventListener("pointerup",endAdminExerciseImageHold,{passive:true});
   surface.addEventListener("pointercancel",endAdminExerciseImageHold,{passive:true});
   surface.addEventListener("pointerleave",endAdminExerciseImageHold,{passive:true});
 });
+document.addEventListener("dragend",clearExerciseVideoDropHighlights);
 elements.detailFrame?.addEventListener("pointerdown",beginAdminExerciseVideoHold);
 elements.detailFrame?.addEventListener("pointermove",moveAdminExerciseVideoHold,{passive:true});
 elements.detailFrame?.addEventListener("pointerup",()=>endAdminExerciseVideoHold(true),{passive:true});
