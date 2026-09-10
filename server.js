@@ -16816,7 +16816,7 @@ const server = http.createServer(async (request, response) => {
       const user = await requireAuth(request, response);
       if (!user) return;
       const sessionId = decodeURIComponent(pathname.replace(/^\/api\/200\/exercises\/([^/]+)\/history$/, "$1"));
-      const deleted = await deleteProject200CompletedExerciseSession(user.id, sessionId);
+      const deleted = await deleteProject200CompletedExerciseSession(user.id, sessionId, requestUrl.searchParams.get("profile"));
       const dashboard = await getProject200WellnessDashboard(user.id, deleted.profileName);
       sendJson(response, 200, { ok: true, deleted, dashboard });
     } catch (error) {

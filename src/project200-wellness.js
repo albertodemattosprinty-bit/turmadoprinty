@@ -905,7 +905,7 @@ async function rebuildProject200ExerciseMuscleState(client, userId, profileName)
   );
 }
 
-export async function deleteProject200CompletedExerciseSession(userId, sessionId) {
+export async function deleteProject200CompletedExerciseSession(userId, sessionId, fallbackProfileName = PROJECT200_DEFAULT_PROFILE_NAME) {
   await ensureProject200WellnessSchema();
   if (!db) throw new Error("DATABASE_URL nao configurada.");
   const client = await db.connect();
@@ -919,7 +919,15 @@ export async function deleteProject200CompletedExerciseSession(userId, sessionId
       [sessionId, userId]
     );
     const workout = workoutResult.rows[0];
-    if (!workout) throw new Error("Treino concluido nao encontrado.");
+    if (!workout) {
+      await client.query("commit");
+      return {
+        id: String(sessionId),
+        exerciseName: "Treino",
+        profileName: normalizeProfileName(fallbackProfileName),
+        alreadyDeleted: true
+      };
+    }
     await client.query(
       `delete from project200_exercise_sessions where id = $1 and user_id = $2 and status = 'completed'`,
       [sessionId, userId]
