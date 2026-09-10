@@ -2104,12 +2104,12 @@
         </section>
         <section class="wellness-pane" data-wellness-pane="exercises">
           <section class="wellness-exercise-daily-progress" aria-label="Progresso total do treino diário"><div class="wellness-exercise-daily-copy"><span>Treino diário</span><strong id="wellnessExerciseDailyPercent">0%</strong><small>progresso total de hoje</small></div><div class="wellness-exercise-daily-track" aria-hidden="true"><i id="wellnessExerciseDailyProgressFill"></i></div></section>
-          <section class="wellness-weekly-muscle-plan" aria-label="Mapa do plano muscular semanal">
-            <header><div><span>Plano semanal</span><h2>Mapa muscular proposto</h2></div><strong id="wellnessWeeklyMuscleSummary">Sem séries definidas</strong></header>
-            <div class="wellness-muscle-map-carousel wellness-weekly-muscle-carousel" id="wellnessWeeklyMuscleMapTrack"></div>
-            <div class="wellness-muscle-map-dots" id="wellnessWeeklyMuscleMapDots" aria-hidden="true"></div>
-            <div class="wellness-weekly-muscle-scale" aria-label="Escala contínua da carga muscular"><i></i><div><span>Saúde</span><span>Adaptação</span><span>Hipertrofia</span><span>Forte</span><span>Sobrecarga</span></div></div>
-            <small>Séries efetivas = séries planejadas × dias × carga muscular × fator de repetições. De 1 a 7 movimentos o fator cresce gradualmente; 8 ou mais valem uma série completa. Referência de 100%: 14 séries efetivas na semana.</small>
+          <section class="wellness-muscle-progress" aria-label="Acompanhamento visual dos músculos treinados">
+            <header><div><span>Acompanhamento muscular</span><h2>Mapa muscular atual</h2></div><strong id="wellnessMuscleProgressSummary">Nenhum músculo pontuado</strong></header>
+            <div class="wellness-muscle-map-carousel wellness-muscle-progress-carousel" id="wellnessMuscleProgressMapTrack"></div>
+            <div class="wellness-muscle-map-dots" id="wellnessMuscleProgressMapDots" aria-hidden="true"></div>
+            <div class="wellness-muscle-progress-scale" aria-label="Escala contínua do estado muscular"><i></i><div><span>Branco</span><span>Saúde</span><span>Adaptação</span><span>Hipertrofia</span><span>Forte</span><span>Sobrecarga</span></div></div>
+            <small>1 série de 12 movimentos = 1 ponto-base. Cada músculo recebe esse ponto × sua intensidade. 12 pontos = manutenção (50%). O nível perde 1% a cada 25 minutos.</small>
           </section>
           <section class="wellness-active-workout" id="wellnessActiveWorkout" hidden>
             <div class="wellness-active-workout-main"><span class="wellness-active-workout-media" data-fixed-exercise-video-shell><img id="wellnessActiveWorkoutImage" src="/200/apps/exercicios.png" alt="" /><video id="wellnessActiveWorkoutVideo" muted loop playsinline preload="metadata" hidden></video><i class="wellness-exercise-video-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z"/></svg></i></span><div><span>Treino em andamento</span><h2 id="wellnessWorkoutName">Caminhar</h2><div class="wellness-workout-counter" id="wellnessWorkoutCounter">00:00</div><small id="wellnessWorkoutDetail">Progresso salvo no seu perfil</small></div></div>
@@ -2273,7 +2273,7 @@
   <script src="/200/offline-data.js?v=1.10-offline-refresh-v1"></script>
   <script type="module" src="/200/project.js?v=20260909-exercise-mission-v1"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
-  <script type="module" src="/200/wellness.js?v=20260910-muscle-volume-v1"></script>
+  <script type="module" src="/200/wellness.js?v=20260910-muscle-progress-v1"></script>
   <script src="/200/books.js?v=20260904-biblia-plano-v7"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260908-readonly-v1"></script>

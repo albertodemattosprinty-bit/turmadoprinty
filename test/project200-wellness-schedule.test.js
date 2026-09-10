@@ -10,11 +10,12 @@ import {
 import { PROJECT200_MUSCLES } from "../public/200/exercise-muscles.js";
 import { PROJECT200_MUSCLE_MAPS } from "../public/200/exercise-muscle-maps.js";
 import {
-  calculateProject200WeeklyMuscleVolume,
-  project200MuscleVolumeColor,
-  project200MuscleVolumePercent,
-  project200RepetitionFactor
-} from "../public/200/exercise-muscle-volume.js";
+  calculateProject200ExerciseMuscleGains,
+  project200DecayedMusclePoints,
+  project200MuscleProgressColor,
+  project200MuscleProgressPercent,
+  project200MuscleProgressStage
+} from "../public/200/exercise-muscle-progress.js";
 
 test("exercise respects the selected weekdays", () => {
   const exercise = { schedule_config: { frequency: "weekly", weekDays: [1, 2, 4, 5, 6] } };
@@ -93,24 +94,37 @@ test("all clickable anatomy regions use the closed muscle registry", () => {
   assert.equal(regions.every(({ muscleId }) => muscleIds.has(muscleId)), true);
 });
 
-test("weekly muscle plan converts weighted sets into the product scale", () => {
-  const volume = calculateProject200WeeklyMuscleVolume([{
-    trackingType: "series",
-    targetSeries: 2,
-    targetReps: 12,
-    scheduleConfig: { frequency: "weekly", weekDays: [1, 4] },
-    muscles: [{ muscleId: "peitoral-maior", load: 1 }, { muscleId: "triceps", load: .5 }]
-  }]);
-  assert.deepEqual(volume.map(({ muscleId, effectiveSets, percent, stage }) => ({ muscleId, effectiveSets, percent, stage })), [
-    { muscleId: "peitoral-maior", effectiveSets: 4, percent: 50, stage: "Manutenção" },
-    { muscleId: "triceps", effectiveSets: 2, percent: 30, stage: "Saúde" }
+test("completed series credit muscles by actual repetitions and intensity", () => {
+  const gains = calculateProject200ExerciseMuscleGains(
+    [{ repetitions: 12 }, { repetitions: 12 }, { repetitions: 12 }],
+    [{ muscleId: "deltoide-anterior", load: .70 }, { muscleId: "triceps", load: 1 }]
+  );
+  assert.deepEqual(gains, [
+    { muscleId: "deltoide-anterior", points: 2.1 },
+    { muscleId: "triceps", points: 3 }
   ]);
-  assert.equal(project200MuscleVolumePercent(14), 100);
+  assert.deepEqual(calculateProject200ExerciseMuscleGains([{ repetitions: 6 }], [{ muscleId: "peitoral-maior", load: .5 }]), [
+    { muscleId: "peitoral-maior", points: .25 }
+  ]);
 });
 
-test("repetition and color scales remain gradual", () => {
-  assert.equal(project200RepetitionFactor(4), .5);
-  assert.equal(project200RepetitionFactor(8), 1);
-  assert.notEqual(project200MuscleVolumeColor(50), project200MuscleVolumeColor(51));
-  assert.notEqual(project200MuscleVolumeColor(99), project200MuscleVolumeColor(100));
+test("12 points are maintenance and 24 points are 100 percent", () => {
+  assert.equal(project200MuscleProgressPercent(12), 50);
+  assert.equal(project200MuscleProgressStage(50), "Manutenção");
+  assert.equal(project200MuscleProgressPercent(24), 100);
+  assert.equal(project200MuscleProgressStage(100), "Hipertrofia forte");
+  assert.equal(project200MuscleProgressPercent(26.4), 110);
+  assert.equal(project200MuscleProgressStage(110), "Sobrecarga");
+});
+
+test("muscle state loses one percent every 25 minutes without becoming negative", () => {
+  assert.equal(project200DecayedMusclePoints(24, 24.99), 24);
+  assert.equal(project200DecayedMusclePoints(24, 25), 23.76);
+  assert.equal(project200DecayedMusclePoints(24, 50), 23.52);
+  assert.equal(project200DecayedMusclePoints(.2, 25), 0);
+});
+
+test("muscle state colors remain gradual", () => {
+  assert.notEqual(project200MuscleProgressColor(50), project200MuscleProgressColor(51));
+  assert.notEqual(project200MuscleProgressColor(99), project200MuscleProgressColor(100));
 });

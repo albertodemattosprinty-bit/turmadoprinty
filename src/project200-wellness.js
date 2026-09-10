@@ -2,6 +2,10 @@ import { query } from "./db.js";
 import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 import { ensureExtraGoalsSchema } from "./extra-goals.js";
 import { normalizeProject200MuscleSelections } from "../public/200/exercise-muscles.js";
+import {
+  calculateProject200ExerciseMuscleGains,
+  PROJECT200_MUSCLE_POINTS_PER_PERCENT
+} from "../public/200/exercise-muscle-progress.js";
 
 const PROJECT200_TIME_ZONE = process.env.PROJECT200_TIME_ZONE || "America/Sao_Paulo";
 const TRACKING_TYPES = new Set(["steps", "minutes", "series", "gps"]);
@@ -220,6 +224,20 @@ export async function ensureProject200WellnessSchema() {
     source text not null default 'luna', generated_by uuid null references users(id) on delete set null,
     created_at timestamptz not null default now(), updated_at timestamptz not null default now()
   )`);
+  await query(`create table if not exists project200_exercise_muscle_state (
+    user_id uuid not null references users(id) on delete cascade,
+    assigned_profile text not null default 'Usuario', muscle_id text not null,
+    points numeric(14,4) not null default 0, updated_at timestamptz not null default now(),
+    primary key (user_id, assigned_profile, muscle_id)
+  )`);
+  await query(`create table if not exists project200_exercise_muscle_credits (
+    session_id uuid not null references project200_exercise_sessions(id) on delete cascade,
+    muscle_id text not null, user_id uuid not null references users(id) on delete cascade,
+    assigned_profile text not null default 'Usuario', points numeric(14,4) not null,
+    credited_at timestamptz not null default now(), primary key (session_id, muscle_id)
+  )`);
+  await query(`create index if not exists idx_project200_exercise_muscle_state_user_profile
+    on project200_exercise_muscle_state(user_id, assigned_profile)`);
   await query(`create table if not exists project200_wellness_preferences (
     user_id uuid not null references users(id) on delete cascade, assigned_profile text not null default 'Usuario',
     height_cm numeric(6,2) null, askagain1 text not null default 'yes' check (askagain1 in ('yes','no')),
@@ -367,7 +385,7 @@ export async function syncProject200ExerciseMission(userId, profileName = PROJEC
 export async function getProject200WellnessDashboard(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME) {
   await ensureProject200WellnessSchema();
   const profile = normalizeProfileName(profileName);
-  const [mealResult, summaryResult, workoutResult, recentWorkoutResult, preferencesResult, libraryResult, weightResult, assetResult, definitionResult] = await Promise.all([
+  const [mealResult, summaryResult, workoutResult, recentWorkoutResult, preferencesResult, libraryResult, weightResult, assetResult, definitionResult, muscleProgressResult] = await Promise.all([
     query(
       `select * from project200_nutrition_entries
        where user_id = $1 and assigned_profile = $2
@@ -417,7 +435,15 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
     ),
     query(`select * from project200_weight_entries where user_id = $1 and assigned_profile = $2 order by measured_at desc limit 30`, [userId, profile]),
     query(`select * from project200_exercise_assets order by exercise_name asc`),
-    query(`select * from project200_exercise_definitions order by exercise_name asc`)
+    query(`select * from project200_exercise_definitions order by exercise_name asc`),
+    query(
+      `select muscle_id,
+         greatest(0::numeric, points - greatest(0, floor(extract(epoch from (now() - updated_at)) / 1500)) * $3::numeric) as current_points,
+         updated_at, now() as measured_at
+       from project200_exercise_muscle_state
+       where user_id = $1 and assigned_profile = $2`,
+      [userId, profile, PROJECT200_MUSCLE_POINTS_PER_PERCENT]
+    )
   ]);
   const summary = summaryResult.rows[0] || {};
   const preference = preferencesResult.rows[0] || {};
@@ -452,6 +478,12 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
     exerciseLibrary: libraryResult.rows.map(normalizeExerciseLibraryRow),
     exerciseAssets: assetResult.rows.map(normalizeExerciseAssetRow),
     exerciseDefinitions: definitionResult.rows.map(normalizeProject200ExerciseDefinition),
+    muscleProgress: muscleProgressResult.rows.map((row) => ({
+      muscleId: String(row.muscle_id || ""),
+      points: Math.max(0, Number(row.current_points || 0)),
+      updatedAt: new Date(row.updated_at).toISOString(),
+      measuredAt: new Date(row.measured_at).toISOString()
+    })),
     wellness: {
       preferences: { heightCm, askagain1: preference.askagain1 === "no" ? "no" : "yes" },
       currentWeight,
@@ -701,6 +733,38 @@ export async function addProject200ExerciseSeries(userId, sessionId, repetitions
   return { seriesNumber, repetitions: reps, targetRepetitions: target, workout: normalizeWorkoutRow(await getActiveWorkoutRow(userId, session.assigned_profile)) };
 }
 
+async function creditProject200ExerciseMuscles(userId, workoutRow) {
+  if (!workoutRow?.id || workoutRow.tracking_type !== "series") return [];
+  const [seriesResult, definitionResult] = await Promise.all([
+    query(`select repetitions from project200_exercise_series where session_id = $1 order by series_number`, [workoutRow.id]),
+    query(`select * from project200_exercise_definitions where exercise_id = $1 limit 1`, [workoutRow.exercise_id])
+  ]);
+  const definition = definitionResult.rows[0] ? normalizeProject200ExerciseDefinition(definitionResult.rows[0]) : null;
+  const gains = calculateProject200ExerciseMuscleGains(seriesResult.rows, definition?.muscles);
+  const profile = normalizeProfileName(workoutRow.assigned_profile);
+  for (const gain of gains) {
+    await query(
+      `with inserted_credit as (
+         insert into project200_exercise_muscle_credits (session_id, muscle_id, user_id, assigned_profile, points)
+         values ($1, $4, $2, $3, $5)
+         on conflict (session_id, muscle_id) do nothing
+         returning points
+       )
+       insert into project200_exercise_muscle_state (user_id, assigned_profile, muscle_id, points, updated_at)
+       select $2, $3, $4, points, now() from inserted_credit
+       on conflict (user_id, assigned_profile, muscle_id) do update set
+         points = greatest(
+           0::numeric,
+           project200_exercise_muscle_state.points
+             - greatest(0, floor(extract(epoch from (now() - project200_exercise_muscle_state.updated_at)) / 1500)) * $6::numeric
+         ) + excluded.points,
+         updated_at = now()`,
+      [workoutRow.id, userId, profile, gain.muscleId, gain.points, PROJECT200_MUSCLE_POINTS_PER_PERCENT]
+    );
+  }
+  return gains;
+}
+
 export async function finishProject200ExerciseSession(userId, sessionId, payload = {}) {
   await ensureProject200WellnessSchema();
   const result = await query(
@@ -720,6 +784,7 @@ export async function finishProject200ExerciseSession(userId, sessionId, payload
     workoutRow = completedResult.rows[0];
   }
   if (!workoutRow) throw new Error("Treino ativo nao encontrado.");
+  await creditProject200ExerciseMuscles(userId, workoutRow);
   const countResult = await query(`select count(*)::integer as series_count from project200_exercise_series where session_id = $1`, [sessionId]);
   return normalizeWorkoutRow({ ...workoutRow, series_count: countResult.rows[0]?.series_count || 0 });
 }
