@@ -1,10 +1,10 @@
 import { getApiUrl } from "../api.js";
 
 const tokenKey = "turma_do_printy_token";
-const releaseVersion = "1.06";
+const releaseVersion = "1.30";
 const defaults = {
   currentVersion: releaseVersion,
-  minimumVersion: "0.71",
+  minimumVersion: releaseVersion,
   downloadUrl: "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk",
   title: "Atualizacao do iLife disponivel",
   message: "Para continuar usando o iLife MindsetPlan com seguranca, baixe a versao mais recente do aplicativo.",

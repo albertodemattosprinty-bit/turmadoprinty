@@ -108,23 +108,24 @@ test("completed series credit muscles by actual repetitions and intensity", () =
   ]);
 });
 
-test("12 points are maintenance and 24 points are 100 percent", () => {
-  assert.equal(project200MuscleProgressPercent(12), 50);
+test("the muscle scale uses 40 percent of its original requirement", () => {
+  assert.equal(project200MuscleProgressPercent(4.8), 50);
   assert.equal(project200MuscleProgressStage(50), "Manutenção");
-  assert.equal(project200MuscleProgressPercent(24), 100);
+  assert.equal(project200MuscleProgressPercent(9.6), 100);
   assert.equal(project200MuscleProgressStage(100), "Hipertrofia forte");
-  assert.equal(project200MuscleProgressPercent(26.4), 110);
+  assert.equal(project200MuscleProgressPercent(10.56), 110);
   assert.equal(project200MuscleProgressStage(110), "Sobrecarga");
 });
 
 test("muscle state loses one percent every 25 minutes without becoming negative", () => {
-  assert.equal(project200DecayedMusclePoints(24, 24.99), 24);
-  assert.equal(project200DecayedMusclePoints(24, 25), 23.76);
-  assert.equal(project200DecayedMusclePoints(24, 50), 23.52);
-  assert.equal(project200DecayedMusclePoints(.2, 25), 0);
+  assert.equal(project200DecayedMusclePoints(9.6, 24.99), 9.6);
+  assert.equal(project200DecayedMusclePoints(9.6, 25), 9.504);
+  assert.equal(project200DecayedMusclePoints(9.6, 50), 9.408);
+  assert.equal(project200DecayedMusclePoints(.05, 25), 0);
 });
 
 test("muscle state colors remain gradual", () => {
+  assert.equal(project200MuscleProgressColor(0), "rgb(148 163 184)");
   assert.notEqual(project200MuscleProgressColor(50), project200MuscleProgressColor(51));
   assert.notEqual(project200MuscleProgressColor(99), project200MuscleProgressColor(100));
 });
