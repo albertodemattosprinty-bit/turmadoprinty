@@ -1,6 +1,7 @@
 import { query } from "./db.js";
 import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 import { ensureExtraGoalsSchema } from "./extra-goals.js";
+import { normalizeProject200MuscleSelections } from "../public/200/exercise-muscles.js";
 
 const PROJECT200_TIME_ZONE = process.env.PROJECT200_TIME_ZONE || "America/Sao_Paulo";
 const TRACKING_TYPES = new Set(["steps", "minutes", "series", "gps"]);
@@ -127,16 +128,7 @@ export function normalizeProject200ExerciseDefinition(payload = {}) {
   const exerciseName = String(payload.exerciseName ?? payload.exercise_name ?? "").trim().slice(0, 160);
   const categoryValue = String(payload.category || "strength").trim().toLowerCase();
   const trackingValue = String(payload.trackingType ?? payload.tracking_type ?? "series").trim().toLowerCase();
-  const seenMuscles = new Set();
-  const muscles = [];
-  for (const raw of Array.isArray(payload.muscles) ? payload.muscles : []) {
-    const name = String(raw?.name || "").trim().slice(0, 80);
-    const key = name.toLocaleLowerCase("pt-BR");
-    if (!name || seenMuscles.has(key)) continue;
-    seenMuscles.add(key);
-    muscles.push({ name, load: quantizeProject200MuscleLoad(raw?.load) });
-    if (muscles.length === 3) break;
-  }
+  const muscles = normalizeProject200MuscleSelections(payload.muscles, { quantize: quantizeProject200MuscleLoad });
   return {
     exerciseId,
     exerciseName,
@@ -148,6 +140,19 @@ export function normalizeProject200ExerciseDefinition(payload = {}) {
     source: String(payload.source || "luna").trim().slice(0, 40) || "luna",
     updatedAt: payload.updated_at || payload.updatedAt ? new Date(payload.updated_at || payload.updatedAt).toISOString() : null
   };
+}
+
+let exerciseMuscleMigrationPromise = null;
+async function migrateProject200ExerciseMuscles() {
+  if (!exerciseMuscleMigrationPromise) exerciseMuscleMigrationPromise = (async () => {
+    const result = await query("select exercise_id, muscles from project200_exercise_definitions");
+    for (const row of result.rows) {
+      const muscles = normalizeProject200MuscleSelections(row.muscles, { quantize: quantizeProject200MuscleLoad });
+      if (JSON.stringify(row.muscles || []) === JSON.stringify(muscles)) continue;
+      await query("update project200_exercise_definitions set muscles = $2::jsonb, updated_at = now() where exercise_id = $1", [row.exercise_id, JSON.stringify(muscles)]);
+    }
+  })().catch((error) => { exerciseMuscleMigrationPromise = null; throw error; });
+  return exerciseMuscleMigrationPromise;
 }
 function normalizeWeightRow(row) {
   if (!row?.id) return null;
@@ -228,7 +233,7 @@ export async function ensureProject200WellnessSchema() {
     measured_at timestamptz not null default now(), created_at timestamptz not null default now()
   )`);
   await query(`create index if not exists idx_project200_weight_user_profile_date on project200_weight_entries(user_id, assigned_profile, measured_at desc)`);
-
+  await migrateProject200ExerciseMuscles();
 }
 
 async function getActiveWorkoutRow(userId, profileName) {

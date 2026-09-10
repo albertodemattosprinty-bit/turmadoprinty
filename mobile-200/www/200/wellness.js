@@ -1,4 +1,6 @@
 import { getApiUrl } from "../api.js";
+import { PROJECT200_MUSCLE_BY_ID, normalizeProject200MuscleSelections } from "./exercise-muscles.js";
+import { PROJECT200_MUSCLE_MAPS } from "./exercise-muscle-maps.js";
 
 const TOKEN_KEY = "turma_do_printy_token";
 const PROFILE_KEY = "project_200_profile_v1";
@@ -162,6 +164,7 @@ const elements = {
   catalogLayer:byId("wellnessCatalogLayer"), catalogGrid:byId("wellnessCatalogGrid"), catalogTitle:byId("wellnessCatalogTitle"), openCatalog:byId("wellnessOpenCatalog"),
   activeWorkout:byId("wellnessActiveWorkout"), activeWorkoutImage:byId("wellnessActiveWorkoutImage"), activeWorkoutVideo:byId("wellnessActiveWorkoutVideo"), workoutName:byId("wellnessWorkoutName"), workoutCounter:byId("wellnessWorkoutCounter"), workoutDetail:byId("wellnessWorkoutDetail"),
   detail:byId("wellnessExerciseDetail"), detailCategory:byId("wellnessExerciseCategory"), detailName:byId("wellnessExerciseName"), detailFrame:byId("wellnessExerciseDetailFrame"), detailImage:byId("wellnessExerciseDetailImage"), detailVideo:byId("wellnessExerciseDetailVideo"), detailVideoInput:byId("wellnessExerciseVideoInput"), detailMediaLoaderText:byId("wellnessExerciseMediaLoaderText"),
+  muscleMapSection:byId("wellnessExerciseMuscleMapSection"), muscleMapTrack:byId("wellnessExerciseMuscleMapTrack"), muscleMapName:byId("wellnessExerciseMuscleMapName"), muscleMapDots:byId("wellnessExerciseMuscleMapDots"), muscleExercisesLayer:byId("wellnessMuscleExercisesLayer"), muscleExercisesName:byId("wellnessMuscleExercisesName"), muscleExercisesList:byId("wellnessMuscleExercisesList"),
   infoLayer:byId("wellnessExerciseInfoLayer"), infoCategory:byId("wellnessExerciseInfoCategory"), infoName:byId("wellnessExerciseInfoName"), infoEquipment:byId("wellnessExerciseInfoEquipment"),
   infoMuscles:byId("wellnessExerciseInfoMuscles"), adminLayer:byId("wellnessExerciseAdminLayer"), adminProgress:byId("wellnessExerciseAdminProgress"), adminProgressFill:byId("wellnessExerciseAdminProgressFill"), adminProgressCount:byId("wellnessExerciseAdminProgressCount"), adminFill:byId("wellnessExerciseAdminFill"), adminNames:byId("wellnessExerciseAdminNames"), adminCreate:byId("wellnessExerciseAdminCreate"), adminStatus:byId("wellnessExerciseAdminStatus"),
   detailInstructions:byId("wellnessExerciseInstructions"), detailStart:byId("wellnessExerciseStart"), detailGoal:byId("wellnessExerciseGoal"), detailDelete:byId("wellnessExerciseDelete"), detailProgress:byId("wellnessExerciseProgress"), detailProgressText:byId("wellnessExerciseProgressText"),
@@ -179,9 +182,9 @@ const elements = {
   heightInput:byId("wellnessHeightInput"), weightInput:byId("wellnessWeightInput"), weightHistory:byId("wellnessWeightHistory")
   ,mealConfigLayer:byId("wellnessMealConfigLayer"), mealConfigList:byId("wellnessMealConfigList"), mealConfigStatus:byId("wellnessMealConfigStatus"), mealAddLayer:byId("wellnessMealAddLayer"), mealAddTitle:byId("wellnessMealAddTitle"), mealAddStatus:byId("wellnessMealAddStatus"), foodMic:byId("wellnessFoodMic")
 };
-const phaseLayers = [elements.catalogLayer,elements.detail,elements.infoLayer,elements.adminLayer,elements.goalLayer,elements.workoutLayer,elements.repsLayer,elements.finishLayer,elements.weightLayer,elements.mealConfigLayer,elements.mealAddLayer].filter(Boolean);
+const phaseLayers = [elements.catalogLayer,elements.detail,elements.muscleExercisesLayer,elements.infoLayer,elements.adminLayer,elements.goalLayer,elements.workoutLayer,elements.repsLayer,elements.finishLayer,elements.weightLayer,elements.mealConfigLayer,elements.mealAddLayer].filter(Boolean);
 const EXERCISE_IMAGE_PHASES = ["start","finish","muscle"];
-const state = { tab:"nutrition", filter:"strength", dashboard:null, isAdmin:false, selectedExercise:null, detailMode:"selected", goalEditMode:false, goalWeekDays:[1,2,3,4,5,6], workout:null, steps:0, lastStepAt:0, motionListening:false, saveTimer:null, ticker:null, exerciseImageTimer:null, detailImageTimer:null, exerciseMuscleTimer:null, exerciseImagePhase:"start", detailImagePhase:"start", muscleNameIndex:0, pendingMeal:"", selectedMealSlot:"", gpsWatchId:null, gpsProvider:"", gpsLastPoint:null, gpsDistanceMeters:0, gpsAccuracy:null, gpsStatus:"GPS aguardando localização", gpsPlugin:null, seriesRepsDraft:null, seriesSaveChain:Promise.resolve(), adminImageHoldTimer:null, adminImageHoldTriggered:false, adminImageHoldX:0, adminImageHoldY:0, adminVideoHoldTimer:null, adminVideoHoldTriggered:false, suppressExerciseImageClick:false, generatingExerciseId:"", uploadingExerciseVideoId:"", generatingDefinitions:false, voiceRecorder:null, voiceStream:null, voiceTarget:null };
+const state = { tab:"nutrition", filter:"strength", dashboard:null, isAdmin:false, selectedExercise:null, selectedMuscleId:"", detailMode:"selected", goalEditMode:false, goalWeekDays:[1,2,3,4,5,6], workout:null, steps:0, lastStepAt:0, motionListening:false, saveTimer:null, ticker:null, exerciseImageTimer:null, detailImageTimer:null, exerciseMuscleTimer:null, exerciseImagePhase:"start", detailImagePhase:"start", muscleNameIndex:0, pendingMeal:"", selectedMealSlot:"", gpsWatchId:null, gpsProvider:"", gpsLastPoint:null, gpsDistanceMeters:0, gpsAccuracy:null, gpsStatus:"GPS aguardando localização", gpsPlugin:null, seriesRepsDraft:null, seriesSaveChain:Promise.resolve(), adminImageHoldTimer:null, adminImageHoldTriggered:false, adminImageHoldX:0, adminImageHoldY:0, adminVideoHoldTimer:null, adminVideoHoldTriggered:false, suppressExerciseImageClick:false, generatingExerciseId:"", uploadingExerciseVideoId:"", generatingDefinitions:false, voiceRecorder:null, voiceStream:null, voiceTarget:null };
 function profileName(){ return String(window.localStorage.getItem(PROFILE_KEY)||document.body.dataset.profile||"Usuario").trim()||"Usuario"; }
 async function apiRequest(path,options={}){
   const headers={...(options.headers||{})};
@@ -313,8 +316,8 @@ function exerciseDefinition(exerciseId){ return exerciseDefinitions().find((item
 function isMuscleLoadDefined(value){ return value!==null&&value!==undefined&&value!==""&&Number.isFinite(Number(value))&&Number(value)>=.25; }
 function exerciseMuscleLoads(exercise){
   const source=Array.isArray(exercise?.muscleLoads)?exercise.muscleLoads:exerciseDefinition(exercise?.id)?.muscles;
-  const loads=(Array.isArray(source)?source:[]).flatMap((item)=>{ const name=String(item?.name||"").trim(),load=Number(item?.load); return name&&isMuscleLoadDefined(item?.load)?[{name,load:Math.max(.25,Math.min(1,Math.round(load*20)/20))}]:[]; }).slice(0,3);
-  return loads.length?loads:heuristicExerciseMuscles(exercise).map((name)=>({name,load:null}));
+  const loads=normalizeProject200MuscleSelections(source).filter((item)=>isMuscleLoadDefined(item.load));
+  return loads.length?loads:normalizeProject200MuscleSelections(heuristicExerciseMuscles(exercise).map((name)=>({name,load:null})));
 }
 function exerciseMuscles(exercise){ return exerciseMuscleLoads(exercise).map((item)=>item.name); }
 function exerciseCatalog(){
@@ -389,6 +392,22 @@ function updateExerciseProgressDetail(){
   if(!item||state.detailMode!=="selected")return;
   const progress=exerciseProgress(item); elements.detailProgressText.textContent=`${progress.percent}% completo hoje`; elements.detailProgressFill.style.width=`${progress.width}%`; elements.detailTotal.textContent=formatExerciseTotal(item,progress.value);
 }
+function renderExerciseMuscleMaps(exercise){
+  if(!elements.muscleMapTrack)return;
+  const loads=new Map(exerciseMuscleLoads(exercise).map((item)=>[item.muscleId,item.load]));
+  elements.muscleMapTrack.innerHTML=PROJECT200_MUSCLE_MAPS.map((map,index)=>`<section class="wellness-muscle-map-slide" data-muscle-map-slide="${index}" aria-label="${escapeHtml(map.title)}"><span>${escapeHtml(map.title)}</span><svg viewBox="${escapeHtml(map.viewBox)}" role="img" aria-label="${escapeHtml(map.title)}"><path class="wellness-muscle-map-skin" d="${escapeHtml(map.skinPath)}"></path>${map.regions.map((region)=>{ const load=loads.get(region.muscleId),active=isMuscleLoadDefined(load),muscle=PROJECT200_MUSCLE_BY_ID[region.muscleId]; return `<path class="wellness-muscle-map-region${active?" is-active":""}" data-muscle-id="${escapeHtml(region.muscleId)}" role="button" tabindex="0" aria-label="${escapeHtml(muscle?.name||region.muscleId)}${active?` · ${Math.round(Number(load)*100)}%`:""}" style="--muscle-opacity:${active?Number(load):.12}" d="${escapeHtml(region.path)}"></path>`; }).join("")}</svg></section>`).join("");
+  elements.muscleMapDots.innerHTML=PROJECT200_MUSCLE_MAPS.map((map,index)=>`<i class="${index===0?"is-active":""}" aria-label="${escapeHtml(map.title)}"></i>`).join("");
+  const strongest=[...loads.entries()].sort((left,right)=>(Number(right[1])||0)-(Number(left[1])||0))[0];
+  elements.muscleMapName.textContent=strongest?`${PROJECT200_MUSCLE_BY_ID[strongest[0]]?.name||"Músculos"} · ${Math.round(Number(strongest[1])*100)}%`:"Toque em uma região";
+  elements.muscleMapTrack.scrollLeft=0;
+}
+function renderMuscleExercises(muscleId){
+  const muscle=PROJECT200_MUSCLE_BY_ID[muscleId]; if(!muscle)return;
+  state.selectedMuscleId=muscleId; elements.muscleExercisesName.textContent=muscle.name;
+  const matches=exerciseCatalog().flatMap((exercise)=>{ const match=exerciseMuscleLoads(exercise).find((item)=>item.muscleId===muscleId); return match?[{exercise,load:match.load}]:[]; }).sort((left,right)=>{ const loadOrder=(Number(right.load)||0)-(Number(left.load)||0); return loadOrder||left.exercise.name.localeCompare(right.exercise.name,"pt-BR"); });
+  elements.muscleExercisesList.innerHTML=matches.length?matches.map(({exercise,load})=>`<button type="button" data-muscle-exercise-id="${escapeHtml(exercise.id)}">${exerciseImageMarkup(exercise,"wellness-muscle-exercise-image")}<span><strong>${escapeHtml(exercise.name)}</strong><small>${escapeHtml(EXERCISE_CATEGORIES.find((item)=>item.id===exercise.category)?.label||"Exercício")}</small></span><b>${isMuscleLoadDefined(load)?`${Math.round(Number(load)*100)}%`:"A definir"}</b></button>`).join(""):'<p class="wellness-muscle-exercises-empty">Nenhum exercício definido para este músculo ainda.</p>';
+  showLayer(elements.muscleExercisesLayer); refreshExerciseImages();
+}
 function openExerciseDetail(exercise,mode="selected"){
   if(state.workout&&mode==="selected"){ showLayer(elements.workoutLayer); renderWorkout(); return; }
   state.selectedExercise=exercise; state.detailMode=mode;
@@ -400,7 +419,7 @@ function openExerciseDetail(exercise,mode="selected"){
   if(elements.detailMediaLoaderText)elements.detailMediaLoaderText.textContent=state.uploadingExerciseVideoId===exercise.id?"Otimizando vídeo...":"Criando imagens...";
   if(elements.detailGenerateStatus&&!isGenerating)elements.detailGenerateStatus.textContent=state.isAdmin?(exerciseImageSources(exercise).video?"Vídeo ativo · segure a mídia por 2 segundos para substituir.":"Segure a mídia por 2 segundos para enviar um vídeo."):"";
   const item=libraryItem(exercise.id),hasGoal=hasExerciseGoal(item); elements.detailStart.textContent=mode==="catalog"?"Adicionar exercício":!hasGoal?"Definir nova meta":exercise.tracking==="series"?"Iniciar série":exercise.tracking==="gps"?"Iniciar caminhada":"Iniciar exercício"; if(elements.detailGoal)elements.detailGoal.hidden=mode!=="selected"||!hasGoal; if(elements.detailDelete)elements.detailDelete.hidden=mode!=="selected"||!item;
-  updateExerciseProgressDetail(); showLayer(elements.detail);
+  updateExerciseProgressDetail(); renderExerciseMuscleMaps(exercise); showLayer(elements.detail); elements.detail?.querySelector(".wellness-phase-screen")?.scrollTo({top:0});
 }
 function openExerciseInfo(){ const exercise=state.selectedExercise;if(!exercise)return; elements.infoCategory.textContent=EXERCISE_CATEGORIES.find((item)=>item.id===exercise.category)?.label||"INFORMAÇÕES"; elements.infoName.textContent=exercise.name; elements.infoEquipment.textContent=exercise.category==="calisthenics"?"Sem equipamento":exercise.equipment||"Sem equipamento"; const loads=exerciseMuscleLoads(exercise); if(elements.infoMuscles)elements.infoMuscles.innerHTML=`<header><span>Carga muscular relativa</span><small>0,25 mínimo · 1,00 principal</small></header>${loads.map((item)=>`<div><strong>${escapeHtml(item.name)}</strong><span>${formatMuscleLoad(item.load)||"A definir"}</span><i><b style="width:${isMuscleLoadDefined(item.load)?Math.round(Number(item.load)*100):0}%"></b></i></div>`).join("")}`; elements.detailInstructions.innerHTML=""; exerciseInstructions(exercise).forEach((instruction)=>{ const li=document.createElement("li"); li.textContent=instruction; elements.detailInstructions.appendChild(li); }); showLayer(elements.infoLayer); }
 
@@ -685,6 +704,11 @@ elements.exerciseGrid?.addEventListener("click",(event)=>{ if(consumeAdminExerci
 elements.catalogGrid?.addEventListener("click",(event)=>{ if(consumeAdminExerciseImageClick(event))return; const videoShell=event.target.closest("[data-exercise-video-shell]"); if(videoShell){event.preventDefault();event.stopPropagation();toggleExerciseVideo(videoShell);return;} const exercise=exerciseCatalog().find((item)=>item.id===event.target.closest("[data-catalog-exercise-id]")?.dataset.catalogExerciseId); if(exercise)openExerciseDetail(exercise,"catalog"); });
 byId("wellnessCatalogClose")?.addEventListener("click",hideLayers);
 byId("wellnessExerciseDetailClose")?.addEventListener("click",()=>{ if(state.detailMode==="catalog")openCatalog(); else hideLayers(); });
+elements.muscleMapTrack?.addEventListener("click",(event)=>{ const region=event.target.closest("[data-muscle-id]"); if(region)renderMuscleExercises(region.dataset.muscleId); });
+elements.muscleMapTrack?.addEventListener("keydown",(event)=>{ if(!["Enter"," "].includes(event.key))return; const region=event.target.closest("[data-muscle-id]"); if(region){event.preventDefault();renderMuscleExercises(region.dataset.muscleId);} });
+elements.muscleMapTrack?.addEventListener("scroll",()=>{ const width=Math.max(1,elements.muscleMapTrack.clientWidth),index=Math.max(0,Math.min(PROJECT200_MUSCLE_MAPS.length-1,Math.round(elements.muscleMapTrack.scrollLeft/width))); [...elements.muscleMapDots.children].forEach((dot,dotIndex)=>dot.classList.toggle("is-active",dotIndex===index)); },{passive:true});
+byId("wellnessMuscleExercisesClose")?.addEventListener("click",()=>openExerciseDetail(state.selectedExercise,state.detailMode));
+elements.muscleExercisesList?.addEventListener("click",(event)=>{ const id=event.target.closest("[data-muscle-exercise-id]")?.dataset.muscleExerciseId,exercise=exerciseCatalog().find((item)=>item.id===id); if(exercise)openExerciseDetail(exercise,libraryItem(exercise.id)?"selected":"catalog"); });
 byId("wellnessExerciseInfoOpen")?.addEventListener("click",openExerciseInfo);
 byId("wellnessExerciseInfoClose")?.addEventListener("click",()=>openExerciseDetail(state.selectedExercise,state.detailMode));
 byId("wellnessExerciseAdminClose")?.addEventListener("click",hideLayers);

@@ -7,6 +7,8 @@ import {
   quantizeProject200MuscleLoad,
   project200ExerciseLibraryCompletionPercent
 } from "../src/project200-wellness.js";
+import { PROJECT200_MUSCLES } from "../public/200/exercise-muscles.js";
+import { PROJECT200_MUSCLE_MAPS } from "../public/200/exercise-muscle-maps.js";
 
 test("exercise respects the selected weekdays", () => {
   const exercise = { schedule_config: { frequency: "weekly", weekDays: [1, 2, 4, 5, 6] } };
@@ -60,8 +62,27 @@ test("exercise definitions keep at most three unique muscles", () => {
     ]
   });
   assert.deepEqual(definition.muscles, [
-    { name: "Quadríceps", load: 1 },
-    { name: "Glúteos", load: 0.85 },
-    { name: "Posteriores", load: 0.55 }
+    { muscleId: "vasto-lateral", name: "Vasto lateral", load: 1 },
+    { muscleId: "reto-femoral", name: "Reto femoral", load: 1 },
+    { muscleId: "vasto-medial", name: "Vasto medial", load: 1 }
   ]);
+});
+
+test("exercise definitions reject muscles outside the fixed map", () => {
+  const definition = normalizeProject200ExerciseDefinition({
+    exerciseId: "custom",
+    exerciseName: "Teste",
+    muscles: [{ muscleId: "musculo-inventado", load: 1 }, { name: "Dorsais", load: 0.65 }]
+  });
+  assert.deepEqual(definition.muscles, [
+    { muscleId: "latissimo-dorso", name: "Latíssimo do dorso", load: 0.65 }
+  ]);
+});
+
+test("all clickable anatomy regions use the closed muscle registry", () => {
+  const muscleIds = new Set(PROJECT200_MUSCLES.map(({ id }) => id));
+  const regions = PROJECT200_MUSCLE_MAPS.flatMap(({ regions: mapRegions }) => mapRegions);
+  assert.equal(PROJECT200_MUSCLES.length, 30);
+  assert.equal(regions.length, 58);
+  assert.equal(regions.every(({ muscleId }) => muscleIds.has(muscleId)), true);
 });

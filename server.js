@@ -65,6 +65,7 @@ import { clearProject200CurrentTaskState, getProject200CurrentTaskState, savePro
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
 import { addProject200ExerciseSeries, addProject200ExerciseToLibrary, approveProject200ExercisePlan, createProject200NutritionEntry, createProject200WeightEntry, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, normalizeProject200ExerciseDefinition, removeProject200ExerciseFromLibrary, saveProject200ExerciseAssets, saveProject200ExerciseDefinitions, saveProject200ExerciseVideoAsset, startProject200ExerciseSession, syncProject200ExerciseMission, updateProject200ExerciseProgress, updateProject200MealSlots, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
+import { PROJECT200_MUSCLES, PROJECT200_MUSCLE_IDS } from "./public/200/exercise-muscles.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, getProject200HistorySpan, listProject200History } from "./src/project200-history.js";
@@ -4677,9 +4678,9 @@ const PROJECT200_EXERCISE_DEFINITIONS_SCHEMA = {
             items: {
               type: "object",
               additionalProperties: false,
-              required: ["name", "load"],
+              required: ["muscleId", "load"],
               properties: {
-                name: { type: "string" },
+                muscleId: { type: "string", enum: PROJECT200_MUSCLE_IDS },
                 load: { type: "number", enum: PROJECT200_MUSCLE_LOAD_VALUES }
               }
             }
@@ -4706,7 +4707,7 @@ async function createProject200ExerciseDefinitionsWithAi(apiKey, exercises, mode
         "Voce e a Luna, especialista de catalogacao de exercicios do iLife. Responda em portugues do Brasil.",
         "Devolva exatamente uma definicao para cada exercicio recebido, na mesma ordem, com no maximo os tres musculos ou grupos realmente mais envolvidos.",
         "A carga muscular e uma participacao relativa: 1.00 e o musculo principal muito exigido; o minimo e 0.25. Use somente passos de 0.05 entre 0.25 e 1.00.",
-        "Para exercicios predominantemente aerobicos, Cardio pode ser usado como grupo funcional quando isso representar melhor o esforco.",
+        `Use exclusivamente muscleId desta base fechada; nunca invente nomes ou IDs: ${PROJECT200_MUSCLES.map(({ id, name }) => `${id}=${name}`).join(", ")}.`,
         "Nao confunda carga muscular relativa com peso, porcentagem de ativacao EMG ou recomendacao medica. Nao diagnostique nem prescreva tratamento.",
         mode === "missing"
           ? "Preserve exatamente exerciseId, exerciseName, category, trackingType, equipment e cue recebidos; apenas complete os musculos e suas cargas."
