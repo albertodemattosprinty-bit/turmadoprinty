@@ -64,7 +64,7 @@ import { createQuickUserAction, createUserAction, deleteUserAction, ensureAction
 import { clearProject200CurrentTaskState, getProject200CurrentTaskState, saveProject200CurrentTaskState } from "./src/project200-current-task-state.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
-import { addProject200ExerciseSeries, addProject200ExerciseToLibrary, approveProject200ExercisePlan, createProject200NutritionEntry, createProject200WeightEntry, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, removeProject200ExerciseFromLibrary, saveProject200ExerciseAssets, saveProject200ExerciseVideoAsset, startProject200ExerciseSession, syncProject200ExerciseMission, updateProject200ExerciseProgress, updateProject200MealSlots, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
+import { addProject200ExerciseSeries, addProject200ExerciseToLibrary, approveProject200ExercisePlan, createProject200NutritionEntry, createProject200WeightEntry, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, normalizeProject200ExerciseDefinition, removeProject200ExerciseFromLibrary, saveProject200ExerciseAssets, saveProject200ExerciseDefinitions, saveProject200ExerciseVideoAsset, startProject200ExerciseSession, syncProject200ExerciseMission, updateProject200ExerciseProgress, updateProject200MealSlots, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, getProject200HistorySpan, listProject200History } from "./src/project200-history.js";
@@ -4646,6 +4646,130 @@ async function handleProject200ExercisePlanRequest(request, response) {
     sendJson(response, 200, { ok: true, plan });
   } catch (error) {
     sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível montar o plano." });
+  }
+}
+
+const PROJECT200_MUSCLE_LOAD_VALUES = Array.from({ length: 16 }, (_, index) => Number((0.25 + index * 0.05).toFixed(2)));
+const PROJECT200_EXERCISE_DEFINITIONS_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["definitions"],
+  properties: {
+    definitions: {
+      type: "array",
+      minItems: 1,
+      maxItems: 12,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["exerciseId", "exerciseName", "category", "trackingType", "equipment", "cue", "muscles"],
+        properties: {
+          exerciseId: { type: "string" },
+          exerciseName: { type: "string" },
+          category: { type: "string", enum: ["strength", "aerobic", "calisthenics"] },
+          trackingType: { type: "string", enum: ["series", "minutes", "gps"] },
+          equipment: { type: "string" },
+          cue: { type: "string" },
+          muscles: {
+            type: "array",
+            minItems: 1,
+            maxItems: 3,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["name", "load"],
+              properties: {
+                name: { type: "string" },
+                load: { type: "number", enum: PROJECT200_MUSCLE_LOAD_VALUES }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+};
+
+function project200AiExerciseId(name) {
+  const slug = String(name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 90);
+  return `ai-${slug || crypto.randomUUID().slice(0, 8)}`;
+}
+
+async function createProject200ExerciseDefinitionsWithAi(apiKey, exercises, mode, adminId) {
+  const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: PROJECT200_MARIN_MODEL_LUNA,
+      instructions: [
+        "Voce e a Luna, especialista de catalogacao de exercicios do iLife. Responda em portugues do Brasil.",
+        "Devolva exatamente uma definicao para cada exercicio recebido, na mesma ordem, com no maximo os tres musculos ou grupos realmente mais envolvidos.",
+        "A carga muscular e uma participacao relativa: 1.00 e o musculo principal muito exigido; o minimo e 0.25. Use somente passos de 0.05 entre 0.25 e 1.00.",
+        "Para exercicios predominantemente aerobicos, Cardio pode ser usado como grupo funcional quando isso representar melhor o esforco.",
+        "Nao confunda carga muscular relativa com peso, porcentagem de ativacao EMG ou recomendacao medica. Nao diagnostique nem prescreva tratamento.",
+        mode === "missing"
+          ? "Preserve exatamente exerciseId, exerciseName, category, trackingType, equipment e cue recebidos; apenas complete os musculos e suas cargas."
+          : "Crie o cadastro completo a partir de cada nome. Use series em musculacao/calistenia, minutes em cardio por tempo e gps apenas em caminhada, corrida ou bicicleta ao ar livre."
+      ].join("\n"),
+      input: JSON.stringify({ mode, exercises }),
+      reasoning: { effort: "medium" },
+      text: { verbosity: "low", format: { type: "json_schema", name: "project200_exercise_definitions", strict: true, schema: PROJECT200_EXERCISE_DEFINITIONS_SCHEMA } },
+      max_output_tokens: 2600,
+      safety_identifier: "ilife_admin_" + crypto.createHash("sha256").update(String(adminId)).digest("hex").slice(0, 32),
+      store: false
+    })
+  });
+  const parsed = await readApiResponse(openAiResponse);
+  if (!openAiResponse.ok) throw new Error("A Luna não conseguiu definir os exercícios agora.");
+  return parseProject200MarinReply(parsed.data)?.definitions || [];
+}
+
+async function handleProject200ExerciseDefinitionsRequest(request, response) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+  try {
+    const body = await readJsonBody(request);
+    const mode = body?.mode === "create" ? "create" : "missing";
+    const rawExercises = Array.isArray(body?.exercises) ? body.exercises.slice(0, 12) : [];
+    const exercises = rawExercises.flatMap((raw) => {
+      const exerciseName = String(typeof raw === "string" ? raw : raw?.exerciseName || raw?.name || "").trim().slice(0, 160);
+      if (!exerciseName) return [];
+      if (mode === "create") return [{ exerciseName }];
+      const exerciseId = String(raw?.exerciseId || raw?.id || "").trim().slice(0, 120);
+      if (!exerciseId) return [];
+      return [{
+        exerciseId, exerciseName,
+        category: ["strength", "aerobic", "calisthenics"].includes(raw?.category) ? raw.category : "strength",
+        trackingType: ["series", "minutes", "gps"].includes(raw?.trackingType || raw?.tracking) ? (raw.trackingType || raw.tracking) : "series",
+        equipment: String(raw?.equipment || "").trim().slice(0, 160),
+        cue: String(raw?.cue || "").trim().slice(0, 500)
+      }];
+    });
+    if (!exercises.length) throw new Error(mode === "create" ? "Informe ao menos um exercício." : "Nenhum exercício pendente foi enviado.");
+    const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+    if (!apiKey) throw new Error("OPENAI_API_KEY nao configurada no backend.");
+    const generated = await createProject200ExerciseDefinitionsWithAi(apiKey, exercises, mode, admin.id);
+    if (!Array.isArray(generated) || generated.length !== exercises.length) throw new Error("A Luna devolveu um lote incompleto. Tente novamente.");
+    const definitions = exercises.flatMap((expected, index) => {
+      const raw = generated[index];
+      if (!raw) return [];
+      const definition = normalizeProject200ExerciseDefinition({
+        ...raw,
+        exerciseId: mode === "missing" ? expected.exerciseId : project200AiExerciseId(raw.exerciseName || expected.exerciseName),
+        exerciseName: mode === "missing" ? expected.exerciseName : (raw.exerciseName || expected.exerciseName),
+        category: mode === "missing" ? expected.category : raw.category,
+        trackingType: mode === "missing" ? expected.trackingType : raw.trackingType,
+        equipment: mode === "missing" ? expected.equipment : raw.equipment,
+        cue: mode === "missing" ? expected.cue : raw.cue,
+        source: "luna"
+      });
+      return definition.muscles.length ? [definition] : [];
+    });
+    const saved = await saveProject200ExerciseDefinitions(admin.id, definitions);
+    sendJson(response, 200, { ok: true, definitions: saved, requested: exercises.length, saved: saved.length });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível definir os exercícios." });
   }
 }
 
@@ -16492,6 +16616,11 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "POST" && pathname.match(/^\/api\/admin\/200\/exercises\/[^/]+\/images$/)) {
     const exerciseId = decodeURIComponent(pathname.replace(/^\/api\/admin\/200\/exercises\/([^/]+)\/images$/, "$1"));
     await handleProject200ExerciseImagesRequest(request, response, exerciseId);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/admin/200/exercises/definitions/generate") {
+    await handleProject200ExerciseDefinitionsRequest(request, response);
     return;
   }
 

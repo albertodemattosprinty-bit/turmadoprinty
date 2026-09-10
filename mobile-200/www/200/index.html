@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
   <link rel="stylesheet" href="/200/quality.css?v=20260906-1" />
   <link rel="stylesheet" href="/200/books.css?v=20260904-biblia-plano-v6" />
-  <link rel="stylesheet" href="/200/wellness.css?v=20260909-exercise-video-v1" />
+  <link rel="stylesheet" href="/200/wellness.css?v=20260909-muscle-loads-v1" />
   <link rel="stylesheet" href="/200/performance.css?v=20260906-scroll-v1" />
 </head>
 <body data-background-theme="edge">
@@ -2143,7 +2143,26 @@
           <span class="wellness-phase-kicker" id="wellnessExerciseInfoCategory">INFORMAÇÕES</span>
           <h2 id="wellnessExerciseInfoName">Agachamento</h2>
           <section class="wellness-exercise-info-equipment"><span>Equipamento</span><strong id="wellnessExerciseInfoEquipment">Sem equipamento</strong></section>
+          <section class="wellness-exercise-muscle-loads" id="wellnessExerciseInfoMuscles" aria-label="Carga muscular relativa"></section>
           <ol class="wellness-instruction-list" id="wellnessExerciseInstructions"></ol>
+        </article>
+      </div>
+
+      <div class="wellness-phase-layer" id="wellnessExerciseAdminLayer" hidden>
+        <article class="wellness-phase-screen wellness-exercise-admin-screen">
+          <button class="wellness-phase-close" type="button" id="wellnessExerciseAdminClose" aria-label="Fechar painel da Luna"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+          <span class="wellness-phase-kicker">ADMIN · LUNA</span>
+          <h2>Inteligência muscular</h2>
+          <p>A Luna define até três músculos e a carga relativa de 0,25 a 1,00.</p>
+          <section class="wellness-exercise-admin-progress">
+            <div><strong id="wellnessExerciseAdminProgress">0%</strong><span id="wellnessExerciseAdminProgressCount">0 de 0 exercícios definidos</span></div>
+            <div class="wellness-exercise-admin-track" aria-hidden="true"><i id="wellnessExerciseAdminProgressFill"></i></div>
+          </section>
+          <button class="wellness-phase-primary" type="button" id="wellnessExerciseAdminFill">Preencher exercícios pendentes</button>
+          <div class="wellness-exercise-admin-divider"><span>ou criar novos</span></div>
+          <label class="wellness-exercise-admin-list">Um exercício por linha<textarea id="wellnessExerciseAdminNames" rows="7" maxlength="4000" placeholder="Supino declinado&#10;Passada no Smith&#10;Corrida na areia"></textarea></label>
+          <button class="wellness-phase-secondary" type="button" id="wellnessExerciseAdminCreate">Criar exercícios com a Luna</button>
+          <p class="wellness-status" id="wellnessExerciseAdminStatus" aria-live="polite"></p>
         </article>
       </div>
 
@@ -2231,7 +2250,7 @@
   <script src="/200/offline-data.js?v=1.10-offline-refresh-v1"></script>
   <script type="module" src="/200/project.js?v=20260909-exercise-mission-v1"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
-  <script type="module" src="/200/wellness.js?v=20260909-exercise-video-v1"></script>
+  <script type="module" src="/200/wellness.js?v=20260909-muscle-loads-v1"></script>
   <script src="/200/books.js?v=20260904-biblia-plano-v7"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260908-readonly-v1"></script>

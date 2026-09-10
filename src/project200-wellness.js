@@ -115,6 +115,40 @@ function normalizeExerciseAssetRow(row) {
     updatedAt: row?.updated_at ? new Date(row.updated_at).toISOString() : null
   };
 }
+
+export function quantizeProject200MuscleLoad(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0.25;
+  return Math.max(0.25, Math.min(1, Math.round(numeric * 20) / 20));
+}
+
+export function normalizeProject200ExerciseDefinition(payload = {}) {
+  const exerciseId = String(payload.exerciseId ?? payload.exercise_id ?? "").trim().slice(0, 120);
+  const exerciseName = String(payload.exerciseName ?? payload.exercise_name ?? "").trim().slice(0, 160);
+  const categoryValue = String(payload.category || "strength").trim().toLowerCase();
+  const trackingValue = String(payload.trackingType ?? payload.tracking_type ?? "series").trim().toLowerCase();
+  const seenMuscles = new Set();
+  const muscles = [];
+  for (const raw of Array.isArray(payload.muscles) ? payload.muscles : []) {
+    const name = String(raw?.name || "").trim().slice(0, 80);
+    const key = name.toLocaleLowerCase("pt-BR");
+    if (!name || seenMuscles.has(key)) continue;
+    seenMuscles.add(key);
+    muscles.push({ name, load: quantizeProject200MuscleLoad(raw?.load) });
+    if (muscles.length === 3) break;
+  }
+  return {
+    exerciseId,
+    exerciseName,
+    category: EXERCISE_CATEGORIES.has(categoryValue) ? categoryValue : "strength",
+    trackingType: TRACKING_TYPES.has(trackingValue) ? trackingValue : "series",
+    equipment: String(payload.equipment || "").trim().slice(0, 160),
+    cue: String(payload.cue || "").trim().slice(0, 500),
+    muscles,
+    source: String(payload.source || "luna").trim().slice(0, 40) || "luna",
+    updatedAt: payload.updated_at || payload.updatedAt ? new Date(payload.updated_at || payload.updatedAt).toISOString() : null
+  };
+}
 function normalizeWeightRow(row) {
   if (!row?.id) return null;
   return { id: String(row.id), weightKg: Number(row.weight_kg || 0), measuredAt: new Date(row.measured_at).toISOString() };
@@ -174,6 +208,13 @@ export async function ensureProject200WellnessSchema() {
   await query(`alter table project200_exercise_assets add column if not exists video_url text not null default ''`);
   await query(`alter table project200_exercise_assets add column if not exists video_poster_url text not null default ''`);
   await query(`alter table project200_exercise_assets add column if not exists video_duration_seconds numeric(6,2) not null default 0`);
+  await query(`create table if not exists project200_exercise_definitions (
+    exercise_id text primary key, exercise_name text not null,
+    category text not null default 'strength', tracking_type text not null default 'series',
+    equipment text not null default '', cue text not null default '', muscles jsonb not null default '[]'::jsonb,
+    source text not null default 'luna', generated_by uuid null references users(id) on delete set null,
+    created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+  )`);
   await query(`create table if not exists project200_wellness_preferences (
     user_id uuid not null references users(id) on delete cascade, assigned_profile text not null default 'Usuario',
     height_cm numeric(6,2) null, askagain1 text not null default 'yes' check (askagain1 in ('yes','no')),
@@ -321,7 +362,7 @@ export async function syncProject200ExerciseMission(userId, profileName = PROJEC
 export async function getProject200WellnessDashboard(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME) {
   await ensureProject200WellnessSchema();
   const profile = normalizeProfileName(profileName);
-  const [mealResult, summaryResult, workoutResult, recentWorkoutResult, preferencesResult, libraryResult, weightResult, assetResult] = await Promise.all([
+  const [mealResult, summaryResult, workoutResult, recentWorkoutResult, preferencesResult, libraryResult, weightResult, assetResult, definitionResult] = await Promise.all([
     query(
       `select * from project200_nutrition_entries
        where user_id = $1 and assigned_profile = $2
@@ -370,7 +411,8 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
       [userId, profile, PROJECT200_TIME_ZONE]
     ),
     query(`select * from project200_weight_entries where user_id = $1 and assigned_profile = $2 order by measured_at desc limit 30`, [userId, profile]),
-    query(`select * from project200_exercise_assets order by exercise_name asc`)
+    query(`select * from project200_exercise_assets order by exercise_name asc`),
+    query(`select * from project200_exercise_definitions order by exercise_name asc`)
   ]);
   const summary = summaryResult.rows[0] || {};
   const preference = preferencesResult.rows[0] || {};
@@ -404,6 +446,7 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
     recentWorkouts: recentWorkoutResult.rows.map(normalizeWorkoutRow),
     exerciseLibrary: libraryResult.rows.map(normalizeExerciseLibraryRow),
     exerciseAssets: assetResult.rows.map(normalizeExerciseAssetRow),
+    exerciseDefinitions: definitionResult.rows.map(normalizeProject200ExerciseDefinition),
     wellness: {
       preferences: { heightCm, askagain1: preference.askagain1 === "no" ? "no" : "yes" },
       currentWeight,
@@ -411,6 +454,28 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
       weightHistory: weights
     }
   };
+}
+
+export async function saveProject200ExerciseDefinitions(userId, definitions = []) {
+  await ensureProject200WellnessSchema();
+  const saved = [];
+  for (const raw of Array.isArray(definitions) ? definitions.slice(0, 40) : []) {
+    const definition = normalizeProject200ExerciseDefinition(raw);
+    if (!definition.exerciseId || !definition.exerciseName || !definition.muscles.length) continue;
+    const result = await query(
+      `insert into project200_exercise_definitions (
+         exercise_id, exercise_name, category, tracking_type, equipment, cue, muscles, source, generated_by
+       ) values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9)
+       on conflict (exercise_id) do update set exercise_name=excluded.exercise_name, category=excluded.category,
+         tracking_type=excluded.tracking_type, equipment=excluded.equipment, cue=excluded.cue,
+         muscles=excluded.muscles, source=excluded.source, generated_by=excluded.generated_by, updated_at=now()
+       returning *`,
+      [definition.exerciseId, definition.exerciseName, definition.category, definition.trackingType,
+        definition.equipment, definition.cue, JSON.stringify(definition.muscles), definition.source, userId]
+    );
+    saved.push(normalizeProject200ExerciseDefinition(result.rows[0]));
+  }
+  return saved;
 }
 
 export async function saveProject200ExerciseAssets(userId, payload = {}) {
