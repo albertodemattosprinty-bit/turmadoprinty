@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   isProject200ExerciseScheduledForDate,
   normalizeProject200ExerciseDefinition,
+  normalizeProject200WorkoutSeries,
   quantizeProject200MuscleLoad,
   project200ExerciseLibraryCompletionPercent
 } from "../src/project200-wellness.js";
@@ -108,6 +109,19 @@ test("completed series credit muscles by actual repetitions and intensity", () =
   ]);
 });
 
+test("finish payload keeps rapid series ordered and idempotent", () => {
+  assert.deepEqual(normalizeProject200WorkoutSeries([
+    { seriesNumber: 1, repetitions: 12, targetRepetitions: 12 },
+    { seriesNumber: 2, repetitions: 10, targetRepetitions: 12 },
+    { seriesNumber: 2, repetitions: 999, targetRepetitions: 12 },
+    { seriesNumber: 3, repetitions: 8, targetRepetitions: 12 }
+  ]), [
+    { seriesNumber: 1, repetitions: 12, targetRepetitions: 12 },
+    { seriesNumber: 2, repetitions: 10, targetRepetitions: 12 },
+    { seriesNumber: 3, repetitions: 8, targetRepetitions: 12 }
+  ]);
+});
+
 test("the muscle scale uses 40 percent of its original requirement", () => {
   assert.equal(project200MuscleProgressPercent(4.8), 50);
   assert.equal(project200MuscleProgressStage(50), "Manutenção");
@@ -128,4 +142,6 @@ test("muscle state colors remain gradual", () => {
   assert.equal(project200MuscleProgressColor(0), "rgb(148 163 184)");
   assert.notEqual(project200MuscleProgressColor(50), project200MuscleProgressColor(51));
   assert.notEqual(project200MuscleProgressColor(99), project200MuscleProgressColor(100));
+  assert.equal(project200MuscleProgressColor(110), "rgb(249 115 22)");
+  assert.equal(project200MuscleProgressColor(140), "rgb(239 68 68)");
 });

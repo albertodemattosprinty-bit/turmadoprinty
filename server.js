@@ -16789,9 +16789,8 @@ const server = http.createServer(async (request, response) => {
       if (!user) return;
       const body = await readJsonBody(request);
       const sessionId = decodeURIComponent(pathname.replace(/^\/api\/200\/exercises\/([^/]+)\/series$/, "$1"));
-      const result = await addProject200ExerciseSeries(user.id, sessionId, body?.repetitions, body?.targetRepetitions);
-      const dashboard = await getProject200WellnessDashboard(user.id, result.workout?.profileName || PROJECT200_DEFAULT_PROFILE_NAME);
-      sendJson(response, 201, { ok: true, ...result, dashboard });
+      const result = await addProject200ExerciseSeries(user.id, sessionId, body?.repetitions, body?.targetRepetitions, body?.seriesNumber);
+      sendJson(response, 201, { ok: true, ...result });
     } catch (error) {
       sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel salvar a serie." });
     }

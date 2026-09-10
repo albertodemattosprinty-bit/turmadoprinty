@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
   <link rel="stylesheet" href="/200/quality.css?v=20260906-1" />
   <link rel="stylesheet" href="/200/books.css?v=20260909-home-icons-v1" />
-  <link rel="stylesheet" href="/200/wellness.css?v=20260909-muscle-loads-v3" />
+  <link rel="stylesheet" href="/200/wellness.css?v=20260910-workout-finish-v1" />
   <link rel="stylesheet" href="/200/performance.css?v=20260906-scroll-v1" />
 </head>
 <body data-background-theme="edge">
@@ -2211,7 +2211,7 @@
         <article class="wellness-phase-screen wellness-workout-screen">
           <button class="wellness-phase-close" type="button" id="wellnessWorkoutBack" aria-label="Voltar aos exercícios"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
           <span class="wellness-phase-kicker" id="wellnessPhaseLabel">Série 1 de 3</span><h2 id="wellnessPhaseExerciseName">Agachamento</h2>
-          <div class="wellness-workout-image-ring" id="wellnessWorkoutProgressRing" data-fixed-exercise-video-shell><img id="wellnessWorkoutExerciseImage" src="/200/apps/exercicios.png" alt="" /><video id="wellnessWorkoutExerciseVideo" muted loop playsinline preload="metadata" hidden></video><i class="wellness-exercise-video-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z"/></svg></i><i class="wellness-workout-image-flash" aria-hidden="true"></i></div><div class="wellness-workout-series-status" id="wellnessWorkoutSeriesStatus"><strong id="wellnessWorkoutSeriesCount">0/3</strong><span>séries concluídas</span></div><div class="wellness-phase-number" id="wellnessPhaseNumber" hidden>12</div><p id="wellnessPhaseUnit">movimentos nesta série</p>
+          <div class="wellness-workout-image-ring" id="wellnessWorkoutProgressRing" data-fixed-exercise-video-shell><img id="wellnessWorkoutExerciseImage" src="/200/apps/exercicios.png" alt="" /><video id="wellnessWorkoutExerciseVideo" muted loop playsinline preload="metadata" hidden></video><i class="wellness-exercise-video-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z"/></svg></i><i class="wellness-workout-image-flash" aria-hidden="true"></i></div><div class="wellness-workout-series-status" id="wellnessWorkoutSeriesStatus" aria-label="Séries concluídas"><div class="wellness-workout-series-icons" id="wellnessWorkoutSeriesCount"></div></div><div class="wellness-phase-number" id="wellnessPhaseNumber" hidden>12</div><p id="wellnessPhaseUnit"></p>
           <div class="wellness-workout-action-stepper" id="wellnessWorkoutNumberStepper"><button class="wellness-workout-reps-arrow" type="button" id="wellnessWorkoutRepsDecrease" aria-label="Diminuir movimentos desta série" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><button class="wellness-phase-primary wellness-workout-add-button" type="button" id="wellnessWorkoutPrimary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span id="wellnessWorkoutPrimaryLabel">Adicionar 12</span></button><button class="wellness-workout-reps-arrow" type="button" id="wellnessWorkoutRepsIncrease" aria-label="Aumentar movimentos desta série" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div>
           <button class="wellness-workout-finish-button" type="button" id="wellnessWorkoutFinish"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v4a4 4 0 0 1-8 0V4Zm0 2H5v1a4 4 0 0 0 4 4M16 6h3v1a4 4 0 0 1-4 4M12 12v5M8 20h8M9 17h6"/></svg><span>Concluir treino</span></button>
         </article>
@@ -2237,6 +2237,17 @@
           <button class="wellness-phase-secondary" type="button" id="wellnessFinishCancel">Continuar treino</button>
           <button class="wellness-discard-button" type="button" id="wellnessDiscardWorkout">Excluir treino sem contabilizar</button>
         </form>
+      </div>
+
+      <div class="wellness-phase-layer wellness-workout-complete-layer" id="wellnessWorkoutCompleteLayer" hidden>
+        <article class="wellness-phase-screen wellness-workout-complete-screen">
+          <button class="wellness-phase-close" type="button" id="wellnessWorkoutCompleteClose" aria-label="Fechar finalização"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+          <span class="wellness-phase-kicker">TREINO CONCLUÍDO</span>
+          <h2 id="wellnessWorkoutCompleteName">Exercício</h2>
+          <div class="wellness-workout-complete-portrait"><img id="wellnessWorkoutCompleteImage" src="/200/apps/exercicios.png" alt="" /><i aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.6-8"/></svg></i></div>
+          <div class="wellness-workout-complete-map" id="wellnessWorkoutCompleteMap" aria-live="polite"></div>
+          <div class="wellness-muscle-map-dots wellness-workout-complete-dots" id="wellnessWorkoutCompleteDots" aria-hidden="true"></div>
+        </article>
       </div>
 
       <div class="wellness-phase-layer" id="wellnessWeightLayer" hidden>
@@ -2269,9 +2280,9 @@
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
   <script src="/200/offline-data.js?v=1.10-offline-refresh-v1"></script>
-  <script type="module" src="/200/project.js?v=20260910-required-130-v1"></script>
+  <script type="module" src="/200/project.js?v=20260910-workout-finish-131-v1"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
-  <script type="module" src="/200/wellness.js?v=20260910-muscle-progress-v3"></script>
+  <script type="module" src="/200/wellness.js?v=20260910-workout-finish-v1"></script>
   <script src="/200/books.js?v=20260904-biblia-plano-v7"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260908-readonly-v1"></script>

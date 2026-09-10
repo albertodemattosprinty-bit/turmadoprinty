@@ -163,7 +163,7 @@ function normalizeWeightRow(row) {
   return { id: String(row.id), weightKg: Number(row.weight_kg || 0), measuredAt: new Date(row.measured_at).toISOString() };
 }
 
-export async function ensureProject200WellnessSchema() {
+async function prepareProject200WellnessSchema() {
   await query(`create table if not exists project200_nutrition_entries (
     id uuid primary key default gen_random_uuid(), user_id uuid not null references users(id) on delete cascade,
     assigned_profile text not null default 'Usuario', description text not null, calories numeric(10,2) not null default 0,
@@ -252,6 +252,17 @@ export async function ensureProject200WellnessSchema() {
   )`);
   await query(`create index if not exists idx_project200_weight_user_profile_date on project200_weight_entries(user_id, assigned_profile, measured_at desc)`);
   await migrateProject200ExerciseMuscles();
+}
+
+let project200WellnessSchemaPromise = null;
+export function ensureProject200WellnessSchema() {
+  if (!project200WellnessSchemaPromise) {
+    project200WellnessSchemaPromise = prepareProject200WellnessSchema().catch((error) => {
+      project200WellnessSchemaPromise = null;
+      throw error;
+    });
+  }
+  return project200WellnessSchemaPromise;
 }
 
 async function getActiveWorkoutRow(userId, profileName) {
@@ -713,7 +724,45 @@ export async function updateProject200ExerciseProgress(userId, sessionId, payloa
   return normalizeWorkoutRow(await getActiveWorkoutRow(userId, result.rows[0].assigned_profile));
 }
 
-export async function addProject200ExerciseSeries(userId, sessionId, repetitions, targetRepetitions = 0) {
+export function normalizeProject200WorkoutSeries(series = []) {
+  return (Array.isArray(series) ? series : []).slice(0, 100).map((item, index) => ({
+    seriesNumber: clampInteger(item?.seriesNumber ?? item?.series_number ?? index + 1, 1, 100),
+    repetitions: clampInteger(item?.repetitions ?? item?.reps, 1, 10000),
+    targetRepetitions: clampInteger(item?.targetRepetitions ?? item?.target_repetitions, 0, 10000)
+  })).filter((item, index, items) => items.findIndex((candidate) => candidate.seriesNumber === item.seriesNumber) === index);
+}
+
+async function syncProject200ExerciseSeries(userId, sessionId, series = []) {
+  const normalized = normalizeProject200WorkoutSeries(series);
+  if (!normalized.length) return [];
+  const sessionResult = await query(
+    `select id from project200_exercise_sessions where id = $1 and user_id = $2 and status = 'active' and tracking_type = 'series' limit 1`,
+    [sessionId, userId]
+  );
+  if (!sessionResult.rows[0]) throw new Error("Treino ativo nao encontrado.");
+  await query(
+    `insert into project200_exercise_series (session_id, user_id, series_number, repetitions, target_repetitions)
+     select $1, $2, item.series_number, item.repetitions, item.target_repetitions
+     from jsonb_to_recordset($3::jsonb) as item(series_number integer, repetitions integer, target_repetitions integer)
+     on conflict (session_id, series_number) do update set
+       repetitions = excluded.repetitions, target_repetitions = excluded.target_repetitions`,
+    [sessionId, userId, JSON.stringify(normalized.map((item) => ({
+      series_number: item.seriesNumber,
+      repetitions: item.repetitions,
+      target_repetitions: item.targetRepetitions
+    })))]
+  );
+  await query(
+    `update project200_exercise_sessions set
+       total_reps = coalesce((select sum(repetitions) from project200_exercise_series where session_id = $1), 0),
+       updated_at = now()
+     where id = $1 and user_id = $2 and status = 'active'`,
+    [sessionId, userId]
+  );
+  return normalized;
+}
+
+export async function addProject200ExerciseSeries(userId, sessionId, repetitions, targetRepetitions = 0, requestedSeriesNumber = 0) {
   await ensureProject200WellnessSchema();
   const reps = clampInteger(repetitions, 1, 10000);
   const target = clampInteger(targetRepetitions, 0, 10000);
@@ -723,13 +772,23 @@ export async function addProject200ExerciseSeries(userId, sessionId, repetitions
   );
   const session = sessionResult.rows[0];
   if (!session) throw new Error("Serie ativa nao encontrada.");
-  const numberResult = await query(`select coalesce(max(series_number), 0) + 1 as next_number from project200_exercise_series where session_id = $1`, [sessionId]);
-  const seriesNumber = Math.max(1, Math.trunc(Number(numberResult.rows[0]?.next_number || 1)));
+  const suppliedNumber = clampInteger(requestedSeriesNumber, 0, 100);
+  const numberResult = suppliedNumber ? null : await query(`select coalesce(max(series_number), 0) + 1 as next_number from project200_exercise_series where session_id = $1`, [sessionId]);
+  const seriesNumber = suppliedNumber || Math.max(1, Math.trunc(Number(numberResult?.rows[0]?.next_number || 1)));
   await query(
-    `insert into project200_exercise_series (session_id, user_id, series_number, repetitions, target_repetitions) values ($1, $2, $3, $4, $5)`,
+    `insert into project200_exercise_series (session_id, user_id, series_number, repetitions, target_repetitions)
+     values ($1, $2, $3, $4, $5)
+     on conflict (session_id, series_number) do update set
+       repetitions = excluded.repetitions, target_repetitions = excluded.target_repetitions`,
     [sessionId, userId, seriesNumber, reps, target]
   );
-  await query(`update project200_exercise_sessions set total_reps = total_reps + $3, updated_at = now() where id = $1 and user_id = $2`, [sessionId, userId, reps]);
+  await query(
+    `update project200_exercise_sessions set
+       total_reps = coalesce((select sum(repetitions) from project200_exercise_series where session_id = $1), 0),
+       updated_at = now()
+     where id = $1 and user_id = $2 and status = 'active'`,
+    [sessionId, userId]
+  );
   return { seriesNumber, repetitions: reps, targetRepetitions: target, workout: normalizeWorkoutRow(await getActiveWorkoutRow(userId, session.assigned_profile)) };
 }
 
@@ -767,6 +826,9 @@ async function creditProject200ExerciseMuscles(userId, workoutRow) {
 
 export async function finishProject200ExerciseSession(userId, sessionId, payload = {}) {
   await ensureProject200WellnessSchema();
+  if (Array.isArray(payload.series) && payload.series.length) {
+    await syncProject200ExerciseSeries(userId, sessionId, payload.series);
+  }
   const result = await query(
     `update project200_exercise_sessions
      set status = 'completed', completed_at = now(), steps = greatest(steps, $3), distance_meters = greatest(distance_meters, $4),
