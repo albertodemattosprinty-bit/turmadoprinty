@@ -64,7 +64,7 @@ import { createQuickUserAction, createUserAction, deleteUserAction, ensureAction
 import { clearProject200CurrentTaskState, getProject200CurrentTaskState, saveProject200CurrentTaskState } from "./src/project200-current-task-state.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
-import { addProject200ExerciseSeries, addProject200ExerciseToLibrary, approveProject200ExercisePlan, createProject200NutritionEntry, createProject200WeightEntry, deleteProject200CompletedExerciseSession, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, normalizeProject200ExerciseDefinition, removeProject200ExerciseFromLibrary, saveProject200ExerciseAssets, saveProject200ExerciseDefinitions, saveProject200ExerciseVideoAsset, startProject200ExerciseSession, syncProject200ExerciseMission, updateProject200ExerciseProgress, updateProject200MealSlots, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
+import { addProject200ExerciseSeries, addProject200ExerciseToLibrary, approveProject200ExercisePlan, createProject200NutritionEntry, createProject200WeightEntry, deleteProject200CompletedExerciseSession, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, normalizeProject200ExerciseDefinition, removeProject200ExerciseFromLibrary, reorderProject200ExerciseLibrary, saveProject200ExerciseAssets, saveProject200ExerciseDefinitions, saveProject200ExerciseVideoAsset, startProject200ExerciseSession, syncProject200ExerciseMission, updateProject200ExerciseProgress, updateProject200MealSlots, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
 import { PROJECT200_MUSCLES, PROJECT200_MUSCLE_IDS } from "./public/200/exercise-muscles.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
@@ -16710,6 +16710,21 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 201, { ok: true, entry, dashboard });
     } catch (error) {
       sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel salvar o peso." });
+    }
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname === "/api/200/exercises/library/order") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const profile = body?.profile || PROJECT200_DEFAULT_PROFILE_NAME;
+      await reorderProject200ExerciseLibrary(user.id, { profileName: profile, exerciseIds: body?.exerciseIds });
+      const dashboard = await getProject200WellnessDashboard(user.id, profile);
+      sendJson(response, 200, { ok: true, dashboard });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel salvar a ordem dos exercicios." });
     }
     return;
   }

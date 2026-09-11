@@ -116,6 +116,7 @@ function normalizeExerciseLibraryRow(row) {
     targetReps: Math.max(0, Math.trunc(Number(row?.target_reps || 0))),
     targetMinutes: Math.max(0, Number(row?.target_minutes || 0)),
     targetDistanceMeters: Math.max(0, Math.trunc(Number(row?.target_distance_meters || 0))),
+    sortOrder: Math.max(0, Math.trunc(Number(row?.sort_order || 0))),
     scheduleConfig: normalizeExerciseSchedule(row?.schedule_config),
     todaySeriesCount: Math.max(0, Math.trunc(Number(row?.today_series_count || 0))),
     todayTotalReps: Math.max(0, Math.trunc(Number(row?.today_total_reps || 0))),
@@ -230,6 +231,7 @@ async function prepareProject200WellnessSchema() {
   )`);
   await query(`create index if not exists idx_project200_exercise_library_user_profile on project200_exercise_library(user_id, assigned_profile, created_at)`);
   await query(`alter table project200_exercise_library add column if not exists schedule_config jsonb`);
+  await query(`alter table project200_exercise_library add column if not exists sort_order integer not null default 0`);
   await query(`create table if not exists project200_exercise_assets (
     exercise_id text primary key, exercise_name text not null, muscles jsonb not null default '[]'::jsonb,
     start_image_url text not null, finish_image_url text not null, muscle_image_url text not null default '', generated_model text not null default 'gpt-image-1',
@@ -424,7 +426,7 @@ export async function syncProject200ExerciseMission(userId, profileName = PROJEC
 export async function getProject200WellnessDashboard(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME) {
   await ensureProject200WellnessSchema();
   const profile = normalizeProfileName(profileName);
-  const [mealResult, summaryResult, workoutResult, recentWorkoutResult, preferencesResult, libraryResult, weightResult, assetResult, definitionResult, muscleProgressResult] = await Promise.all([
+  const [mealResult, summaryResult, workoutResult, recentWorkoutResult, preferencesResult, libraryResult, weightResult, assetResult, definitionResult, muscleProgressResult, muscleLifetimeResult] = await Promise.all([
     query(
       `select * from project200_nutrition_entries
        where user_id = $1 and assigned_profile = $2
@@ -469,7 +471,7 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
            and (session.started_at at time zone $3)::date = (now() at time zone $3)::date
        ) stats on true
        where library.user_id = $1 and library.assigned_profile = $2
-       order by library.created_at asc`,
+       order by library.sort_order asc, library.created_at asc`,
       [userId, profile, PROJECT200_TIME_ZONE]
     ),
     query(`select * from project200_weight_entries where user_id = $1 and assigned_profile = $2 order by measured_at desc limit 30`, [userId, profile]),
@@ -482,6 +484,13 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
        from project200_exercise_muscle_state
        where user_id = $1 and assigned_profile = $2`,
       [userId, profile, PROJECT200_MUSCLE_POINTS_PER_PERCENT]
+    ),
+    query(
+      `select muscle_id, coalesce(sum(points), 0)::numeric as points
+       from project200_exercise_muscle_credits
+       where user_id = $1 and assigned_profile = $2
+       group by muscle_id`,
+      [userId, profile]
     )
   ]);
   const summary = summaryResult.rows[0] || {};
@@ -515,6 +524,7 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
     activeWorkout: normalizeWorkoutRow(workoutResult),
     recentWorkouts: recentWorkoutResult.rows.map(normalizeWorkoutRow),
     exerciseLibrary: libraryResult.rows.map(normalizeExerciseLibraryRow),
+    muscleLifetime: muscleLifetimeResult.rows.map((row) => ({ muscleId: String(row.muscle_id || ""), points: Math.max(0, Number(row.points || 0)) })),
     exerciseAssets: assetResult.rows.map(normalizeExerciseAssetRow),
     exerciseDefinitions: definitionResult.rows.map(normalizeProject200ExerciseDefinition),
     muscleProgress: muscleProgressResult.rows.map((row) => ({
@@ -652,8 +662,9 @@ export async function addProject200ExerciseToLibrary(userId, payload = {}) {
   const result = await query(
     `insert into project200_exercise_library (
        user_id, assigned_profile, exercise_id, exercise_name, category, tracking_type, equipment,
-       daily_goal, target_series, target_reps, target_minutes, target_distance_meters, schedule_config
-     ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, coalesce($13::jsonb, '{"frequency":"daily","interval":1,"intervalUnit":"day"}'::jsonb))
+       daily_goal, target_series, target_reps, target_minutes, target_distance_meters, schedule_config, sort_order
+     ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, coalesce($13::jsonb, '{"frequency":"daily","interval":1,"intervalUnit":"day"}'::jsonb),
+       coalesce((select max(sort_order) + 1 from project200_exercise_library where user_id = $1 and assigned_profile = $2), 0))
      on conflict (user_id, assigned_profile, exercise_id) do update
      set exercise_name = excluded.exercise_name, category = excluded.category, tracking_type = excluded.tracking_type,
        equipment = excluded.equipment, daily_goal = excluded.daily_goal, target_series = excluded.target_series,
@@ -678,6 +689,28 @@ export async function removeProject200ExerciseFromLibrary(userId, payload = {}) 
   );
   if (!result.rows[0]) throw new Error("Exercicio nao encontrado na sua lista.");
   return { exerciseId: String(result.rows[0].exercise_id), exerciseName: String(result.rows[0].exercise_name || "Exercicio") };
+}
+
+export async function reorderProject200ExerciseLibrary(userId, payload = {}) {
+  await ensureProject200WellnessSchema();
+  const profile = normalizeProfileName(payload.profileName);
+  const exerciseIds = [...new Set((Array.isArray(payload.exerciseIds) ? payload.exerciseIds : []).map((value) => String(value || "").trim().slice(0, 80)).filter(Boolean))];
+  if (!exerciseIds.length) throw new Error("Informe os exercícios na ordem desejada.");
+  const owned = await query(`select exercise_id from project200_exercise_library where user_id = $1 and assigned_profile = $2`, [userId, profile]);
+  const ownedIds = new Set(owned.rows.map((row) => String(row.exercise_id)));
+  if (exerciseIds.length !== ownedIds.size || exerciseIds.some((exerciseId) => !ownedIds.has(exerciseId))) throw new Error("A lista de exercícios mudou. Atualize e tente novamente.");
+  await query(
+    `with requested as (
+       select exercise_id, ordinality::integer - 1 as sort_order
+       from unnest($3::text[]) with ordinality as item(exercise_id, ordinality)
+     )
+     update project200_exercise_library library
+     set sort_order = requested.sort_order, updated_at = now()
+     from requested
+     where library.user_id = $1 and library.assigned_profile = $2 and library.exercise_id = requested.exercise_id`,
+    [userId, profile, exerciseIds]
+  );
+  return { exerciseIds };
 }
 
 export async function updateProject200MealSlots(userId, payload = {}) {
@@ -728,8 +761,9 @@ export async function startProject200ExerciseSession(userId, payload = {}) {
   await query(
     `insert into project200_exercise_library (
        user_id, assigned_profile, exercise_id, exercise_name, category, tracking_type, equipment,
-       daily_goal, target_series, target_reps, target_minutes, target_distance_meters
-     ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       daily_goal, target_series, target_reps, target_minutes, target_distance_meters, sort_order
+     ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+       coalesce((select max(sort_order) + 1 from project200_exercise_library where user_id = $1 and assigned_profile = $2), 0))
      on conflict (user_id, assigned_profile, exercise_id) do update
      set exercise_name = excluded.exercise_name, category = excluded.category, tracking_type = excluded.tracking_type,
        equipment = excluded.equipment, daily_goal = excluded.daily_goal, target_series = excluded.target_series,

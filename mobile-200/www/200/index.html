@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/200/quality.css?v=20260906-1" />
   <link rel="stylesheet" href="/200/books.css?v=20260909-home-icons-v1" />
   <link rel="stylesheet" href="/200/wellness.css?v=20260911-exercise-background-v1" />
+  <link rel="stylesheet" href="/200/wellness-pack.css?v=20260911-daily-feedback-v1" />
   <link rel="stylesheet" href="/200/performance.css?v=20260906-scroll-v1" />
 </head>
 <body data-background-theme="edge">
@@ -2103,21 +2104,32 @@
           <section class="wellness-list-section"><header><div><span>Hoje</span><h2>Suas refeições</h2></div></header><div class="wellness-meal-list" id="wellnessMealList"></div></section>
         </section>
         <section class="wellness-pane" data-wellness-pane="exercises">
-          <section class="wellness-exercise-daily-progress" aria-label="Progresso total do treino diário"><div class="wellness-exercise-daily-copy"><span>Treino diário</span><strong id="wellnessExerciseDailyPercent">0%</strong><small>progresso total de hoje</small></div><div class="wellness-exercise-daily-track" aria-hidden="true"><i id="wellnessExerciseDailyProgressFill"></i></div></section>
           <section class="wellness-muscle-progress" aria-label="Acompanhamento visual dos músculos treinados">
             <div class="wellness-muscle-map-carousel wellness-muscle-progress-carousel" id="wellnessMuscleProgressMapTrack"></div>
             <div class="wellness-muscle-map-dots" id="wellnessMuscleProgressMapDots" aria-hidden="true"></div>
-            <div class="wellness-muscle-progress-scale" aria-label="Escala contínua do estado muscular"><i></i><div><span>Cinza</span><span>Saúde</span><span>Adaptação</span><span>Hipertrofia</span><span>Forte</span><span>Sobrecarga</span></div></div>
           </section>
+          <section class="wellness-exercise-daily-progress" id="wellnessExerciseDailyProgress" role="button" tabindex="0" aria-label="Ver exercícios do treino diário"><button class="wellness-exercise-daily-play" type="button" id="wellnessExerciseDailyPlay" aria-label="Iniciar o primeiro exercício de hoje"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"/></svg></button><div class="wellness-exercise-daily-copy"><span>Treino diário</span><strong id="wellnessExerciseDailyPercent">0%</strong><small>Toque para ver</small></div><div class="wellness-exercise-daily-track" aria-hidden="true"><i id="wellnessExerciseDailyProgressFill"></i></div></section>
           <section class="wellness-active-workout" id="wellnessActiveWorkout" role="button" tabindex="0" aria-label="Abrir treino em andamento" hidden>
             <div class="wellness-active-workout-main"><span class="wellness-active-workout-media" data-fixed-exercise-video-shell><img id="wellnessActiveWorkoutImage" src="/200/apps/exercicios.png" alt="" /><video id="wellnessActiveWorkoutVideo" muted loop playsinline preload="metadata" hidden></video><i class="wellness-exercise-video-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z"/></svg></i></span><div><span>Treino em andamento</span><h2 id="wellnessWorkoutName">Caminhar</h2><div class="wellness-workout-counter" id="wellnessWorkoutCounter">00:00</div><small id="wellnessWorkoutDetail">Progresso salvo no seu perfil</small></div></div>
           </section>
           <div class="wellness-exercise-category-switcher" role="group" aria-label="Categoria de exercícios"><button type="button" id="wellnessExerciseCategoryPrevious" aria-label="Categoria anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><strong id="wellnessExerciseCategoryName" aria-live="polite">Musculação</strong><button type="button" id="wellnessExerciseCategoryNext" aria-label="Próxima categoria"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div>
           <div class="wellness-exercise-grid" id="wellnessExerciseGrid"></div>
           <button class="wellness-catalog-open" type="button" id="wellnessOpenCatalog" aria-label="Abrir acervo de exercícios" title="Abrir acervo de exercícios"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
-          <section class="wellness-list-section wellness-workout-history-section"><header><div><span>Sua tabela</span><h2>Treinos recentes</h2></div></header><div class="wellness-workout-history" id="wellnessWorkoutHistory"></div></section>
+          <h2 class="wellness-exercise-section-title">Exercícios Recentes</h2>
+          <section class="wellness-list-section wellness-workout-history-section"><div class="wellness-workout-history" id="wellnessWorkoutHistory"></div></section>
         </section>
       </main>
+
+      <div class="wellness-phase-layer" id="wellnessDailyPlanLayer" hidden>
+        <article class="wellness-phase-screen wellness-daily-plan-screen">
+          <button class="wellness-phase-close" type="button" id="wellnessDailyPlanClose" aria-label="Voltar aos exercícios"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+          <span class="wellness-phase-kicker">HOJE</span>
+          <h2>Treino diário</h2>
+          <p>Segure o botão de trocar por 500 ms e arraste para organizar.</p>
+          <div class="wellness-daily-plan-list" id="wellnessDailyPlanList"></div>
+          <p class="wellness-status" id="wellnessDailyPlanStatus" aria-live="polite"></p>
+        </article>
+      </div>
 
       <div class="wellness-phase-layer" id="wellnessCatalogLayer" hidden>
         <article class="wellness-phase-screen wellness-catalog-screen">
@@ -2167,7 +2179,7 @@
             <button class="wellness-exercise-start-button" type="button" id="wellnessExerciseStart" aria-label="Iniciar exercício"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"/></svg></button>
             <button class="wellness-exercise-info-button" type="button" id="wellnessExerciseInfoOpen" aria-label="Informações do exercício"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10v7M12 7h.01"/></svg></button>
           </div>
-          <section class="wellness-exercise-progress" id="wellnessExerciseProgress" hidden><div class="wellness-workout-series-icons wellness-exercise-series-icons" id="wellnessExerciseSeriesProgress"></div></section>
+          <section class="wellness-exercise-progress" id="wellnessExerciseProgress" hidden><strong id="wellnessExerciseTotalPoints">0 pontos totais</strong><small id="wellnessExerciseGoalProgress">Defina uma meta</small></section>
           <section class="wellness-exercise-muscle-map" id="wellnessExerciseMuscleMapSection" aria-label="Mapa dos músculos trabalhados">
             <div class="wellness-muscle-map-carousel" id="wellnessExerciseMuscleMapTrack"></div>
             <div class="wellness-muscle-map-dots" id="wellnessExerciseMuscleMapDots" aria-hidden="true"></div>
@@ -2270,9 +2282,10 @@
       <div class="wellness-phase-layer wellness-workout-complete-layer" id="wellnessWorkoutCompleteLayer" hidden>
         <article class="wellness-phase-screen wellness-workout-complete-screen">
           <button class="wellness-phase-close" type="button" id="wellnessWorkoutCompleteClose" aria-label="Fechar finalização"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
-          <span class="wellness-phase-kicker">TREINO CONCLUÍDO</span>
-          <h2 id="wellnessWorkoutCompleteName">Exercício</h2>
+          <span class="wellness-workout-complete-title">Treino Concluído</span>
           <div class="wellness-workout-complete-portrait" id="wellnessWorkoutCompletePortrait" data-fixed-exercise-video-shell><img id="wellnessWorkoutCompleteImage" src="/200/apps/exercicios.png" alt="" /><video id="wellnessWorkoutCompleteVideo" muted loop playsinline preload="metadata" hidden></video><i aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.6-8"/></svg></i></div>
+          <h2 id="wellnessWorkoutCompleteName">Exercício</h2>
+          <div class="wellness-workout-complete-progress"><span aria-hidden="true"><i id="wellnessWorkoutCompleteProgressFill"></i></span><strong id="wellnessWorkoutCompleteProgressText">Progresso do Exercício 0%</strong></div>
           <div class="wellness-workout-complete-map" id="wellnessWorkoutCompleteMap" aria-live="polite"></div>
           <div class="wellness-muscle-map-dots wellness-workout-complete-dots" id="wellnessWorkoutCompleteDots" aria-hidden="true"></div>
         </article>
@@ -2310,7 +2323,7 @@
   <script src="/200/offline-data.js?v=1.10-offline-refresh-v1"></script>
   <script type="module" src="/200/project.js?v=20260911-exercise-background-v1"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
-  <script type="module" src="/200/wellness.js?v=20260911-workout-immediate-v1"></script>
+  <script type="module" src="/200/wellness.js?v=20260911-daily-feedback-v1"></script>
   <script src="/200/books.js?v=20260904-biblia-plano-v7"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260908-readonly-v1"></script>
