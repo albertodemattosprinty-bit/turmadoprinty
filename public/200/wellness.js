@@ -187,10 +187,10 @@ const elements = {
   ,mealConfigLayer:byId("wellnessMealConfigLayer"), mealConfigList:byId("wellnessMealConfigList"), mealConfigStatus:byId("wellnessMealConfigStatus"), mealAddLayer:byId("wellnessMealAddLayer"), mealAddTitle:byId("wellnessMealAddTitle"), mealAddStatus:byId("wellnessMealAddStatus"), foodMic:byId("wellnessFoodMic")
 };
 const phaseLayers = [elements.dailyPlanLayer,elements.catalogLayer,elements.catalogMuscleLayer,elements.catalogAddLayer,elements.detail,elements.muscleExercisesLayer,elements.infoLayer,elements.adminLayer,elements.goalLayer,elements.workoutLayer,elements.repsLayer,elements.finishLayer,elements.completeLayer,elements.weightLayer,elements.mealConfigLayer,elements.mealAddLayer].filter(Boolean);
+function hasVisibleWellnessPhase(){return phaseLayers.some((layer)=>!layer.hidden);}
 const EXERCISE_IMAGE_PHASES = ["start","finish","muscle"];
-const state = { tab:"nutrition", filter:"strength", catalogQuery:"", catalogType:"", catalogDifficulty:0, catalogMuscleId:"", catalogSort:"popular", catalogSearchTimer:null, dashboard:null, isAdmin:false, selectedExercise:null, selectedMuscleId:"", muscleReturnView:"detail", detailMode:"selected", goalEditMode:false, goalWeekDays:[1,2,3,4,5,6], workout:null, workoutNavigationWorkoutId:"", workoutNavigationExerciseId:"", steps:0, lastStepAt:0, motionListening:false, saveTimer:null, ticker:null, exerciseImageTimer:null, detailImageTimer:null, detailMuscleTimer:null, exerciseMuscleTimer:null, muscleProgressTimer:null, muscleCarouselTimer:null, muscleCarouselTouchedAt:0, provisionalMuscleProgress:new Map(), deletedWorkoutIds:new Set(), completionRunId:0, exerciseImagePhase:"start", detailImagePhase:"start", muscleNameIndex:0, pendingMeal:"", selectedMealSlot:"", gpsWatchId:null, gpsProvider:"", gpsLastPoint:null, gpsDistanceMeters:0, gpsAccuracy:null, gpsStatus:"GPS aguardando localização", gpsPlugin:null, seriesRepsDraft:null, seriesSaveChain:Promise.resolve(), seriesRestUntil:0, seriesRestWorkoutId:"", seriesRestTimer:null, seriesRestDelayTimer:null, seriesRestRevealTimer:null, seriesRestPending:false, dailyReorderTimer:null, dailyReorderActive:false, dailyReorderPointerId:null, dailyReorderItem:null, dailyReorderStartX:0, dailyReorderStartY:0, adminImageHoldTimer:null, adminImageHoldTriggered:false, adminImageHoldX:0, adminImageHoldY:0, adminVideoHoldTimer:null, adminVideoHoldTriggered:false, suppressExerciseImageClick:false, generatingExerciseId:"", uploadingExerciseVideoId:"", generatingDefinitions:false, voiceRecorder:null, voiceStream:null, voiceTarget:null };
+const state = { tab:"nutrition", filter:"strength", catalogQuery:"", catalogType:"", catalogDifficulty:0, catalogMuscleId:"", catalogSort:"popular", catalogSearchTimer:null, dashboard:null, isAdmin:false, selectedExercise:null, selectedMuscleId:"", muscleReturnView:"detail", detailMode:"selected", goalEditMode:false, goalWeekDays:[1,2,3,4,5,6], workout:null, workoutStarting:false, workoutNavigationWorkoutId:"", workoutNavigationExerciseId:"", steps:0, lastStepAt:0, motionListening:false, saveTimer:null, ticker:null, exerciseImageTimer:null, detailImageTimer:null, detailMuscleTimer:null, exerciseMuscleTimer:null, muscleProgressTimer:null, muscleCarouselTimer:null, muscleCarouselTouchedAt:0, provisionalMuscleProgress:new Map(), deletedWorkoutIds:new Set(), completionRunId:0, exerciseImagePhase:"start", detailImagePhase:"start", muscleNameIndex:0, pendingMeal:"", selectedMealSlot:"", gpsWatchId:null, gpsProvider:"", gpsLastPoint:null, gpsDistanceMeters:0, gpsAccuracy:null, gpsStatus:"GPS aguardando localização", gpsPlugin:null, seriesRepsDraft:null, seriesSaveChain:Promise.resolve(), seriesRestUntil:0, seriesRestWorkoutId:"", seriesRestTimer:null, seriesRestDelayTimer:null, seriesRestRevealTimer:null, seriesRestPending:false, dailyReorderTimer:null, dailyReorderActive:false, dailyReorderPointerId:null, dailyReorderItem:null, dailyReorderStartX:0, dailyReorderStartY:0, adminImageHoldTimer:null, adminImageHoldTriggered:false, adminImageHoldX:0, adminImageHoldY:0, adminVideoHoldTimer:null, adminVideoHoldTriggered:false, suppressExerciseImageClick:false, generatingExerciseId:"", uploadingExerciseVideoId:"", generatingDefinitions:false, voiceRecorder:null, voiceStream:null, voiceTarget:null };
 const WORKOUT_SERIES_REST_MS=60000;
-const WORKOUT_SERIES_REST_DELAY_MS=1200;
 const runningMiniPlayer=byId("runningMiniPlayer"),runningMiniPlayerHomeParent=runningMiniPlayer?.parentNode||null,runningMiniPlayerHomeNext=runningMiniPlayer?.nextSibling||null;
 function profileName(){ return String(window.localStorage.getItem(PROFILE_KEY)||document.body.dataset.profile||"Usuario").trim()||"Usuario"; }
 async function apiRequest(path,options={}){
@@ -297,11 +297,11 @@ async function syncOfflineWorkouts(){
 function pauseHiddenExerciseVideos(){ document.querySelectorAll("video[data-exercise-video]").forEach((video)=>{ if(video.closest("[hidden]")){ video.pause(); video.closest(".is-playing")?.classList.remove("is-playing"); } }); }
 function mountWorkoutPlayer(){if(!runningMiniPlayer||!elements.workoutPlayerSlot)return;elements.workoutPlayerSlot.appendChild(runningMiniPlayer);runningMiniPlayer.classList.add("is-in-wellness-workout");}
 function restoreWorkoutPlayer(){if(!runningMiniPlayer||!runningMiniPlayerHomeParent)return;if(runningMiniPlayer.parentNode===runningMiniPlayerHomeParent){runningMiniPlayer.classList.remove("is-in-wellness-workout");return;}if(runningMiniPlayerHomeNext?.parentNode===runningMiniPlayerHomeParent)runningMiniPlayerHomeParent.insertBefore(runningMiniPlayer,runningMiniPlayerHomeNext);else runningMiniPlayerHomeParent.appendChild(runningMiniPlayer);runningMiniPlayer.classList.remove("is-in-wellness-workout");}
-function showLayer(layer){ phaseLayers.forEach((item)=>{ item.hidden=item!==layer; });if(layer===elements.workoutLayer)mountWorkoutPlayer();else restoreWorkoutPlayer();pauseHiddenExerciseVideos(); if(layer!==elements.detail){if(state.detailImageTimer)window.clearInterval(state.detailImageTimer);if(state.detailMuscleTimer)window.clearInterval(state.detailMuscleTimer);state.detailImageTimer=null;state.detailMuscleTimer=null;} }
+function showLayer(layer){ phaseLayers.forEach((item)=>{ item.hidden=item!==layer; });modal?.classList.toggle("is-workout-phase",layer===elements.workoutLayer);if(layer===elements.workoutLayer)mountWorkoutPlayer();else restoreWorkoutPlayer();pauseHiddenExerciseVideos(); if(layer!==elements.detail){if(state.detailImageTimer)window.clearInterval(state.detailImageTimer);if(state.detailMuscleTimer)window.clearInterval(state.detailMuscleTimer);state.detailImageTimer=null;state.detailMuscleTimer=null;} }
 function stopWellnessVoice(){
   if(state.voiceRecorder&&state.voiceRecorder.state!=="inactive")state.voiceRecorder.stop();
 }
-function hideLayers(){ stopWellnessVoice(); if(state.dailyReorderTimer)window.clearTimeout(state.dailyReorderTimer);state.dailyReorderTimer=null;state.dailyReorderActive=false;state.dailyReorderItem=null;phaseLayers.forEach((item)=>{ item.hidden=true; });restoreWorkoutPlayer();pauseHiddenExerciseVideos(); if(state.detailImageTimer)window.clearInterval(state.detailImageTimer);if(state.detailMuscleTimer)window.clearInterval(state.detailMuscleTimer); state.detailImageTimer=null;state.detailMuscleTimer=null; }
+function hideLayers(){ stopWellnessVoice(); if(state.dailyReorderTimer)window.clearTimeout(state.dailyReorderTimer);state.dailyReorderTimer=null;state.dailyReorderActive=false;state.dailyReorderItem=null;phaseLayers.forEach((item)=>{ item.hidden=true; });modal?.classList.remove("is-workout-phase");restoreWorkoutPlayer();pauseHiddenExerciseVideos(); if(state.detailImageTimer)window.clearInterval(state.detailImageTimer);if(state.detailMuscleTimer)window.clearInterval(state.detailMuscleTimer); state.detailImageTimer=null;state.detailMuscleTimer=null; }
 function setTab(tab){ state.tab=tab==="exercises"?"exercises":"nutrition";if(modal)modal.dataset.wellnessTab=state.tab; document.querySelectorAll("[data-wellness-tab]").forEach((button)=>button.classList.toggle("active",button.dataset.wellnessTab===state.tab)); document.querySelectorAll("[data-wellness-pane]").forEach((pane)=>pane.classList.toggle("active",pane.dataset.wellnessPane===state.tab)); const exercising=state.tab==="exercises"; elements.title.textContent=exercising?"Exercícios":"Nutrição"; elements.headerIcon.src=exercising?"/200/apps/exercicios.png":"/200/apps/nutricao.png"; }
 function openWellness(tab){ setTab(tab); modal?.setAttribute("aria-label",state.tab==="nutrition"?"Nutrição":"Exercícios"); modal?.classList.add("active"); modal?.setAttribute("aria-hidden","false"); document.body.classList.add("modal-open"); hideLayers(); startExerciseImageTicker(); if(state.tab==="exercises")warmExerciseProgressSound(); renderExerciseGrid(); void refreshAdminAccess(); void loadDashboard(); }
 function closeWellness(){ hideLayers(); modal?.classList.remove("active"); modal?.setAttribute("aria-hidden","true"); if(!document.querySelector(".workspace-modal.active"))document.body.classList.remove("modal-open"); }
@@ -366,7 +366,7 @@ function exerciseImageMarkup(exercise,className="wellness-exercise-image"){
   if(images.video)return `<span class="${className} wellness-exercise-video-shell has-video" data-exercise-video-shell><video class="wellness-exercise-video" data-exercise-video src="${escapeHtml(images.video)}" poster="${escapeHtml(images.poster)}" muted loop playsinline preload="metadata" aria-label="${escapeHtml(label)}"></video><i class="wellness-exercise-video-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z"/></svg></i></span>`;
   return `<img class="${className}" data-exercise-image data-exercise-image-id="${escapeHtml(exercise?.id||"")}" data-start-src="${escapeHtml(images.start)}" data-finish-src="${escapeHtml(images.finish)}" data-muscle-src="${escapeHtml(images.muscle)}" src="${escapeHtml(exerciseImageForPhase(images))}" alt="${escapeHtml(label)}" />`;
 }
-function playFixedExerciseVideo(shell,{restart=false}={}){const video=shell?.querySelector?.("video[data-exercise-video]");if(!video||shell.dataset.userPaused==="true")return false;video.muted=true;if(restart)video.currentTime=0;void video.play().then(()=>shell.classList.add("is-playing")).catch(()=>{});return true;}
+function playFixedExerciseVideo(shell,{restart=false}={}){const video=shell?.querySelector?.("video[data-exercise-video]");if(!video||shell.dataset.userPaused==="true")return false;video.muted=true;if(!restart&&!video.paused&&!video.ended){shell.classList.add("is-playing");return true;}if(restart)video.currentTime=0;void video.play().then(()=>shell.classList.add("is-playing")).catch(()=>{});return true;}
 function toggleExerciseVideo(shell){ const video=shell?.querySelector?.("video[data-exercise-video]"); if(!video)return false; if(video.paused){delete shell.dataset.userPaused;document.querySelectorAll("video[data-exercise-video]").forEach((item)=>{ if(item===video)return;item.pause();try{item.currentTime=0;}catch{}item.closest(".is-playing")?.classList.remove("is-playing"); });playFixedExerciseVideo(shell); }else{ video.pause();shell.dataset.userPaused="true"; shell.classList.remove("is-playing"); } return true; }
 function configureFixedExerciseMedia(shell,image,video,exercise,{movementOnly=false}={}){
   if(!shell||!image||!video)return;
@@ -382,8 +382,8 @@ function muscleLoadIndicatorMarkup(item){const name=String(item?.name||"Corpo in
 function exerciseMuscleMarkup(exercise){ const muscles=exerciseMuscleLoads(exercise),item=muscles[state.muscleNameIndex%Math.max(1,muscles.length)]; return `<small class="wellness-exercise-muscle-label" data-exercise-muscles="${escapeHtml(JSON.stringify(muscles))}">${muscleLoadIndicatorMarkup(item)}</small>`; }
 function refreshExerciseMuscleLabels(){ document.querySelectorAll("[data-exercise-muscles]").forEach((label)=>{ try{ const muscles=JSON.parse(label.dataset.exerciseMuscles||"[]"); if(Array.isArray(muscles)&&muscles.length)label.innerHTML=muscleLoadIndicatorMarkup(muscles[state.muscleNameIndex%muscles.length]); }catch{} }); }
 function advanceMuscleProgressCarousel(){ const track=elements.muscleProgressMapTrack;if(!track||document.hidden||!modal?.classList.contains("active")||state.tab!=="exercises"||phaseLayers.some((layer)=>!layer.hidden)||Date.now()-state.muscleCarouselTouchedAt<2000)return; const bounds=track.getBoundingClientRect();if(bounds.bottom<=0||bounds.top>=window.innerHeight)return; const width=Math.max(1,track.clientWidth),current=Math.max(0,Math.min(PROJECT200_MUSCLE_MAPS.length-1,Math.round(track.scrollLeft/width))),next=(current+1)%PROJECT200_MUSCLE_MAPS.length; track.scrollTo({left:next*width,behavior:"smooth"}); }
-function startExerciseImageTicker(){ if(!state.exerciseImageTimer)state.exerciseImageTimer=window.setInterval(()=>{ if(document.hidden||!modal?.classList.contains("active"))return; const index=EXERCISE_IMAGE_PHASES.indexOf(state.exerciseImagePhase); state.exerciseImagePhase=EXERCISE_IMAGE_PHASES[(index+1)%EXERCISE_IMAGE_PHASES.length]; refreshExerciseImages(); },1500); if(!state.exerciseMuscleTimer)state.exerciseMuscleTimer=window.setInterval(()=>{ if(document.hidden||!modal?.classList.contains("active"))return; state.muscleNameIndex+=1; refreshExerciseMuscleLabels(); },1000); if(!state.muscleProgressTimer)state.muscleProgressTimer=window.setInterval(()=>{ if(document.hidden||!modal?.classList.contains("active")||state.tab!=="exercises")return; refreshMuscleProgressMap(); },25000); if(!state.muscleCarouselTimer)state.muscleCarouselTimer=window.setInterval(advanceMuscleProgressCarousel,2000); }
-function startDetailMovementTicker(){ if(state.detailImageTimer)window.clearInterval(state.detailImageTimer); state.detailImageTimer=null; state.detailImagePhase="start"; const images=exerciseImageSources(state.selectedExercise); if(images.video&&!elements.detailVideo?.hidden){elements.detailVideo.muted=true;void elements.detailVideo.play().then(()=>elements.detailFrame?.classList.add("is-playing")).catch(()=>{});return;} if(!elements.detailImage)return; elements.detailImage.src=images.start; state.detailImageTimer=window.setInterval(()=>{ if(document.hidden||elements.detail?.hidden||exerciseImageSources(state.selectedExercise).video)return; state.detailImagePhase=state.detailImagePhase==="start"?"finish":"start"; const current=exerciseImageSources(state.selectedExercise); elements.detailImage.src=exerciseImageForPhase(current,state.detailImagePhase); },1000); }
+function startExerciseImageTicker(){ if(!state.exerciseImageTimer)state.exerciseImageTimer=window.setInterval(()=>{ if(document.hidden||!modal?.classList.contains("active")||hasVisibleWellnessPhase())return; const index=EXERCISE_IMAGE_PHASES.indexOf(state.exerciseImagePhase); state.exerciseImagePhase=EXERCISE_IMAGE_PHASES[(index+1)%EXERCISE_IMAGE_PHASES.length]; refreshExerciseImages(); },1500); if(!state.exerciseMuscleTimer)state.exerciseMuscleTimer=window.setInterval(()=>{ if(document.hidden||!modal?.classList.contains("active")||hasVisibleWellnessPhase())return; state.muscleNameIndex+=1; refreshExerciseMuscleLabels(); },1000); if(!state.muscleProgressTimer)state.muscleProgressTimer=window.setInterval(()=>{ if(document.hidden||!modal?.classList.contains("active")||state.tab!=="exercises"||hasVisibleWellnessPhase())return; refreshMuscleProgressMap(); },25000); if(!state.muscleCarouselTimer)state.muscleCarouselTimer=window.setInterval(advanceMuscleProgressCarousel,2000); }
+function startDetailMovementTicker(){ if(state.detailImageTimer)window.clearInterval(state.detailImageTimer); state.detailImageTimer=null; state.detailImagePhase="start"; const images=exerciseImageSources(state.selectedExercise); if(images.video&&!elements.detailVideo?.hidden){elements.detailVideo.muted=true;elements.detailVideo.pause();try{elements.detailVideo.currentTime=0;}catch{}elements.detailFrame?.classList.remove("is-playing");return;} if(!elements.detailImage)return; elements.detailImage.src=images.start; state.detailImageTimer=window.setInterval(()=>{ if(document.hidden||elements.detail?.hidden||exerciseImageSources(state.selectedExercise).video)return; state.detailImagePhase=state.detailImagePhase==="start"?"finish":"start"; const current=exerciseImageSources(state.selectedExercise); elements.detailImage.src=exerciseImageForPhase(current,state.detailImagePhase); },1000); }
 function exerciseTodayValue(item){
   if(!item)return 0;
   if(item.trackingType==="series")return Math.max(0,Number(item.todayTotalReps||0));
@@ -458,7 +458,7 @@ function renderDailyPlan(){
 function openDailyPlan(){ if(!todayExerciseLibrary().length)return;renderDailyPlan();showLayer(elements.dailyPlanLayer); }
 function startFirstDailyExercise(){
   const exercise=exerciseFromLibrary(todayExerciseLibrary()[0]);if(!exercise)return;
-  if(state.workout){renderWorkout();showLayer(elements.workoutLayer);playFixedExerciseVideo(elements.phaseProgress);return;}
+  if(state.workout){renderWorkout();showLayer(elements.workoutLayer);return;}
   state.selectedExercise=exercise;state.detailMode="selected";startSelectedExercise();
 }
 function animateDailyPlanReorder(before){
@@ -491,7 +491,7 @@ function endDailyPlanReorder(event){
   if(event.pointerId!==undefined&&state.dailyReorderPointerId!==null&&event.pointerId!==state.dailyReorderPointerId)return;
   if(state.dailyReorderTimer)window.clearTimeout(state.dailyReorderTimer);state.dailyReorderTimer=null;const active=state.dailyReorderActive,item=state.dailyReorderItem;if(item)item.classList.remove("is-dragging");state.dailyReorderActive=false;state.dailyReorderItem=null;state.dailyReorderPointerId=null;if(active)void saveDailyPlanOrder();
 }
-function refreshExerciseProgress(){ refreshExerciseImages(); renderDailyExerciseProgress(); }
+function refreshExerciseProgress(){ if(!hasVisibleWellnessPhase())refreshExerciseImages(); renderDailyExerciseProgress(); }
 function exerciseRating(value){return Math.max(1,Math.min(5,Math.round(Number(value)||1)));}
 function exerciseDifficultyMarkup(exercise){const difficulty=exerciseRating(exercise?.difficulty),labels=["","Iniciante","Básico","Intermediário","Difícil","Avançado"],label=`${labels[difficulty]} · dificuldade ${difficulty} de 5`;return `<span class="wellness-catalog-difficulty" role="img" aria-label="${label}" title="${label}">${Array.from({length:5},(_,index)=>`<i class="${index<difficulty?"is-active":""}">★</i>`).join("")}</span>`;}
 function catalogExerciseHasMuscle(exercise,muscleId){return !muscleId||exerciseMuscleLoads(exercise).some((muscle)=>muscle.muscleId===muscleId);}
@@ -564,9 +564,9 @@ function openExerciseDetail(exercise,mode="selected"){
   elements.detailName.textContent=exercise.name;
   configureFixedExerciseMedia(elements.detailFrame,elements.detailImage,elements.detailVideo,exercise,{movementOnly:true});
   const isGenerating=state.generatingExerciseId===exercise.id||state.uploadingExerciseVideoId===exercise.id; elements.detailFrame?.classList.toggle("is-generating",isGenerating);
-  if(elements.detailGenerate){ elements.detailGenerate.hidden=!state.isAdmin; elements.detailGenerate.disabled=isGenerating; }
+  if(elements.detailGenerate)elements.detailGenerate.hidden=true;
   if(elements.detailMediaLoaderText)elements.detailMediaLoaderText.textContent=state.uploadingExerciseVideoId===exercise.id?"Otimizando vídeo...":"Criando imagens...";
-  if(elements.detailGenerateStatus&&!isGenerating)elements.detailGenerateStatus.textContent=state.isAdmin?(exerciseImageSources(exercise).video?"Vídeo ativo · segure a mídia por 2 segundos para substituir.":"Segure a mídia por 2 segundos para enviar um vídeo."):"";
+  if(elements.detailGenerateStatus&&!isGenerating)elements.detailGenerateStatus.textContent="";
   const item=libraryItem(exercise.id),hasGoal=hasExerciseGoal(item),startLabel=mode==="catalog"?"Iniciar exercício":!hasGoal?"Definir nova meta":exercise.tracking==="series"?"Iniciar série":exercise.tracking==="gps"?"Iniciar caminhada":"Iniciar exercício"; elements.detailStart.setAttribute("aria-label",startLabel);elements.detailStart.title=startLabel; if(elements.detailGoal)elements.detailGoal.hidden=mode!=="selected"||!hasGoal; if(elements.detailDelete)elements.detailDelete.hidden=mode!=="selected"||!item;
   updateExerciseProgressDetail(); renderExerciseMuscleMaps(exercise); showLayer(elements.detail);startDetailMovementTicker(); elements.detail?.querySelector(".wellness-phase-screen")?.scrollTo({top:0});
 }
@@ -670,7 +670,7 @@ async function addSelectedExercise(){
 function exerciseDefaultTargets(exercise){const isSeries=exercise?.tracking==="series",isGps=exercise?.tracking==="gps";return {targetSeries:isSeries?3:0,targetReps:isSeries?12:0,targetMinutes:!isSeries&&!isGps?30:0,targetDistanceMeters:isGps?3000:0};}
 function openCatalogAddConfirmation(exercise){if(!exercise||libraryItem(exercise.id))return;state.selectedExercise=exercise;state.detailMode="catalog";elements.catalogAddName.textContent=exercise.name;elements.catalogAddStatus.textContent="";elements.catalogAddConfirm.disabled=false;configureFixedExerciseMedia(elements.catalogAddFrame,elements.catalogAddImage,elements.catalogAddVideo,exercise,{movementOnly:true});showLayer(elements.catalogAddLayer);playFixedExerciseVideo(elements.catalogAddFrame,{restart:true});}
 async function confirmCatalogAddition(){const exercise=state.selectedExercise;if(!exercise||libraryItem(exercise.id)){showLayer(elements.catalogLayer);renderCatalog();return;}elements.catalogAddConfirm.disabled=true;elements.catalogAddStatus.textContent="Adicionando ao seu plano...";try{const payload=await apiRequest("/api/200/exercises/library",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:profileName(),exerciseId:exercise.id,exerciseName:exercise.name,category:exercise.category,trackingType:exercise.tracking,equipment:exercise.equipment,...exerciseDefaultTargets(exercise)}),offlineInvalidates:["/api/200/wellness","/api/200/extra-goals"]});state.dashboard=payload.dashboard||state.dashboard;cacheDashboard();showLayer(elements.catalogLayer);renderCatalog();window.dispatchEvent(new CustomEvent("project200:exercise-mission-updated"));}catch(error){elements.catalogAddStatus.textContent=error instanceof Error?error.message:"Não foi possível adicionar o exercício.";}finally{elements.catalogAddConfirm.disabled=false;}}
-function startCatalogExercise(exercise){if(!exercise)return;if(state.workout){renderWorkout();showLayer(elements.workoutLayer);playFixedExerciseVideo(elements.phaseProgress);return;}state.selectedExercise=exercise;state.detailMode="catalog";fillExerciseGoalFields(exercise,null);void startExercise({preventDefault(){},currentTarget:elements.detailStart});}
+function startCatalogExercise(exercise){if(!exercise)return;if(state.workout){renderWorkout();showLayer(elements.workoutLayer);return;}state.selectedExercise=exercise;state.detailMode="catalog";fillExerciseGoalFields(exercise,null);void startExercise({preventDefault(){},currentTarget:elements.detailStart});}
 function fillExerciseGoalFields(exercise,item){
   const isSeries=exercise?.tracking==="series",isGps=exercise?.tracking==="gps";
   if(isSeries){ elements.targetSeries.value=String(item?.targetSeries||3); elements.targetReps.value=String(item?.targetReps||12); }
@@ -774,12 +774,15 @@ function setWorkoutProgress(value){
 function renderWorkoutSeriesMarkers(done,target){
   if(!elements.workoutSeriesCount)return;
   const total=Math.max(1,Math.min(20,Math.max(Number(done||0),Number(target||1))));
-  if(Number(elements.workoutSeriesCount.dataset.total||0)!==total){
+  const totalChanged=Number(elements.workoutSeriesCount.dataset.total||0)!==total;
+  if(totalChanged){
     elements.workoutSeriesCount.dataset.total=String(total);
     elements.workoutSeriesCount.innerHTML=Array.from({length:total},(_,index)=>`<img src="/200/apps/exercicios.png" alt="" data-series-marker="${index+1}" />`).join("");
   }
-  const apply=()=>elements.workoutSeriesCount.querySelectorAll("[data-series-marker]").forEach((marker,index)=>marker.classList.toggle("is-complete",index<done));
-  window.requestAnimationFrame(apply);
+  if(totalChanged||elements.workoutSeriesCount.dataset.done!==String(done)){
+    elements.workoutSeriesCount.dataset.done=String(done);
+    window.requestAnimationFrame(()=>elements.workoutSeriesCount.querySelectorAll("[data-series-marker]").forEach((marker,index)=>marker.classList.toggle("is-complete",index<done)));
+  }
   elements.workoutSeriesStatus?.setAttribute("aria-label",`${done} de ${target} séries concluídas`);
 }
 function stopSeriesRestTimer(){ if(state.seriesRestTimer)window.clearInterval(state.seriesRestTimer);if(state.seriesRestDelayTimer)window.clearTimeout(state.seriesRestDelayTimer);state.seriesRestTimer=null;state.seriesRestDelayTimer=null; }
@@ -806,8 +809,7 @@ function refreshSeriesRest(){
 function scheduleSeriesRest(workout=state.workout){
   const done=Number(workout?.seriesCount||0),target=Math.max(1,Number(workout?.targetSeries||1));
   if(workout?.trackingType!=="series"||done>=target){clearSeriesRest();return false;}
-  clearSeriesRest();state.seriesRestWorkoutId=String(workout.id||"");state.seriesRestPending=true;
-  state.seriesRestDelayTimer=window.setTimeout(()=>{state.seriesRestDelayTimer=null;if(!state.workout||String(state.workout.id||"")!==state.seriesRestWorkoutId){clearSeriesRest();return;}state.seriesRestPending=false;state.seriesRestUntil=Date.now()+WORKOUT_SERIES_REST_MS;state.seriesRestTimer=window.setInterval(refreshSeriesRest,250);renderWorkout();},WORKOUT_SERIES_REST_DELAY_MS);return true;
+  clearSeriesRest();state.seriesRestWorkoutId=String(workout.id||"");state.seriesRestPending=false;state.seriesRestUntil=Date.now()+WORKOUT_SERIES_REST_MS;state.seriesRestTimer=window.setInterval(refreshSeriesRest,250);return true;
 }
 function revealWorkoutAfterRest(){
   clearSeriesRest();const ring=elements.phaseProgress;if(ring){ring.classList.add("is-rest-revealing");state.seriesRestRevealTimer=window.setTimeout(()=>{ring.classList.remove("is-rest-revealing");state.seriesRestRevealTimer=null;},760);}renderWorkout();
@@ -816,7 +818,18 @@ function skipSeriesRest(){ if(!workoutRestRemainingMs())return;revealWorkoutAfte
 function adjustSeriesRest(seconds){
   const remainingMs=workoutRestRemainingMs();if(!remainingMs)return;const nextMs=remainingMs+(Number(seconds)||0)*1000;if(nextMs<=0){revealWorkoutAfterRest();return;}state.seriesRestUntil=Date.now()+nextMs;refreshSeriesRest();
 }
-function renderWorkout(){
+function setWorkoutStarting(active){
+  state.workoutStarting=Boolean(active);modal?.classList.toggle("is-workout-starting",state.workoutStarting);elements.phaseProgress?.classList.toggle("is-starting",state.workoutStarting);elements.workoutRest?.classList.toggle("is-starting",state.workoutStarting);
+  [elements.workoutPrimary,elements.workoutAdvance,elements.workoutFinish,elements.workoutClose,elements.workoutPreviousExercise,elements.workoutNextExercise].forEach((button)=>{if(button)button.disabled=state.workoutStarting;});
+  if(!state.workoutStarting&&elements.workoutRest){elements.workoutRest.hidden=true;elements.workoutRest.classList.remove("is-starting");}
+}
+function waitForWorkoutStartTick(milliseconds){return new Promise((resolve)=>window.setTimeout(resolve,milliseconds));}
+async function runWorkoutStartCountdown(){
+  setWorkoutStarting(true);if(elements.workoutRest)elements.workoutRest.hidden=false;
+  for(const label of ["3","2","1"]){if(elements.workoutRestTime)elements.workoutRestTime.textContent=label;await waitForWorkoutStartTick(650);}
+  if(elements.workoutRestTime)elements.workoutRestTime.textContent="Vai";await waitForWorkoutStartTick(450);
+}
+function renderWorkout({syncMedia=true}={}){
   const workout=state.workout; elements.activeWorkout.hidden=!workout; if(!workout){ clearSeriesRest();setWorkoutRestAppearance(false);elements.activeWorkoutVideo?.pause(); elements.workoutVideo?.pause();state.workoutNavigationWorkoutId="";state.workoutNavigationExerciseId="";if(elements.workoutNextName)elements.workoutNextName.textContent="—";if(elements.workoutAdvance)elements.workoutAdvance.disabled=true;if(elements.workoutPreviousExercise)elements.workoutPreviousExercise.disabled=true;if(elements.workoutNextExercise)elements.workoutNextExercise.disabled=true; return; }
   if(state.seriesRestWorkoutId&&String(workout.id||"")!==state.seriesRestWorkoutId)clearSeriesRest();
   const isSeries=workout.trackingType==="series", isGps=workout.trackingType==="gps",exercise=exerciseCatalog().find((item)=>item.id===workout.exerciseId)||exerciseFromLibrary(libraryItem(workout.exerciseId)||{});
@@ -824,15 +837,17 @@ function renderWorkout(){
   elements.workoutSeriesStatus.hidden=!isSeries;
   elements.workoutName.textContent=workout.exerciseName||"Treino"; elements.workoutCounter.textContent=isSeries?`${Number(workout.seriesCount||0)}/${Number(workout.targetSeries||0)} séries`:isGps?formatDistance(currentGpsDistance()):formatTimer(elapsedSeconds(workout));
   elements.workoutDetail.textContent=isGps?`${formatTimer(elapsedSeconds(workout))} · média ${formatAverageSpeed()}`:"Meta e progresso salvos no seu perfil"; elements.phaseName.textContent=workout.exerciseName||"Treino";
-  configureFixedExerciseMedia(elements.activeWorkoutImage?.closest("[data-fixed-exercise-video-shell]"),elements.activeWorkoutImage,elements.activeWorkoutVideo,exercise);
-  configureFixedExerciseMedia(elements.phaseProgress,elements.workoutImage,elements.workoutVideo,exercise);
+  if(syncMedia){
+    configureFixedExerciseMedia(elements.activeWorkoutImage?.closest("[data-fixed-exercise-video-shell]"),elements.activeWorkoutImage,elements.activeWorkoutVideo,exercise);
+    configureFixedExerciseMedia(elements.phaseProgress,elements.workoutImage,elements.workoutVideo,exercise);
+  }
   if(isSeries){
     const done=Number(workout.seriesCount||0),target=Math.max(1,Number(workout.targetSeries||1)),reps=currentSeriesReps(),remainingMs=workoutRestRemainingMs();
     renderWorkoutSeriesMarkers(done,target);elements.phaseUnit.textContent="";
     if(remainingMs>0){elements.phaseLabel.textContent="Descanso";elements.workoutVideo?.pause();setWorkoutRestAppearance(true,remainingMs);return;}
-    if(state.seriesRestUntil)clearSeriesRest();setWorkoutRestAppearance(false);playFixedExerciseVideo(elements.phaseProgress);elements.phaseLabel.textContent=done>=target?"Meta concluída · série extra":`Série ${done+1} de ${target}`;elements.workoutPrimary.setAttribute("aria-label",`Registrar ${reps} movimentos`);setWorkoutProgress((done/target)*100);return;
+    if(state.seriesRestUntil)clearSeriesRest();setWorkoutRestAppearance(false);elements.phaseLabel.textContent=done>=target?"Meta concluída · série extra":`Série ${done+1} de ${target}`;elements.workoutPrimary.setAttribute("aria-label",`Registrar ${reps} movimentos`);setWorkoutProgress((done/target)*100);return;
   }
-  if(state.seriesRestUntil)clearSeriesRest();setWorkoutRestAppearance(false);playFixedExerciseVideo(elements.phaseProgress);
+  if(state.seriesRestUntil)clearSeriesRest();setWorkoutRestAppearance(false);
   const elapsed=elapsedSeconds(workout);
   if(isGps){ const targetMeters=Math.max(100,Number(workout.targetDistanceMeters||100)); elements.phaseLabel.textContent=`Meta de ${formatDistance(targetMeters)}`; elements.phaseUnit.textContent=`${formatDistance(currentGpsDistance())} · ${formatTimer(elapsed)} · média ${formatAverageSpeed()} · ${state.gpsStatus}`; elements.workoutPrimary.setAttribute("aria-label","Salvar progresso do GPS"); setWorkoutProgress((currentGpsDistance()/targetMeters)*100); }
   else{ const targetSeconds=Math.max(60,Number(workout.targetMinutes||1)*60); elements.phaseLabel.textContent=`Meta de ${Math.round(Number(workout.targetMinutes||0))} minutos`; elements.phaseUnit.textContent=`${formatTimer(elapsed)} de atividade`; elements.workoutPrimary.setAttribute("aria-label","Salvar progresso do exercício"); setWorkoutProgress((elapsed/targetSeconds)*100); }
@@ -881,8 +896,18 @@ async function startExercise(event){
   const {targetSeries,targetReps,targetMinutes,targetDistanceMeters}=exerciseGoalValues(exercise);
   const directStart=event?.currentTarget===elements.detailStart,submit=directStart?elements.detailStart:elements.goalForm.querySelector("button[type=submit]"); submit.disabled=true;
   const startPayload={profile:profileName(),exerciseId:exercise.id,exerciseName:exercise.name,category:exercise.category,trackingType:exercise.tracking,equipment:exercise.equipment,targetSeries:isSeries?targetSeries:0,targetReps:isSeries?targetReps:0,targetMinutes:!isSeries&&!isGps?targetMinutes:0,targetDistanceMeters:isGps?targetDistanceMeters:0};
-  try{ if(navigator.onLine===false){ activateOfflineWorkout(createOfflineWorkout(exercise,startPayload),startPayload); }else{ try{ const payload=await apiRequest("/api/200/exercises/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(startPayload)}); state.dashboard=payload.dashboard||state.dashboard; state.workout=payload.workout; }catch(error){ if(error?.httpResponse)throw error; activateOfflineWorkout(createOfflineWorkout(exercise,startPayload),startPayload); } } state.seriesSaveChain=Promise.resolve(); rebuildProvisionalMuscleProgress(state.workout); state.seriesRepsDraft=null; state.steps=Number(state.workout?.steps||0); state.gpsDistanceMeters=Number(state.workout?.distanceMeters||0); if(exercise.tracking==="steps")await startStepCounter(true); if(exercise.tracking==="gps")await startGpsTracking(true); renderExerciseGrid(); renderWorkout(); showLayer(elements.workoutLayer);playFixedExerciseVideo(elements.phaseProgress); }
-  catch(error){ const message=error instanceof Error?error.message:"Nao foi possivel iniciar."; if(directStart){ openExerciseDetail(exercise,state.detailMode); elements.detailGenerateStatus.textContent=message; }else elements.goalForm.querySelector("p").textContent=message; } finally{ submit.disabled=false; }
+  const previousDashboard=state.dashboard,preview={...createOfflineWorkout(exercise,startPayload),id:`pending-start-${Date.now()}`,offline:false,pendingStart:true};
+  const requestStart=async()=>{if(navigator.onLine===false)return {workout:createOfflineWorkout(exercise,startPayload),offline:true};try{const payload=await apiRequest("/api/200/exercises/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(startPayload)});return {workout:payload.workout,dashboard:payload.dashboard,offline:false};}catch(error){if(error?.httpResponse)throw error;return {workout:createOfflineWorkout(exercise,startPayload),offline:true};}};
+  try{
+    state.workout=preview;state.seriesRepsDraft=null;state.steps=0;state.gpsDistanceMeters=0;renderWorkout();showLayer(elements.workoutLayer);
+    const [started]=await Promise.all([requestStart(),runWorkoutStartCountdown()]);
+    if(started.offline)activateOfflineWorkout(started.workout,startPayload);else{state.dashboard=started.dashboard||state.dashboard;state.workout=started.workout;}
+    state.seriesSaveChain=Promise.resolve();rebuildProvisionalMuscleProgress(state.workout);state.seriesRepsDraft=null;state.steps=Number(state.workout?.steps||0);state.gpsDistanceMeters=Number(state.workout?.distanceMeters||0);
+    if(exercise.tracking==="steps")await startStepCounter(true);if(exercise.tracking==="gps")await startGpsTracking(true);
+    setWorkoutStarting(false);renderExerciseGrid();renderWorkout();
+  }
+  catch(error){state.workout=null;state.dashboard=previousDashboard;setWorkoutStarting(false);const message=error instanceof Error?error.message:"Nao foi possivel iniciar.";if(directStart){openExerciseDetail(exercise,state.detailMode);elements.detailGenerateStatus.textContent=message;}else{showLayer(elements.goalLayer);elements.goalForm.querySelector("p").textContent=message;}}
+  finally{submit.disabled=false;}
 }
 async function saveWorkoutProgress(){ if(!state.workout||state.workout.trackingType==="series")return; const progress={steps:state.steps,distanceMeters:state.workout.trackingType==="gps"?currentGpsDistance():Number(state.workout.distanceMeters||0),durationMinutes:elapsedSeconds(state.workout)/60}; if(isOfflineWorkout()){ state.workout={...state.workout,...progress}; state.dashboard={...(state.dashboard||{}),activeWorkout:state.workout}; persistOfflineWorkout(state.workout); cacheDashboard(); return; } const payload=await apiRequest(`/api/200/exercises/${encodeURIComponent(state.workout.id)}/progress`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(progress)}); state.workout=payload.workout||state.workout; if(state.workout.trackingType==="gps")state.gpsDistanceMeters=Math.max(state.gpsDistanceMeters,Number(state.workout.distanceMeters||0)); }
 function seriesSummary(workout){ const series=Array.isArray(workout?.series)?workout.series:[]; const reps=series.map((item)=>Number(item.repetitions||0)); if(!reps.length)return "este treino sem séries"; const homogeneous=reps.every((value)=>value===reps[0]); if(reps.length===1)return `${reps[0]} movimentos`; if(homogeneous)return `${reps.length} séries de ${reps[0]} movimentos`; const tail=reps.length>1?`${reps.slice(0,-1).join(", ")} e ${reps.at(-1)}`:String(reps[0]); return `${reps.length} séries de ${tail} movimentos`; }
@@ -1079,7 +1104,7 @@ elements.catalogMuscleClear?.addEventListener("click",()=>chooseCatalogMuscle(""
 elements.catalogMuscleTrack?.addEventListener("click",(event)=>{const region=event.target.closest("[data-catalog-muscle-id]");if(region)chooseCatalogMuscle(region.dataset.catalogMuscleId);});
 elements.catalogMuscleTrack?.addEventListener("keydown",(event)=>{if(!["Enter"," "].includes(event.key))return;const region=event.target.closest("[data-catalog-muscle-id]");if(!region)return;event.preventDefault();chooseCatalogMuscle(region.dataset.catalogMuscleId);});
 elements.catalogMuscleTrack?.addEventListener("scroll",()=>{const width=Math.max(1,elements.catalogMuscleTrack.clientWidth),index=Math.max(0,Math.min(PROJECT200_MUSCLE_MAPS.length-1,Math.round(elements.catalogMuscleTrack.scrollLeft/width)));[...elements.catalogMuscleDots.children].forEach((dot,dotIndex)=>dot.classList.toggle("is-active",dotIndex===index));},{passive:true});
-elements.exerciseGrid?.addEventListener("click",(event)=>{ if(consumeAdminExerciseImageClick(event))return; const videoShell=event.target.closest("[data-exercise-video-shell]"); if(videoShell){event.preventDefault();event.stopPropagation();toggleExerciseVideo(videoShell);return;} const play=event.target.closest("[data-exercise-play-id]"); if(play){ const exercise=exerciseCatalog().find((item)=>item.id===play.dataset.exercisePlayId); if(!exercise)return; if(state.workout){ renderWorkout(); showLayer(elements.workoutLayer); playFixedExerciseVideo(elements.phaseProgress); return; } state.selectedExercise=exercise; state.detailMode="selected"; startSelectedExercise(); return; } const target=event.target.closest("[data-exercise-id],[data-open-catalog],[data-show-all-exercises]"); if(!target)return; if(target.hasAttribute("data-open-catalog")){ openCatalog(); return; } if(target.hasAttribute("data-show-all-exercises")){ setExerciseCategory("all"); return; } const exercise=exerciseCatalog().find((item)=>item.id===target.dataset.exerciseId); if(exercise)openExerciseDetail(exercise,"selected"); });
+elements.exerciseGrid?.addEventListener("click",(event)=>{ if(consumeAdminExerciseImageClick(event))return; const videoShell=event.target.closest("[data-exercise-video-shell]"); if(videoShell){event.preventDefault();event.stopPropagation();toggleExerciseVideo(videoShell);return;} const play=event.target.closest("[data-exercise-play-id]"); if(play){ const exercise=exerciseCatalog().find((item)=>item.id===play.dataset.exercisePlayId); if(!exercise)return; if(state.workout){ renderWorkout(); showLayer(elements.workoutLayer); return; } state.selectedExercise=exercise; state.detailMode="selected"; startSelectedExercise(); return; } const target=event.target.closest("[data-exercise-id],[data-open-catalog],[data-show-all-exercises]"); if(!target)return; if(target.hasAttribute("data-open-catalog")){ openCatalog(); return; } if(target.hasAttribute("data-show-all-exercises")){ setExerciseCategory("all"); return; } const exercise=exerciseCatalog().find((item)=>item.id===target.dataset.exerciseId); if(exercise)openExerciseDetail(exercise,"selected"); });
 elements.catalogGrid?.addEventListener("click",(event)=>{
   if(consumeAdminExerciseImageClick(event))return;
   const videoShell=event.target.closest("[data-exercise-video-shell]");
@@ -1129,20 +1154,13 @@ elements.workoutHistory?.addEventListener("click",(event)=>{const button=event.t
   surface.addEventListener("pointerleave",endAdminExerciseImageHold,{passive:true});
 });
 document.addEventListener("dragend",clearExerciseVideoDropHighlights);
-elements.detailFrame?.addEventListener("pointerdown",beginAdminExerciseVideoHold);
-elements.detailFrame?.addEventListener("pointermove",moveAdminExerciseVideoHold,{passive:true});
-elements.detailFrame?.addEventListener("pointerup",()=>endAdminExerciseVideoHold(true),{passive:true});
-elements.detailFrame?.addEventListener("pointercancel",()=>endAdminExerciseVideoHold(false),{passive:true});
-elements.detailFrame?.addEventListener("pointerleave",()=>endAdminExerciseVideoHold(false),{passive:true});
-elements.detailFrame?.addEventListener("contextmenu",(event)=>{if(state.isAdmin)event.preventDefault();});
 elements.detailFrame?.addEventListener("click",(event)=>{ if(consumeAdminExerciseImageClick(event))return; toggleExerciseVideo(elements.detailFrame); });
-elements.detailVideoInput?.addEventListener("change",()=>{ const file=elements.detailVideoInput.files?.[0]; if(file)void uploadSelectedExerciseVideo(file); });
-elements.phaseProgress?.addEventListener("click",(event)=>{if(event.target.closest("button")||workoutRestRemainingMs())return;toggleExerciseVideo(elements.phaseProgress);});
+elements.phaseProgress?.addEventListener("click",(event)=>{if(event.target.closest("button")||workoutRestRemainingMs()||state.workoutStarting)return;toggleExerciseVideo(elements.phaseProgress);});
 byId("wellnessGoalClose")?.addEventListener("click",()=>openExerciseDetail(state.selectedExercise,state.detailMode));
 elements.goalForm?.addEventListener("click",(event)=>{ const weekday=event.target.closest("[data-exercise-weekday]"); if(weekday){ toggleExerciseGoalWeekday(weekday.dataset.exerciseWeekday); return; } const adjust=event.target.closest("[data-goal-adjust]"); if(adjust)adjustExerciseGoalValue(adjust.dataset.goalAdjust,adjust.dataset.direction); });
 elements.goalForm?.addEventListener("submit",submitExerciseGoal);
-elements.activeWorkout?.addEventListener("click",()=>{renderWorkout();showLayer(elements.workoutLayer);playFixedExerciseVideo(elements.phaseProgress);});
-elements.activeWorkout?.addEventListener("keydown",(event)=>{if(event.key!=="Enter"&&event.key!==" ")return;event.preventDefault();renderWorkout();showLayer(elements.workoutLayer);playFixedExerciseVideo(elements.phaseProgress);});
+elements.activeWorkout?.addEventListener("click",()=>{renderWorkout();showLayer(elements.workoutLayer);});
+elements.activeWorkout?.addEventListener("keydown",(event)=>{if(event.key!=="Enter"&&event.key!==" ")return;event.preventDefault();renderWorkout();showLayer(elements.workoutLayer);});
 elements.workoutPrimary?.addEventListener("click",()=>void handleWorkoutPrimary());
 elements.workoutAdvance?.addEventListener("click",()=>void advanceWorkoutImmediately());
 elements.workoutPreviousExercise?.addEventListener("click",()=>moveWorkoutNavigation(-1));
@@ -1173,8 +1191,8 @@ modal?.addEventListener("pointerdown",()=>{if(state.tab==="exercises"){void warm
   state.ticker=window.setInterval(()=>{
     if(document.hidden||!modal?.classList.contains("active"))return;
     refreshWorkoutRelativeTimes();
-    if(!state.workout)return;
-    renderWorkout();
+    if(!state.workout||state.workoutStarting)return;
+    renderWorkout({syncMedia:false});
     refreshExerciseProgress();
     if(!elements.detail?.hidden&&state.detailMode==="selected")updateExerciseProgressDetail();
   },2000);
