@@ -101,6 +101,7 @@ function normalizeExerciseLibraryRow(row) {
     targetMinutes: Math.max(0, Number(row?.target_minutes || 0)),
     targetDistanceMeters: Math.max(0, Math.trunc(Number(row?.target_distance_meters || 0))),
     scheduleConfig: normalizeExerciseSchedule(row?.schedule_config),
+    todaySeriesCount: Math.max(0, Math.trunc(Number(row?.today_series_count || 0))),
     todayTotalReps: Math.max(0, Math.trunc(Number(row?.today_total_reps || 0))),
     todayDurationMinutes: Math.max(0, Number(row?.today_duration_minutes || 0)),
     todayDistanceMeters: Math.max(0, Math.trunc(Number(row?.today_distance_meters || 0)))
@@ -337,12 +338,14 @@ export async function syncProject200ExerciseMission(userId, profileName = PROJEC
   let rows = Array.isArray(libraryRows) ? libraryRows : null;
   if (!rows) {
     const result = await query(
-      `select library.*, coalesce(stats.today_total_reps, 0)::integer as today_total_reps,
+      `select library.*, coalesce(stats.today_series_count, 0)::integer as today_series_count,
+         coalesce(stats.today_total_reps, 0)::integer as today_total_reps,
          coalesce(stats.today_duration_minutes, 0)::numeric as today_duration_minutes,
          coalesce(stats.today_distance_meters, 0)::integer as today_distance_meters
        from project200_exercise_library library
        left join lateral (
-         select coalesce(sum(session.total_reps), 0)::integer as today_total_reps,
+         select coalesce(sum((select count(*) from project200_exercise_series item where item.session_id = session.id)), 0)::integer as today_series_count,
+           coalesce(sum(session.total_reps), 0)::integer as today_total_reps,
            coalesce(sum(session.duration_minutes), 0)::numeric as today_duration_minutes,
            coalesce(sum(session.distance_meters), 0)::integer as today_distance_meters
          from project200_exercise_sessions session
@@ -737,7 +740,7 @@ async function syncProject200ExerciseSeries(userId, sessionId, series = []) {
   const normalized = normalizeProject200WorkoutSeries(series);
   if (!normalized.length) return [];
   const sessionResult = await query(
-    `select id from project200_exercise_sessions where id = $1 and user_id = $2 and status = 'active' and tracking_type = 'series' limit 1`,
+    `select id from project200_exercise_sessions where id = $1 and user_id = $2 and status in ('active', 'completed') and tracking_type = 'series' limit 1`,
     [sessionId, userId]
   );
   if (!sessionResult.rows[0]) throw new Error("Treino ativo nao encontrado.");
@@ -757,7 +760,7 @@ async function syncProject200ExerciseSeries(userId, sessionId, series = []) {
     `update project200_exercise_sessions set
        total_reps = coalesce((select sum(repetitions) from project200_exercise_series where session_id = $1), 0),
        updated_at = now()
-     where id = $1 and user_id = $2 and status = 'active'`,
+     where id = $1 and user_id = $2 and status in ('active', 'completed')`,
     [sessionId, userId]
   );
   return normalized;
@@ -827,7 +830,14 @@ async function creditProject200ExerciseMuscles(userId, workoutRow) {
 
 export async function finishProject200ExerciseSession(userId, sessionId, payload = {}) {
   await ensureProject200WellnessSchema();
-  if (Array.isArray(payload.series) && payload.series.length) {
+  const currentResult = await query(
+    `select status from project200_exercise_sessions where id = $1 and user_id = $2 limit 1`,
+    [sessionId, userId]
+  );
+  const currentStatus = String(currentResult.rows[0]?.status || "");
+  if (!currentStatus) throw new Error("Treino ativo nao encontrado.");
+  if (currentStatus !== "active" && currentStatus !== "completed") throw new Error("Treino ativo nao encontrado.");
+  if (currentStatus === "active" && Array.isArray(payload.series) && payload.series.length) {
     await syncProject200ExerciseSeries(userId, sessionId, payload.series);
   }
   const result = await query(

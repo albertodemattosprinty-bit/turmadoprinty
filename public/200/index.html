@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
   <link rel="stylesheet" href="/200/quality.css?v=20260906-1" />
   <link rel="stylesheet" href="/200/books.css?v=20260909-home-icons-v1" />
-  <link rel="stylesheet" href="/200/wellness.css?v=20260910-workout-rest-v6" />
+  <link rel="stylesheet" href="/200/wellness.css?v=20260910-preworkout-v1" />
   <link rel="stylesheet" href="/200/performance.css?v=20260906-scroll-v1" />
 </head>
 <body data-background-theme="edge">
@@ -2130,19 +2130,20 @@
       </div>
       <div class="wellness-phase-layer" id="wellnessExerciseDetail" hidden>
         <article class="wellness-phase-screen wellness-exercise-detail-screen">
-          <button class="wellness-phase-close" type="button" id="wellnessExerciseDetailClose" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
-          <button class="wellness-exercise-info-button" type="button" id="wellnessExerciseInfoOpen" aria-label="Informações do exercício"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10v7M12 7h.01"/></svg></button>
           <span class="wellness-phase-kicker" id="wellnessExerciseCategory">Musculação</span>
           <h2 id="wellnessExerciseName">Agachamento</h2>
           <div class="wellness-exercise-detail-frame" id="wellnessExerciseDetailFrame" data-fixed-exercise-video-shell><img class="wellness-exercise-detail-image" id="wellnessExerciseDetailImage" src="/200/apps/exercicios.png" alt="" /><video class="wellness-exercise-detail-video" id="wellnessExerciseDetailVideo" muted loop playsinline preload="metadata" hidden></video><i class="wellness-exercise-video-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z"/></svg></i><span class="wellness-exercise-image-loader" aria-live="polite"><i></i><b id="wellnessExerciseMediaLoaderText">Criando imagens...</b></span></div>
-          <section class="wellness-exercise-progress" id="wellnessExerciseProgress" hidden><strong id="wellnessExerciseProgressText">0% completo hoje</strong><div class="wellness-exercise-progress-track"><i id="wellnessExerciseProgressFill"></i></div><span id="wellnessExerciseTotal">0 movimentos totais</span></section>
+          <div class="wellness-exercise-detail-controls">
+            <button class="wellness-phase-close" type="button" id="wellnessExerciseDetailClose" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+            <button class="wellness-exercise-start-button" type="button" id="wellnessExerciseStart" aria-label="Iniciar exercício"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"/></svg></button>
+            <button class="wellness-exercise-info-button" type="button" id="wellnessExerciseInfoOpen" aria-label="Informações do exercício"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10v7M12 7h.01"/></svg></button>
+          </div>
+          <section class="wellness-exercise-progress" id="wellnessExerciseProgress" hidden><div class="wellness-workout-series-icons wellness-exercise-series-icons" id="wellnessExerciseSeriesProgress"></div></section>
           <section class="wellness-exercise-muscle-map" id="wellnessExerciseMuscleMapSection" aria-label="Mapa dos músculos trabalhados">
-            <header><span>Mapa muscular</span><strong id="wellnessExerciseMuscleMapName">Toque em uma região</strong></header>
             <div class="wellness-muscle-map-carousel" id="wellnessExerciseMuscleMapTrack"></div>
             <div class="wellness-muscle-map-dots" id="wellnessExerciseMuscleMapDots" aria-hidden="true"></div>
-            <small>Deslize para ver as três vistas · toque em um músculo para conhecer os exercícios.</small>
           </section>
-          <button class="wellness-phase-primary" type="button" id="wellnessExerciseStart">Definir meta</button><button class="wellness-phase-secondary wellness-exercise-generate" type="button" id="wellnessExerciseGenerate" hidden>Adicionar imagens com IA</button><p class="wellness-status" id="wellnessExerciseGenerateStatus" aria-live="polite"></p><div class="wellness-exercise-library-actions"><button class="wellness-phase-secondary wellness-exercise-goal" type="button" id="wellnessExerciseGoal" hidden>Alterar meta</button><button class="wellness-exercise-delete" type="button" id="wellnessExerciseDelete" aria-label="Excluir exercício" title="Excluir exercício" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg></button></div>
+          <button class="wellness-phase-secondary wellness-exercise-generate" type="button" id="wellnessExerciseGenerate" hidden>Adicionar imagens com IA</button><p class="wellness-status" id="wellnessExerciseGenerateStatus" aria-live="polite"></p><div class="wellness-exercise-library-actions"><button class="wellness-phase-secondary wellness-exercise-goal" type="button" id="wellnessExerciseGoal" hidden>Alterar meta</button><button class="wellness-exercise-delete" type="button" id="wellnessExerciseDelete" aria-label="Excluir exercício" title="Excluir exercício" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg></button></div>
           <input type="file" id="wellnessExerciseVideoInput" accept="video/*" hidden />
         </article>
       </div>
@@ -2278,7 +2279,7 @@
   <script src="/200/offline-data.js?v=1.10-offline-refresh-v1"></script>
   <script type="module" src="/200/project.js?v=20260910-workout-finish-131-v1"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
-  <script type="module" src="/200/wellness.js?v=20260910-workout-rest-v6"></script>
+  <script type="module" src="/200/wellness.js?v=20260910-preworkout-v1"></script>
   <script src="/200/books.js?v=20260904-biblia-plano-v7"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260908-readonly-v1"></script>
