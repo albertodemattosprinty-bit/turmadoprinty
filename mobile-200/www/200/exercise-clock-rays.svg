@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" aria-hidden="true">
-  <g fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity="0.5">
+  <style>path{vector-effect:non-scaling-stroke}</style>
+  <g fill="none" stroke="#ffffff" stroke-width="1" stroke-linecap="round" opacity="0.5">
     <path d="M650 500H1400" />
     <path d="M629.9 575 L1279.4 950" />
     <path d="M575 629.9 L950 1279.4" />
