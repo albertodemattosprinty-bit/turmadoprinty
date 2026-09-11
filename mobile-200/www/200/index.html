@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
   <link rel="stylesheet" href="/200/quality.css?v=20260906-1" />
   <link rel="stylesheet" href="/200/books.css?v=20260909-home-icons-v1" />
-  <link rel="stylesheet" href="/200/wellness.css?v=20260910-workout-rest-v5" />
+  <link rel="stylesheet" href="/200/wellness.css?v=20260910-workout-rest-v6" />
   <link rel="stylesheet" href="/200/performance.css?v=20260906-scroll-v1" />
 </head>
 <body data-background-theme="edge">
@@ -2114,7 +2114,7 @@
           </section>
           <div class="wellness-exercise-category-switcher" role="group" aria-label="Categoria de exercícios"><button type="button" id="wellnessExerciseCategoryPrevious" aria-label="Categoria anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><strong id="wellnessExerciseCategoryName" aria-live="polite">Musculação</strong><button type="button" id="wellnessExerciseCategoryNext" aria-label="Próxima categoria"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div>
           <div class="wellness-exercise-grid" id="wellnessExerciseGrid"></div>
-          <button class="wellness-catalog-open" type="button" id="wellnessOpenCatalog">Abrir acervo de exercícios</button>
+          <button class="wellness-catalog-open" type="button" id="wellnessOpenCatalog" aria-label="Abrir acervo de exercícios" title="Abrir acervo de exercícios"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
           <section class="wellness-list-section wellness-workout-history-section"><header><div><span>Sua tabela</span><h2>Treinos recentes</h2></div></header><div class="wellness-workout-history" id="wellnessWorkoutHistory"></div></section>
         </section>
       </main>
@@ -2209,8 +2209,9 @@
       <div class="wellness-phase-layer" id="wellnessWorkoutLayer" hidden>
         <article class="wellness-phase-screen wellness-workout-screen">
           <span class="wellness-phase-kicker" id="wellnessPhaseLabel">Série 1 de 3</span><h2 id="wellnessPhaseExerciseName">Agachamento</h2>
-          <div class="wellness-workout-image-ring" id="wellnessWorkoutProgressRing" data-fixed-exercise-video-shell><img id="wellnessWorkoutExerciseImage" src="/200/apps/exercicios.png" alt="" /><video id="wellnessWorkoutExerciseVideo" muted loop playsinline preload="metadata" hidden></video><i class="wellness-exercise-video-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z"/></svg></i><i class="wellness-workout-image-flash" aria-hidden="true"></i><div class="wellness-workout-rest" id="wellnessWorkoutRest" hidden><strong id="wellnessWorkoutRestTime">60s</strong></div><button class="wellness-workout-image-action wellness-workout-cancel-action" type="button" id="wellnessWorkoutCancel" aria-label="Cancelar exercício"><svg class="wellness-workout-cancel-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg><svg class="wellness-workout-forward-icon" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="m5 6 8 6-8 6V6Zm9 0 7 6-7 6V6Z"/></svg></button><button class="wellness-workout-image-action wellness-workout-add-button" type="button" id="wellnessWorkoutPrimary" aria-label="Registrar movimentos definidos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div><div class="wellness-workout-series-status" id="wellnessWorkoutSeriesStatus" aria-label="Séries concluídas"><div class="wellness-workout-series-icons" id="wellnessWorkoutSeriesCount"></div></div><p id="wellnessPhaseUnit"></p>
+          <div class="wellness-workout-image-ring" id="wellnessWorkoutProgressRing" data-fixed-exercise-video-shell><img id="wellnessWorkoutExerciseImage" src="/200/apps/exercicios.png" alt="" /><video id="wellnessWorkoutExerciseVideo" muted loop playsinline preload="metadata" hidden></video><i class="wellness-exercise-video-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z"/></svg></i><i class="wellness-workout-image-flash" aria-hidden="true"></i><div class="wellness-workout-rest" id="wellnessWorkoutRest" hidden><strong id="wellnessWorkoutRestTime">60s</strong><span>Densanse</span></div><button class="wellness-workout-image-action wellness-workout-cancel-action" type="button" id="wellnessWorkoutCancel" aria-label="Cancelar exercício"><svg class="wellness-workout-cancel-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg><svg class="wellness-workout-forward-icon" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M4 5v14l9-7L4 5Zm10 0v14l8-7-8-7Z"/></svg></button><button class="wellness-workout-image-action wellness-workout-add-button" type="button" id="wellnessWorkoutPrimary" aria-label="Registrar movimentos definidos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div><div class="wellness-workout-series-status" id="wellnessWorkoutSeriesStatus" aria-label="Séries concluídas"><div class="wellness-workout-series-icons" id="wellnessWorkoutSeriesCount"></div></div><p id="wellnessPhaseUnit"></p>
           <button class="wellness-workout-finish-button" type="button" id="wellnessWorkoutFinish"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v4a4 4 0 0 1-8 0V4Zm0 2H5v1a4 4 0 0 0 4 4M16 6h3v1a4 4 0 0 1-4 4M12 12v5M8 20h8M9 17h6"/></svg><span>Concluir treino</span></button>
+          <div class="wellness-workout-player-slot" id="wellnessWorkoutPlayerSlot"></div>
         </article>
       </div>
 
@@ -2277,7 +2278,7 @@
   <script src="/200/offline-data.js?v=1.10-offline-refresh-v1"></script>
   <script type="module" src="/200/project.js?v=20260910-workout-finish-131-v1"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
-  <script type="module" src="/200/wellness.js?v=20260910-workout-rest-v5"></script>
+  <script type="module" src="/200/wellness.js?v=20260910-workout-rest-v6"></script>
   <script src="/200/books.js?v=20260904-biblia-plano-v7"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260908-readonly-v1"></script>
