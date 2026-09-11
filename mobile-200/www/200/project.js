@@ -1107,8 +1107,6 @@ const toggleMessageNotificationSoundOptionButton = document.getElementById("togg
 const toggleMessageNotificationSoundHint = document.getElementById("toggleMessageNotificationSoundHint");
 const toggleBackgroundThemeOptionButton = document.getElementById("toggleBackgroundThemeOption");
 const toggleBackgroundThemeHint = document.getElementById("toggleBackgroundThemeHint");
-const toggleExerciseRaysOptionButton = document.getElementById("toggleExerciseRaysOption");
-const toggleExerciseRaysHint = document.getElementById("toggleExerciseRaysHint");
 const defineGlobalMusicDefaultOptionButton = document.getElementById("defineGlobalMusicDefaultOption");
 const defineGlobalMusicDefaultHint = document.getElementById("defineGlobalMusicDefaultHint");
 const toggleStopMusicOnFinishOptionButton = document.getElementById("toggleStopMusicOnFinishOption");
@@ -1616,7 +1614,6 @@ const state = {
     minuteNotificationInterval: 1,
     finalMinuteNotificationsEnabled: true,
     backgroundTheme: "edge",
-    exerciseRaysEnabled: true,
     screenLockEnabled: false,
     stopMusicOnFinish: false,
     messageNotificationsEnabled: false,
@@ -1871,10 +1868,6 @@ function getBackgroundThemeMode(value) {
 
 function applyBackgroundTheme() {
   document.body.dataset.backgroundTheme = normalizeBackgroundTheme(state.options.backgroundTheme);
-}
-
-function applyExerciseRaysPreference() {
-  document.body.dataset.exerciseRays = state.options.exerciseRaysEnabled === false ? "off" : "on";
 }
 
 function readTokenCookie() {
@@ -18879,7 +18872,6 @@ async function loadOptionsConfig() {
       state.options.minuteNotificationInterval = normalizeMinuteCueInterval(parsed.minuteNotificationInterval);
       state.options.finalMinuteNotificationsEnabled = parsed.finalMinuteNotificationsEnabled !== false;
       state.options.backgroundTheme = normalizeBackgroundTheme(parsed.backgroundTheme);
-      state.options.exerciseRaysEnabled = parsed.exerciseRaysEnabled !== false;
       state.options.screenLockEnabled = parsed.screenLockEnabled === true;
       state.options.stopMusicOnFinish = parsed.stopMusicOnFinish === true;
       state.options.messageNotificationsEnabled = parsed.messageNotificationsEnabled === true;
@@ -18893,7 +18885,6 @@ async function loadOptionsConfig() {
       state.options.minuteNotificationInterval = 1;
       state.options.finalMinuteNotificationsEnabled = true;
       state.options.backgroundTheme = "edge";
-      state.options.exerciseRaysEnabled = true;
       state.options.screenLockEnabled = false;
       state.options.stopMusicOnFinish = false;
       state.options.messageNotificationsEnabled = false;
@@ -18902,7 +18893,6 @@ async function loadOptionsConfig() {
       state.options.useAppKeyboard = false;
     }
     applyBackgroundTheme();
-    applyExerciseRaysPreference();
     applyHomeViewMode();
     applyProjectKeyboardPreference();
   })();
@@ -18917,7 +18907,6 @@ function saveOptionsConfig() {
     minuteNotificationInterval: normalizeMinuteCueInterval(state.options.minuteNotificationInterval),
     finalMinuteNotificationsEnabled: Boolean(state.options.finalMinuteNotificationsEnabled),
     backgroundTheme: normalizeBackgroundTheme(state.options.backgroundTheme),
-    exerciseRaysEnabled: state.options.exerciseRaysEnabled !== false,
     screenLockEnabled: Boolean(state.options.screenLockEnabled),
     stopMusicOnFinish: Boolean(state.options.stopMusicOnFinish),
     messageNotificationsEnabled: Boolean(state.options.messageNotificationsEnabled),
@@ -19132,10 +19121,6 @@ toggleMissionActionsOptionButton?.classList.toggle("is-off", missionActionsMode 
   if (toggleBackgroundThemeHint) {
     toggleBackgroundThemeHint.textContent = getBackgroundThemeMode(state.options.backgroundTheme).label;
   }
-  if (toggleExerciseRaysHint) {
-    toggleExerciseRaysHint.textContent = state.options.exerciseRaysEnabled === false ? "Removidos" : "Ativados";
-  }
-  toggleExerciseRaysOptionButton?.classList.toggle("is-off", state.options.exerciseRaysEnabled === false);
   if (defineGlobalMusicDefaultHint) {
     const globalMusic = state.runningPlayer.globalDefaultPreference;
     const globalMusicLabel = globalMusic?.mode === "station"
@@ -21417,12 +21402,6 @@ toggleBackgroundThemeOptionButton?.addEventListener("click", () => {
   const nextIndex = (currentIndex + 1) % backgroundThemeModes.length;
   state.options.backgroundTheme = backgroundThemeModes[nextIndex].key;
   applyBackgroundTheme();
-  saveOptionsConfig();
-  renderOptionsModal();
-});
-toggleExerciseRaysOptionButton?.addEventListener("click", () => {
-  state.options.exerciseRaysEnabled = state.options.exerciseRaysEnabled === false;
-  applyExerciseRaysPreference();
   saveOptionsConfig();
   renderOptionsModal();
 });

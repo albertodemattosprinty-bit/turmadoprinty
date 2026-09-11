@@ -20,10 +20,12 @@ function normalizeRow(row) {
       completedAt: null
     };
   }
-  const completed = String(row.status || "").toUpperCase() === "COMPLETED";
+  const status = String(row.status || "").toUpperCase();
+  const completed = status === "COMPLETED";
+  const exempt = status === "EXEMPT";
   return {
-    required: !completed,
-    status: completed ? "COMPLETED" : "PENDING",
+    required: !completed && !exempt,
+    status: completed ? "COMPLETED" : exempt ? "NOT_REQUIRED" : "PENDING",
     currentStep: Math.max(1, Math.min(4, Math.trunc(Number(row.current_step) || 1))),
     educationPage: Math.max(0, Math.min(4, Math.trunc(Number(row.education_page) || 0))),
     selectedPersona: normalizePersona(row.selected_persona),
@@ -50,6 +52,27 @@ export async function ensureProject200OnboardingSchema() {
         );
       `);
       await query("create index if not exists idx_project200_user_onboarding_status on project200_user_onboarding(status);");
+      await query(`
+        update project200_user_onboarding onboarding
+           set status = 'EXEMPT',
+               updated_at = now()
+          from users account
+         where onboarding.user_id = account.id
+           and onboarding.status = 'PENDING'
+           and onboarding.started_at < '2026-09-12T03:00:00Z'::timestamptz
+           and onboarding.started_at > account.created_at + interval '5 minutes';
+      `);
+      await query(`
+        update users account
+           set project200_onboarding_required = false
+         where account.project200_onboarding_required = true
+           and exists (
+             select 1
+               from project200_user_onboarding onboarding
+              where onboarding.user_id = account.id
+                and onboarding.status = 'EXEMPT'
+           );
+      `);
     })().catch((error) => {
       schemaPromise = null;
       throw error;
@@ -74,7 +97,7 @@ export async function initializeProject200Onboarding(userId) {
           select 1
             from project200_user_onboarding onboarding
            where onboarding.user_id = $1
-             and onboarding.status <> 'COMPLETED'
+             and onboarding.status = 'PENDING'
         )`,
     [userId]
   );
@@ -93,6 +116,7 @@ export async function restartProject200Onboarding(userId) {
              education_page = 0,
              selected_persona = null,
              avatar_completed = false,
+             started_at = now(),
              completed_at = null,
              updated_at = now()
        returning user_id

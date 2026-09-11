@@ -2515,6 +2515,10 @@ function isProject200OnboardingRequestAllowed(request) {
   if (pathname === "/api/200/onboarding" || pathname === "/api/200/onboarding/start") {
     return true;
   }
+  if (pathname === "/api/200/quality-assessment"
+    && (request.method === "GET" || request.method === "PUT")) {
+    return true;
+  }
   if (request.method === "GET" && pathname === "/api/200/profiles") {
     return true;
   }
@@ -15468,7 +15472,6 @@ const server = http.createServer(async (request, response) => {
 
     const username = typeof body.username === "string" ? body.username.trim() : "";
     const password = typeof body.password === "string" ? body.password : "";
-    const app = typeof body.app === "string" ? body.app.trim().toLowerCase() : "";
 
     if (!isValidUsername(username) || !password) {
       sendJson(response, 400, { error: "Nome de usuario e senha sao obrigatorios." });
@@ -15490,9 +15493,7 @@ const server = http.createServer(async (request, response) => {
         return;
       }
 
-      const onboarding = app === "project200"
-        ? await initializeProject200Onboarding(user.id)
-        : await getProject200Onboarding(user.id);
+      const onboarding = await getProject200Onboarding(user.id);
       user.project200_onboarding_required = Boolean(onboarding?.required);
       const session = await createSession(user.id);
 
@@ -15705,10 +15706,7 @@ const server = http.createServer(async (request, response) => {
 
       const contractorState = await getUserContractorState(user.id);
       const project200Profile = await getProject200AssignedProfile(user.id);
-      const isProject200Session = String(requestUrl.searchParams.get("app") || "").trim().toLowerCase() === "project200";
-      const onboarding = isProject200Session
-        ? await initializeProject200Onboarding(user.id)
-        : await getProject200Onboarding(user.id);
+      const onboarding = await getProject200Onboarding(user.id);
       user.project200_onboarding_required = Boolean(onboarding?.required);
 
       sendJson(response, 200, {
