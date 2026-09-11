@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
   <link rel="stylesheet" href="/200/quality.css?v=20260906-1" />
   <link rel="stylesheet" href="/200/books.css?v=20260909-home-icons-v1" />
-  <link rel="stylesheet" href="/200/wellness.css?v=20260910-preworkout-v1" />
+  <link rel="stylesheet" href="/200/wellness.css?v=20260911-catalog-metadata-v1" />
   <link rel="stylesheet" href="/200/performance.css?v=20260906-scroll-v1" />
 </head>
 <body data-background-theme="edge">
@@ -2128,6 +2128,16 @@
           <div class="wellness-catalog-grid" id="wellnessCatalogGrid"></div>
         </article>
       </div>
+      <div class="wellness-phase-layer" id="wellnessCatalogAddLayer" hidden>
+        <article class="wellness-phase-screen wellness-catalog-add-screen">
+          <button class="wellness-phase-close" type="button" id="wellnessCatalogAddClose" aria-label="Voltar ao acervo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+          <span class="wellness-phase-kicker">Adicionar ao seu plano</span>
+          <h2 id="wellnessCatalogAddName">Exercício</h2>
+          <div class="wellness-catalog-add-media" id="wellnessCatalogAddFrame" data-fixed-exercise-video-shell><img id="wellnessCatalogAddImage" src="/200/apps/exercicios.png" alt="" /><video id="wellnessCatalogAddVideo" muted loop playsinline preload="metadata" hidden></video><i class="wellness-exercise-video-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z"/></svg></i></div>
+          <button class="wellness-catalog-add-confirm" type="button" id="wellnessCatalogAddConfirm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg><span>Adicionar exercício</span></button>
+          <p class="wellness-status" id="wellnessCatalogAddStatus" aria-live="polite"></p>
+        </article>
+      </div>
       <div class="wellness-phase-layer" id="wellnessExerciseDetail" hidden>
         <article class="wellness-phase-screen wellness-exercise-detail-screen">
           <span class="wellness-phase-kicker" id="wellnessExerciseCategory">Musculação</span>
@@ -2163,6 +2173,7 @@
           <button class="wellness-phase-close" type="button" id="wellnessExerciseInfoClose" aria-label="Voltar ao exercício"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
           <span class="wellness-phase-kicker" id="wellnessExerciseInfoCategory">INFORMAÇÕES</span>
           <h2 id="wellnessExerciseInfoName">Agachamento</h2>
+          <section class="wellness-exercise-info-aliases" id="wellnessExerciseInfoAliases" hidden><span>Também conhecido como</span><strong></strong></section>
           <section class="wellness-exercise-info-equipment"><span>Equipamento</span><strong id="wellnessExerciseInfoEquipment">Sem equipamento</strong></section>
           <section class="wellness-exercise-muscle-loads" id="wellnessExerciseInfoMuscles" aria-label="Carga muscular relativa"></section>
           <ol class="wellness-instruction-list" id="wellnessExerciseInstructions"></ol>
@@ -2174,7 +2185,7 @@
           <button class="wellness-phase-close" type="button" id="wellnessExerciseAdminClose" aria-label="Fechar painel da Luna"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
           <span class="wellness-phase-kicker">ADMIN · LUNA</span>
           <h2>Inteligência muscular</h2>
-          <p>A Luna define até três músculos e a carga relativa de 0,25 a 1,00.</p>
+          <p>A Luna define nomes usados no Brasil, dificuldade, popularidade e até três músculos com carga relativa de 0,25 a 1,00.</p>
           <section class="wellness-exercise-admin-progress">
             <div><strong id="wellnessExerciseAdminProgress">0%</strong><span id="wellnessExerciseAdminProgressCount">0 de 0 exercícios definidos</span></div>
             <div class="wellness-exercise-admin-track" aria-hidden="true"><i id="wellnessExerciseAdminProgressFill"></i></div>
@@ -2279,7 +2290,7 @@
   <script src="/200/offline-data.js?v=1.10-offline-refresh-v1"></script>
   <script type="module" src="/200/project.js?v=20260910-workout-finish-131-v1"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
-  <script type="module" src="/200/wellness.js?v=20260910-preworkout-v1"></script>
+  <script type="module" src="/200/wellness.js?v=20260911-catalog-metadata-v1"></script>
   <script src="/200/books.js?v=20260904-biblia-plano-v7"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260908-readonly-v1"></script>

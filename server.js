@@ -4663,12 +4663,15 @@ const PROJECT200_EXERCISE_DEFINITIONS_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["exerciseId", "exerciseName", "category", "trackingType", "equipment", "cue", "muscles"],
+        required: ["exerciseId", "exerciseName", "alternativeNames", "category", "trackingType", "difficulty", "popularity", "equipment", "cue", "muscles"],
         properties: {
           exerciseId: { type: "string" },
           exerciseName: { type: "string" },
+          alternativeNames: { type: "array", minItems: 0, maxItems: 3, items: { type: "string" } },
           category: { type: "string", enum: ["strength", "aerobic", "calisthenics"] },
           trackingType: { type: "string", enum: ["series", "minutes", "gps"] },
+          difficulty: { type: "integer", minimum: 1, maximum: 5 },
+          popularity: { type: "integer", minimum: 1, maximum: 5 },
           equipment: { type: "string" },
           cue: { type: "string" },
           muscles: {
@@ -4706,11 +4709,14 @@ async function createProject200ExerciseDefinitionsWithAi(apiKey, exercises, mode
       instructions: [
         "Voce e a Luna, especialista de catalogacao de exercicios do iLife. Responda em portugues do Brasil.",
         "Devolva exatamente uma definicao para cada exercicio recebido, na mesma ordem, com no maximo os tres musculos ou grupos realmente mais envolvidos.",
+        "O exerciseName e o nome principal em portugues do Brasil. Em alternativeNames, inclua de zero a tres outros nomes realmente usados no Brasil para o mesmo exercicio; nao invente variantes e deixe a lista vazia quando so houver um nome comum.",
+        "Avalie difficulty de 1 a 5: 1 e iniciante e simples de executar; 5 exige tecnica, coordenacao, mobilidade ou forca avancada.",
+        "Avalie popularity de 1 a 5 pelo quanto o exercicio e conhecido, praticado e mencionado na web: 1 e raro; 5 e extremamente popular.",
         "A carga muscular e uma participacao relativa: 1.00 e o musculo principal muito exigido; o minimo e 0.25. Use somente passos de 0.05 entre 0.25 e 1.00.",
         `Use exclusivamente muscleId desta base fechada; nunca invente nomes ou IDs: ${PROJECT200_MUSCLES.map(({ id, name }) => `${id}=${name}`).join(", ")}.`,
         "Nao confunda carga muscular relativa com peso, porcentagem de ativacao EMG ou recomendacao medica. Nao diagnostique nem prescreva tratamento.",
         mode === "missing"
-          ? "Preserve exatamente exerciseId, exerciseName, category, trackingType, equipment e cue recebidos; apenas complete os musculos e suas cargas."
+          ? "Preserve exatamente exerciseId, exerciseName, category, trackingType, equipment e cue recebidos; complete alternativeNames, difficulty, popularity, musculos e suas cargas."
           : "Crie o cadastro completo a partir de cada nome. Use series em musculacao/calistenia, minutes em cardio por tempo e gps apenas em caminhada, corrida ou bicicleta ao ar livre."
       ].join("\n"),
       input: JSON.stringify({ mode, exercises }),

@@ -42,6 +42,22 @@ function clampInteger(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, Math.trunc(Number(value || 0) || 0)));
 }
 
+function normalizeExerciseNameKey(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+}
+
+function normalizeExerciseAlternativeNames(value, exerciseName = "") {
+  const primaryKey = normalizeExerciseNameKey(exerciseName);
+  const seen = new Set(primaryKey ? [primaryKey] : []);
+  return (Array.isArray(value) ? value : []).flatMap((item) => {
+    const name = String(item || "").trim().replace(/\s+/g, " ").slice(0, 160);
+    const key = normalizeExerciseNameKey(name);
+    if (name.length < 2 || !key || seen.has(key)) return [];
+    seen.add(key);
+    return [name];
+  }).slice(0, 3);
+}
+
 function normalizeExerciseSchedule(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const { nativeType: _ignoredNativeType, ...schedule } = value;
@@ -135,11 +151,16 @@ export function normalizeProject200ExerciseDefinition(payload = {}) {
   const categoryValue = String(payload.category || "strength").trim().toLowerCase();
   const trackingValue = String(payload.trackingType ?? payload.tracking_type ?? "series").trim().toLowerCase();
   const muscles = normalizeProject200MuscleSelections(payload.muscles, { quantize: quantizeProject200MuscleLoad });
+  const alternativeNames = normalizeExerciseAlternativeNames(payload.alternativeNames ?? payload.alternative_names, exerciseName);
   return {
     exerciseId,
     exerciseName,
+    alternativeNames,
+    names: [exerciseName, ...alternativeNames].filter(Boolean),
     category: EXERCISE_CATEGORIES.has(categoryValue) ? categoryValue : "strength",
     trackingType: TRACKING_TYPES.has(trackingValue) ? trackingValue : "series",
+    difficulty: clampInteger(payload.difficulty, 0, 5),
+    popularity: clampInteger(payload.popularity, 0, 5),
     equipment: String(payload.equipment || "").trim().slice(0, 160),
     cue: String(payload.cue || "").trim().slice(0, 500),
     muscles,
@@ -226,6 +247,9 @@ async function prepareProject200WellnessSchema() {
     source text not null default 'luna', generated_by uuid null references users(id) on delete set null,
     created_at timestamptz not null default now(), updated_at timestamptz not null default now()
   )`);
+  await query(`alter table project200_exercise_definitions add column if not exists alternative_names jsonb not null default '[]'::jsonb`);
+  await query(`alter table project200_exercise_definitions add column if not exists difficulty integer not null default 0`);
+  await query(`alter table project200_exercise_definitions add column if not exists popularity integer not null default 0`);
   await query(`create table if not exists project200_exercise_muscle_state (
     user_id uuid not null references users(id) on delete cascade,
     assigned_profile text not null default 'Usuario', muscle_id text not null,
@@ -516,14 +540,15 @@ export async function saveProject200ExerciseDefinitions(userId, definitions = []
     if (!definition.exerciseId || !definition.exerciseName || !definition.muscles.length) continue;
     const result = await query(
       `insert into project200_exercise_definitions (
-         exercise_id, exercise_name, category, tracking_type, equipment, cue, muscles, source, generated_by
-       ) values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9)
+         exercise_id, exercise_name, alternative_names, category, tracking_type, difficulty, popularity, equipment, cue, muscles, source, generated_by
+       ) values ($1,$2,$3::jsonb,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12)
        on conflict (exercise_id) do update set exercise_name=excluded.exercise_name, category=excluded.category,
-         tracking_type=excluded.tracking_type, equipment=excluded.equipment, cue=excluded.cue,
+         alternative_names=excluded.alternative_names, tracking_type=excluded.tracking_type,
+         difficulty=excluded.difficulty, popularity=excluded.popularity, equipment=excluded.equipment, cue=excluded.cue,
          muscles=excluded.muscles, source=excluded.source, generated_by=excluded.generated_by, updated_at=now()
        returning *`,
-      [definition.exerciseId, definition.exerciseName, definition.category, definition.trackingType,
-        definition.equipment, definition.cue, JSON.stringify(definition.muscles), definition.source, userId]
+      [definition.exerciseId, definition.exerciseName, JSON.stringify(definition.alternativeNames), definition.category, definition.trackingType,
+        definition.difficulty, definition.popularity, definition.equipment, definition.cue, JSON.stringify(definition.muscles), definition.source, userId]
     );
     saved.push(normalizeProject200ExerciseDefinition(result.rows[0]));
   }

@@ -87,6 +87,20 @@ test("exercise definitions reject muscles outside the fixed map", () => {
   ]);
 });
 
+test("exercise definitions keep one primary name and at most three real aliases", () => {
+  const definition = normalizeProject200ExerciseDefinition({
+    exerciseId: "romanian-deadlift",
+    exerciseName: "Stiff",
+    alternativeNames: ["Levantamento terra romeno", "stiff", "Terra romeno", "Levantamento romeno", "Outro nome"],
+    difficulty: 3.9,
+    popularity: 9,
+    muscles: [{ muscleId: "biceps-femoral", load: 1 }]
+  });
+  assert.deepEqual(definition.names, ["Stiff", "Levantamento terra romeno", "Terra romeno", "Levantamento romeno"]);
+  assert.equal(definition.difficulty, 3);
+  assert.equal(definition.popularity, 5);
+});
+
 test("all clickable anatomy regions use the closed muscle registry", () => {
   const muscleIds = new Set(PROJECT200_MUSCLES.map(({ id }) => id));
   const regions = PROJECT200_MUSCLE_MAPS.flatMap(({ regions: mapRegions }) => mapRegions);
