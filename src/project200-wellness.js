@@ -132,6 +132,7 @@ function normalizeExerciseAssetRow(row) {
     startImageUrl: String(row?.start_image_url || ""),
     finishImageUrl: String(row?.finish_image_url || ""),
     muscleImageUrl: String(row?.muscle_image_url || ""),
+    thumbnailUrl: String(row?.thumbnail_url || ""),
     videoUrl: String(row?.video_url || ""),
     videoPosterUrl: String(row?.video_poster_url || ""),
     videoDurationSeconds: Math.max(0, Number(row?.video_duration_seconds || 0)),
@@ -234,11 +235,12 @@ async function prepareProject200WellnessSchema() {
   await query(`alter table project200_exercise_library add column if not exists sort_order integer not null default 0`);
   await query(`create table if not exists project200_exercise_assets (
     exercise_id text primary key, exercise_name text not null, muscles jsonb not null default '[]'::jsonb,
-    start_image_url text not null, finish_image_url text not null, muscle_image_url text not null default '', generated_model text not null default 'gpt-image-1',
+    start_image_url text not null, finish_image_url text not null, muscle_image_url text not null default '', thumbnail_url text not null default '', generated_model text not null default 'gpt-image-1',
     generated_by uuid null references users(id) on delete set null,
     created_at timestamptz not null default now(), updated_at timestamptz not null default now()
   )`);
   await query(`alter table project200_exercise_assets add column if not exists muscle_image_url text not null default ''`);
+  await query(`alter table project200_exercise_assets add column if not exists thumbnail_url text not null default ''`);
   await query(`alter table project200_exercise_assets add column if not exists video_url text not null default ''`);
   await query(`alter table project200_exercise_assets add column if not exists video_poster_url text not null default ''`);
   await query(`alter table project200_exercise_assets add column if not exists video_duration_seconds numeric(6,2) not null default 0`);
@@ -584,6 +586,27 @@ export async function saveProject200ExerciseAssets(userId, payload = {}) {
        muscle_image_url=excluded.muscle_image_url, generated_model=excluded.generated_model, generated_by=excluded.generated_by, updated_at=now()
      returning *`,
     [exerciseId, exerciseName, JSON.stringify(muscles), startImageUrl, finishImageUrl, muscleImageUrl, generatedModel, userId]
+  );
+  return normalizeExerciseAssetRow(result.rows[0]);
+}
+
+export async function saveProject200ExerciseThumbnailAsset(userId, payload = {}) {
+  await ensureProject200WellnessSchema();
+  const exerciseId = String(payload.exerciseId || "").trim().slice(0, 120);
+  const exerciseName = String(payload.exerciseName || "").trim().slice(0, 160);
+  const thumbnailUrl = String(payload.thumbnailUrl || "").trim().slice(0, 2000);
+  const generatedModel = String(payload.generatedModel || "gpt-image-1").trim().slice(0, 80);
+  if (!exerciseId || !exerciseName || !thumbnailUrl) throw new Error("Dados da thumb do exercício incompletos.");
+  const result = await query(
+    `insert into project200_exercise_assets (
+       exercise_id, exercise_name, muscles, start_image_url, finish_image_url, muscle_image_url,
+       thumbnail_url, generated_model, generated_by
+     ) values ($1,$2,'[]'::jsonb,$3,$3,$3,$3,$4,$5)
+     on conflict (exercise_id) do update set exercise_name=excluded.exercise_name,
+       thumbnail_url=excluded.thumbnail_url, generated_model=excluded.generated_model,
+       generated_by=excluded.generated_by, updated_at=now()
+     returning *`,
+    [exerciseId, exerciseName, thumbnailUrl, generatedModel, userId]
   );
   return normalizeExerciseAssetRow(result.rows[0]);
 }

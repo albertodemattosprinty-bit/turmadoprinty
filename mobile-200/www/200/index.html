@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="/200/quality.css?v=20260906-1" />
   <link rel="stylesheet" href="/200/books.css?v=20260909-home-icons-v1" />
   <link rel="stylesheet" href="/200/wellness.css?v=20260911-exercise-background-v1" />
-  <link rel="stylesheet" href="/200/wellness-pack.css?v=20260911-fluid-prework-v3" />
+  <link rel="stylesheet" href="/200/wellness-pack.css?v=20260911-exercise-thumbs-v1" />
   <link rel="stylesheet" href="/200/performance.css?v=20260906-scroll-v1" />
 </head>
 <body data-background-theme="edge">
@@ -833,6 +833,11 @@
         <span class="running-music-default-top">Adicionar um novo usuário local do /200</span>
         <strong>Criar usuario</strong>
         <span class="running-music-default-bottom">Cada usuário terá as próprias tarefas e persona</span>
+      </button>
+      <button class="running-music-default-option" type="button" id="openExerciseThumbAdminOption" hidden>
+        <span class="running-music-default-top">Criar capas quadradas otimizadas para todo o acervo de exercícios</span>
+        <strong>Preencher Thumbs</strong>
+        <span class="running-music-default-bottom">gpt-image-1 · 600×600 WebP · somente administradores</span>
       </button>
       <button class="running-music-default-option options-toggle-btn" type="button" id="toggleMissionActionsOption">
         <span class="running-music-default-top">Escolher onde as missões do dia aparecem</span>
@@ -2228,6 +2233,23 @@
         </article>
       </div>
 
+      <div class="wellness-phase-layer" id="wellnessExerciseThumbsLayer" hidden>
+        <article class="wellness-phase-screen wellness-exercise-thumbs-screen">
+          <button class="wellness-phase-close" type="button" id="wellnessExerciseThumbsClose" aria-label="Fechar preenchimento de thumbs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+          <span class="wellness-phase-kicker">ADMIN · OPENAI</span>
+          <h2>Preencher Thumbs</h2>
+          <p>Uma capa 600×600 otimizada para cada exercício. A capa aparece em todo o acervo e, quando houver vídeo, mantém o play por cima.</p>
+          <section class="wellness-exercise-thumb-progress">
+            <div><strong id="wellnessExerciseThumbProgress">0%</strong><span id="wellnessExerciseThumbProgressCount">0 de 0 exercícios com thumb</span></div>
+            <div class="wellness-exercise-admin-track" aria-hidden="true"><i id="wellnessExerciseThumbProgressFill"></i></div>
+          </section>
+          <label class="wellness-exercise-thumb-prompt">Prompt base<textarea id="wellnessExerciseThumbPrompt" rows="5" maxlength="1200">Academia de luxo. Imagem mostrando claramente qual é o exercício. Homem adulto de 1,75 m, branco, cabelo preto curto padrão, usando uniforme esportivo laranja e preto.</textarea></label>
+          <button class="wellness-phase-primary" type="button" id="wellnessExerciseThumbFill">Gerar thumbs pendentes</button>
+          <button class="wellness-phase-secondary wellness-exercise-thumb-regenerate" type="button" id="wellnessExerciseThumbRegenerate">Gerar todas novamente</button>
+          <p class="wellness-status" id="wellnessExerciseThumbStatus" aria-live="polite">Nenhuma geração iniciada.</p>
+        </article>
+      </div>
+
       <div class="wellness-phase-layer" id="wellnessGoalLayer" hidden>
         <form class="wellness-phase-screen wellness-goal-screen" id="wellnessGoalForm">
           <button class="wellness-phase-close" type="button" id="wellnessGoalClose" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
@@ -2320,9 +2342,9 @@
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
   <script src="/200/offline-data.js?v=1.10-offline-refresh-v1"></script>
-  <script type="module" src="/200/project.js?v=20260911-exercise-background-v1"></script>
+  <script type="module" src="/200/project.js?v=20260911-exercise-thumbs-v1"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
-  <script type="module" src="/200/wellness.js?v=20260911-fluid-workout-v2"></script>
+  <script type="module" src="/200/wellness.js?v=20260911-exercise-thumbs-v1"></script>
   <script src="/200/books.js?v=20260904-biblia-plano-v7"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260908-readonly-v1"></script>

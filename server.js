@@ -64,7 +64,7 @@ import { createQuickUserAction, createUserAction, deleteUserAction, ensureAction
 import { clearProject200CurrentTaskState, getProject200CurrentTaskState, saveProject200CurrentTaskState } from "./src/project200-current-task-state.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
-import { addProject200ExerciseSeries, addProject200ExerciseToLibrary, approveProject200ExercisePlan, createProject200NutritionEntry, createProject200WeightEntry, deleteProject200CompletedExerciseSession, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, normalizeProject200ExerciseDefinition, removeProject200ExerciseFromLibrary, reorderProject200ExerciseLibrary, saveProject200ExerciseAssets, saveProject200ExerciseDefinitions, saveProject200ExerciseVideoAsset, startProject200ExerciseSession, syncProject200ExerciseMission, updateProject200ExerciseProgress, updateProject200MealSlots, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
+import { addProject200ExerciseSeries, addProject200ExerciseToLibrary, approveProject200ExercisePlan, createProject200NutritionEntry, createProject200WeightEntry, deleteProject200CompletedExerciseSession, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, normalizeProject200ExerciseDefinition, removeProject200ExerciseFromLibrary, reorderProject200ExerciseLibrary, saveProject200ExerciseAssets, saveProject200ExerciseDefinitions, saveProject200ExerciseThumbnailAsset, saveProject200ExerciseVideoAsset, startProject200ExerciseSession, syncProject200ExerciseMission, updateProject200ExerciseProgress, updateProject200MealSlots, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
 import { PROJECT200_MUSCLES, PROJECT200_MUSCLE_IDS } from "./public/200/exercise-muscles.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
@@ -4864,6 +4864,68 @@ async function handleProject200ExerciseImagesRequest(request, response, exercise
     sendJson(response, 201, { ok: true, asset });
   } catch (error) {
     sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível gerar as imagens do exercício." });
+  }
+}
+
+const PROJECT200_EXERCISE_THUMB_PROMPT = "Academia de luxo. Imagem mostrando claramente qual é o exercício. Homem adulto de 1,75 m, branco, cabelo preto curto padrão, usando uniforme esportivo laranja e preto.";
+
+async function handleProject200ExerciseThumbnailRequest(request, response, exerciseId) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+  try {
+    const body = await readJsonBody(request);
+    const safeExerciseId = String(exerciseId || "").trim().slice(0, 120);
+    const exerciseName = String(body?.exerciseName || "").trim().slice(0, 160);
+    const category = String(body?.category || "exercício").trim().slice(0, 80);
+    const equipment = String(body?.equipment || "sem equipamento").trim().slice(0, 160);
+    const cue = String(body?.cue || "").trim().slice(0, 500);
+    const customBasePrompt = String(body?.basePrompt || "").trim().slice(0, 1200);
+    if (!safeExerciseId || !exerciseName) throw new Error("Exercício inválido para geração da thumb.");
+    const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+    if (!apiKey) throw new Error("OPENAI_API_KEY nao configurada no backend.");
+    const model = "gpt-image-1";
+    const prompt = [
+      customBasePrompt || PROJECT200_EXERCISE_THUMB_PROMPT,
+      `Crie uma única fotografia fitness quadrada, realista e premium, ensinando visualmente o exercício ${exerciseName}.`,
+      `Categoria: ${category}. Equipamento: ${equipment}.`,
+      cue ? `Execução correta: ${cue}` : "",
+      "Mostre a posição mais reconhecível do movimento, com o corpo inteiro centralizado e sem cortar cabeça, mãos ou pés.",
+      "O exercício precisa ser identificado claramente apenas pela pose, pelo equipamento e pelo ambiente.",
+      "Composição publicitária elegante, anatomia correta, iluminação cinematográfica suave, alto contraste e fundo de academia organizado.",
+      "Não inclua palavras, letras, números, setas, legendas, logotipos, marcas, molduras ou marca d'água."
+    ].filter(Boolean).join(" ");
+    const openAiResponse = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model, prompt, size: "1024x1024", quality: "medium", output_format: "png", n: 1 })
+    });
+    const openAiPayload = await openAiResponse.json().catch(() => ({}));
+    if (!openAiResponse.ok) throw new Error(openAiPayload?.error?.message || "A OpenAI não conseguiu gerar a thumb do exercício.");
+    const generatedBase64 = String(openAiPayload?.data?.[0]?.b64_json || "").trim();
+    if (!generatedBase64) throw new Error("A OpenAI não devolveu a thumb do exercício.");
+    const thumbnailBuffer = await sharp(Buffer.from(generatedBase64, "base64"))
+      .resize({ width: 600, height: 600, fit: "cover", position: "attention" })
+      .webp({ quality: 80, effort: 5 })
+      .toBuffer();
+    const safeKeyId = safeExerciseId.replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "") || "exercise";
+    const generationId = `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+    const thumbnailKey = `project200/exercises/${safeKeyId}/thumb-${generationId}.webp`;
+    await getR2Client().send(new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: thumbnailKey,
+      Body: thumbnailBuffer,
+      ContentType: "image/webp",
+      CacheControl: "public, max-age=31536000, immutable"
+    }));
+    const asset = await saveProject200ExerciseThumbnailAsset(admin.id, {
+      exerciseId: safeExerciseId,
+      exerciseName,
+      thumbnailUrl: buildPublicR2UrlFromKey(thumbnailKey),
+      generatedModel: model
+    });
+    sendJson(response, 201, { ok: true, asset, width: 600, height: 600, model });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível gerar a thumb do exercício." });
   }
 }
 
@@ -16621,6 +16683,12 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "POST" && pathname.match(/^\/api\/admin\/200\/exercises\/[^/]+\/images$/)) {
     const exerciseId = decodeURIComponent(pathname.replace(/^\/api\/admin\/200\/exercises\/([^/]+)\/images$/, "$1"));
     await handleProject200ExerciseImagesRequest(request, response, exerciseId);
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/admin\/200\/exercises\/[^/]+\/thumbnail$/)) {
+    const exerciseId = decodeURIComponent(pathname.replace(/^\/api\/admin\/200\/exercises\/([^/]+)\/thumbnail$/, "$1"));
+    await handleProject200ExerciseThumbnailRequest(request, response, exerciseId);
     return;
   }
 

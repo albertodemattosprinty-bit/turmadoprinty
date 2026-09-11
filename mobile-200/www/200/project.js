@@ -648,6 +648,7 @@ const missionOrderStatus = document.getElementById("missionOrderStatus");
 const toggleScreenLockOptionButton = document.getElementById("toggleScreenLockOption");
 const toggleScreenLockHint = document.getElementById("toggleScreenLockHint");
 const openProject200ExportModalButton = document.getElementById("openProject200ExportModal");
+const openExerciseThumbAdminOptionButton = document.getElementById("openExerciseThumbAdminOption");
 const project200ExportModal = document.getElementById("project200ExportModal");
 const project200ExportUsernameInput = document.getElementById("project200ExportUsername");
 const project200ExportMessage = document.getElementById("project200ExportMessage");
@@ -19138,6 +19139,9 @@ toggleMissionActionsOptionButton?.classList.toggle("is-off", missionActionsMode 
     toggleScreenLockHint.textContent = state.options.screenLockEnabled ? "Ativada" : "Desbloqueada";
   }
   toggleScreenLockOptionButton?.classList.toggle("is-off", !state.options.screenLockEnabled);
+  if (openExerciseThumbAdminOptionButton) {
+    openExerciseThumbAdminOptionButton.hidden = !isProject200AdminUser();
+  }
   if (optionsContent && previousScrollTop > 0) {
     window.requestAnimationFrame(() => {
       optionsContent.scrollTop = previousScrollTop;
@@ -21425,6 +21429,11 @@ toggleScreenLockOptionButton?.addEventListener("click", () => {
   }
   saveOptionsConfig();
   renderOptionsModal();
+});
+openExerciseThumbAdminOptionButton?.addEventListener("click", () => {
+  if (!isProject200AdminUser()) return;
+  closeModal("optionsModal");
+  void window.project200Wellness?.openThumbsAdmin?.();
 });
 screenLockOverlay?.addEventListener("pointerdown", (event) => {
   if (!state.screenLock.locked) {
