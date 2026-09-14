@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="/200/quality.css?v=20260906-1" />
   <link rel="stylesheet" href="/200/books.css?v=20260909-home-icons-v1" />
   <link rel="stylesheet" href="/200/wellness.css?v=20260911-exercise-background-v1" />
-  <link rel="stylesheet" href="/200/wellness-pack.css?v=20260911-exercise-thumbs-v1" />
+  <link rel="stylesheet" href="/200/wellness-pack.css?v=20260914-exercise-focus-v1" />
   <link rel="stylesheet" href="/200/performance.css?v=20260906-scroll-v1" />
 </head>
 <body data-background-theme="edge">
@@ -2300,6 +2300,17 @@
         </form>
       </div>
 
+      <div class="wellness-phase-layer wellness-exercise-picture-layer" id="wellnessAdvanceLayer" hidden>
+        <article class="wellness-phase-screen wellness-confirm-screen wellness-advance-screen">
+          <button class="wellness-phase-close" type="button" id="wellnessAdvanceBack" aria-label="Voltar ao treino"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+          <span class="wellness-phase-kicker">PRÓXIMO EXERCÍCIO</span>
+          <h2>Deseja avançar para o próximo exercício?</h2>
+          <p id="wellnessAdvanceName"></p>
+          <button class="wellness-phase-primary wellness-advance-confirm-button" type="button" id="wellnessAdvanceConfirm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 6 6 6-6 6M12 6l6 6-6 6"/></svg><span>Avançar exercício</span></button>
+          <button class="wellness-phase-secondary" type="button" id="wellnessAdvanceCancel">Continuar treino</button>
+        </article>
+      </div>
+
       <div class="wellness-phase-layer wellness-workout-complete-layer" id="wellnessWorkoutCompleteLayer" hidden>
         <article class="wellness-phase-screen wellness-workout-complete-screen">
           <button class="wellness-phase-close" type="button" id="wellnessWorkoutCompleteClose" aria-label="Fechar finalização"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
@@ -2344,7 +2355,7 @@
   <script src="/200/offline-data.js?v=1.10-offline-refresh-v1"></script>
   <script type="module" src="/200/project.js?v=20260911-exercise-thumbs-v1"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
-  <script type="module" src="/200/wellness.js?v=20260911-exercise-thumbs-v1"></script>
+  <script type="module" src="/200/wellness.js?v=20260914-exercise-focus-v1"></script>
   <script src="/200/books.js?v=20260904-biblia-plano-v7"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260908-readonly-v1"></script>
