@@ -21,8 +21,8 @@
       <h1 id="updateTitle">Atualizacao do iLife disponivel</h1>
       <p id="updateMessage" class="message">Carregando informacoes da atualizacao...</p>
       <div class="version-row">
-        <span>Versao minima</span>
-        <strong id="minimumVersionLabel">0.7</strong>
+        <span>Acesso ao aplicativo</span>
+        <strong id="minimumVersionLabel">Todas as versoes</strong>
       </div>
       <a id="downloadButton" class="download-button" href="#" rel="noopener noreferrer">Baixar APK atualizado</a>
       <p id="publicStatus" class="status" role="status"></p>
@@ -32,11 +32,11 @@
       <h2 id="adminTitle">Controle admin do APK</h2>
       <div class="force-update-control">
         <div>
-          <p class="force-update-label">Versao pronta para publicar</p>
-          <strong>iLife Mindset 0.79</strong>
-          <p>Ao ativar, versoes anteriores ficam bloqueadas na tela de atualizacao.</p>
+          <p class="force-update-label">Acesso livre</p>
+          <strong>Bloqueio de versao desativado</strong>
+          <p>No momento, usuarios de qualquer versao podem acessar o aplicativo.</p>
         </div>
-        <button id="forceUpdateButton" class="force-update-button" type="button">Exigir atualizacao 0.79</button>
+        <button id="forceUpdateButton" class="force-update-button" type="button" disabled>Todas as versoes liberadas</button>
       </div>
       <form id="adminForm">
         <label>
@@ -44,8 +44,8 @@
           <input id="currentVersionInput" name="currentVersion" inputmode="decimal" autocomplete="off" />
         </label>
         <label>
-          Versao minima para abrir o /200
-          <input id="minimumVersionInput" name="minimumVersion" inputmode="decimal" autocomplete="off" />
+          Versao minima para abrir o /200 (bloqueio desativado)
+          <input id="minimumVersionInput" name="minimumVersion" inputmode="decimal" autocomplete="off" disabled />
         </label>
         <label>
           Link R2 do APK atualizado
@@ -68,6 +68,6 @@
       </form>
     </section>
   </main>
-  <script type="module" src="/201/app.js?v=1.30-required-v1"></script>
+  <script type="module" src="/201/app.js?v=20260915-any-version-v1"></script>
 </body>
 </html>

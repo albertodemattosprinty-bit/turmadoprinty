@@ -4,7 +4,8 @@ const tokenKey = "turma_do_printy_token";
 const releaseVersion = "1.30";
 const defaults = {
   currentVersion: releaseVersion,
-  minimumVersion: releaseVersion,
+  minimumVersion: "0.0",
+  allowAnyVersion: true,
   downloadUrl: "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk",
   title: "Atualizacao do iLife disponivel",
   message: "Para continuar usando o iLife MindsetPlan com seguranca, baixe a versao mais recente do aplicativo.",
@@ -62,7 +63,10 @@ function showAdminLoginPrompt(message = "Entre com uma conta ADMIN para editar a
 }
 
 function normalizeConfig(config) {
-  return { ...defaults, ...(config || {}) };
+  const merged = { ...defaults, ...(config || {}) };
+  merged.allowAnyVersion = config?.allowAnyVersion === true
+    || compareVersions(merged.minimumVersion, "0.0") <= 0;
+  return merged;
 }
 
 function compareVersions(left, right) {
@@ -77,6 +81,11 @@ function compareVersions(left, right) {
 }
 
 function updateForceButton(config) {
+  if (config.allowAnyVersion) {
+    elements.forceUpdateButton.disabled = true;
+    elements.forceUpdateButton.textContent = "Todas as versoes liberadas";
+    return;
+  }
   const isRequired = compareVersions(config.minimumVersion, releaseVersion) >= 0;
   elements.forceUpdateButton.disabled = isRequired;
   elements.forceUpdateButton.textContent = isRequired
@@ -88,7 +97,7 @@ function renderConfig(rawConfig) {
   const config = normalizeConfig(rawConfig);
   elements.title.textContent = config.title;
   elements.message.textContent = config.message;
-  elements.minimum.textContent = config.minimumVersion;
+  elements.minimum.textContent = config.allowAnyVersion ? "Todas as versoes" : config.minimumVersion;
   elements.download.textContent = config.buttonLabel;
   const url = new URL(config.downloadUrl);
   url.searchParams.set("download", "1");
@@ -99,6 +108,7 @@ function renderConfig(rawConfig) {
 
   elements.currentInput.value = config.currentVersion;
   elements.minimumInput.value = config.minimumVersion;
+  elements.minimumInput.disabled = Boolean(config.allowAnyVersion);
   elements.urlInput.value = config.downloadUrl;
   elements.titleInput.value = config.title;
   elements.messageInput.value = config.message;
@@ -138,8 +148,7 @@ async function revealAdminIfAllowed() {
       document.body.classList.add("admin-mode");
       elements.adminPanel.hidden = false;
       elements.adminPanel.setAttribute("aria-hidden", "false");
-      elements.adminStatus.textContent = "Campos ativos para salvar a versao minima global no Postgres.";
-      elements.minimumInput.focus({ preventScroll: true });
+      elements.adminStatus.textContent = "Bloqueio desativado: qualquer versao pode acessar o /200.";
       return;
     }
     elements.publicStatus.textContent = "Sua conta nao tem permissao de ADMIN para editar esta pagina.";
@@ -158,6 +167,7 @@ async function saveConfig(config) {
 }
 
 elements.forceUpdateButton.addEventListener("click", () => {
+  if (elements.forceUpdateButton.disabled) return;
   const confirmed = window.confirm(
     `Exigir a versao ${releaseVersion} agora? Usuarios com versoes anteriores nao poderao continuar sem atualizar.`
   );

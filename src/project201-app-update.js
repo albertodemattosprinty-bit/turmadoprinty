@@ -2,10 +2,13 @@ import { query } from "./db.js";
 
 const CONFIG_KEY = "project200_android_update";
 const REQUIRED_MINIMUM_VERSION = "1.30";
+const OPEN_ACCESS_MINIMUM_VERSION = "0.0";
+export const PROJECT201_APP_UPDATE_ENFORCEMENT_ENABLED = false;
 
 export const PROJECT201_DEFAULT_UPDATE_CONFIG = {
   currentVersion: "1.30",
-  minimumVersion: "1.30",
+  minimumVersion: OPEN_ACCESS_MINIMUM_VERSION,
+  allowAnyVersion: true,
   downloadUrl: "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk",
   title: "Atualizacao do iLife disponivel",
   message: "Para continuar usando o iLife MindsetPlan com seguranca, baixe a versao mais recente do aplicativo.",
@@ -41,11 +44,14 @@ function normalizeText(value, fallback, maxLength) {
 export function normalizeProject201UpdateConfig(input = {}) {
   const minimumVersion = normalizeVersion(input.minimumVersion, PROJECT201_DEFAULT_UPDATE_CONFIG.minimumVersion);
   const currentVersion = normalizeVersion(input.currentVersion, PROJECT201_DEFAULT_UPDATE_CONFIG.currentVersion);
-  const enforcedMinimumVersion = compareVersions(minimumVersion, REQUIRED_MINIMUM_VERSION) < 0 ? REQUIRED_MINIMUM_VERSION : minimumVersion;
+  const enforcedMinimumVersion = PROJECT201_APP_UPDATE_ENFORCEMENT_ENABLED
+    ? (compareVersions(minimumVersion, REQUIRED_MINIMUM_VERSION) < 0 ? REQUIRED_MINIMUM_VERSION : minimumVersion)
+    : OPEN_ACCESS_MINIMUM_VERSION;
   const enforcedCurrentVersion = compareVersions(currentVersion, enforcedMinimumVersion) < 0 ? enforcedMinimumVersion : currentVersion;
   return {
     currentVersion: enforcedCurrentVersion,
     minimumVersion: enforcedMinimumVersion,
+    allowAnyVersion: !PROJECT201_APP_UPDATE_ENFORCEMENT_ENABLED,
     downloadUrl: normalizeUrl(input.downloadUrl, PROJECT201_DEFAULT_UPDATE_CONFIG.downloadUrl),
     title: normalizeText(input.title, PROJECT201_DEFAULT_UPDATE_CONFIG.title, 90),
     message: normalizeText(input.message, PROJECT201_DEFAULT_UPDATE_CONFIG.message, 700),
