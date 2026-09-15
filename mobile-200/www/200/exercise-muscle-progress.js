@@ -48,6 +48,17 @@ export function calculateProject200ExerciseMuscleGains(series, muscles) {
   });
 }
 
+export function calculateProject200TimedMuscleGains(durationMinutes, muscles) {
+  const basePoints = Math.max(0, Number(durationMinutes) || 0);
+  if (!basePoints) return [];
+  return (Array.isArray(muscles) ? muscles : []).flatMap((muscle) => {
+    const muscleId = String(muscle?.muscleId || "").trim();
+    const numericLoad = Number(muscle?.load);
+    if (!muscleId || !Number.isFinite(numericLoad) || numericLoad < .25) return [];
+    return [{ muscleId, points: round(basePoints * clamp(numericLoad, .25, 1)) }];
+  });
+}
+
 export function project200DecayedMusclePoints(points, elapsedMinutes) {
   const elapsedSteps = Math.floor(Math.max(0, Number(elapsedMinutes) || 0) / PROJECT200_MUSCLE_DECAY_MINUTES);
   return round(Math.max(0, (Number(points) || 0) - (elapsedSteps * PROJECT200_MUSCLE_POINTS_PER_PERCENT)));

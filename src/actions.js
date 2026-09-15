@@ -13,6 +13,7 @@ const DEFAULT_ASSIGNEE = PROJECT200_DEFAULT_PROFILE_NAME;
 const DEFAULT_CATEGORY_ID = "planejamento";
 const QUICK_TASK_CATEGORY_ID = "quick_task";
 const ACTIONS_TIME_ZONE = "America/Sao_Paulo";
+let actionsSchemaPromise = null;
 
 function toIso(value) {
   if (!value) {
@@ -308,7 +309,7 @@ function getRecurringOccurrenceDates(action, fromDate, toDate) {
 async function materializeRecurringActionsForRange(userId, fromDate, toDate) {
   const seedResult = await query(
     `
-      select
+      select distinct on (repeat_group_id)
         id,
         user_id,
         title,
@@ -338,33 +339,42 @@ async function materializeRecurringActionsForRange(userId, fromDate, toDate) {
         and repeat_group_id is not null
         and repeat_rule <> 'none'
         and start_at < $2
+      order by repeat_group_id, start_at asc
     `,
     [userId, toDate.toISOString()]
   );
+
+  const existingResult = await query(
+    `
+      select repeat_group_id, start_at
+      from actions
+      where user_id = $1
+        and repeat_group_id is not null
+        and start_at >= $2
+        and start_at < $3
+    `,
+    [userId, fromDate.toISOString(), toDate.toISOString()]
+  );
+  const existingOccurrences = new Set(existingResult.rows.map((row) => (
+    `${String(row.repeat_group_id || "")}:${new Date(row.start_at).getTime()}`
+  )));
 
   for (const row of seedResult.rows) {
     const action = normalizeAction(row);
     const occurrences = getRecurringOccurrenceDates(action, fromDate, toDate);
     for (const occurrence of occurrences) {
-      const exists = await query(
-        `
-          select id
-          from actions
-          where user_id = $1
-            and repeat_group_id = $2
-            and start_at = $3::timestamptz
-          limit 1
-        `,
-        [userId, action.repeatGroupId, occurrence.startAt.toISOString()]
-      );
-      if (exists.rows[0]) continue;
+      const occurrenceKey = `${String(action.repeatGroupId || "")}:${occurrence.startAt.getTime()}`;
+      if (existingOccurrences.has(occurrenceKey)) continue;
       await cloneActionOccurrence(userId, action, occurrence.startAt, occurrence.endAt);
+      existingOccurrences.add(occurrenceKey);
     }
   }
 }
 
 export async function ensureActionsSchema() {
-  await query(`
+  if (!actionsSchemaPromise) {
+    actionsSchemaPromise = (async () => {
+      await query(`
     create table if not exists actions (
       id uuid primary key default gen_random_uuid(),
       user_id uuid not null references users(id) on delete cascade,
@@ -444,7 +454,13 @@ export async function ensureActionsSchema() {
       updated_at timestamptz not null default now()
     );
   `);
-  await query("create index if not exists idx_project200_runtime_state_user_time on project200_runtime_state(user_id, updated_at desc);");
+      await query("create index if not exists idx_project200_runtime_state_user_time on project200_runtime_state(user_id, updated_at desc);");
+    })().catch((error) => {
+      actionsSchemaPromise = null;
+      throw error;
+    });
+  }
+  return actionsSchemaPromise;
 }
 
 async function getStoredActionSvgDefault(userId, title) {
@@ -1617,36 +1633,55 @@ export async function extendQuickUserAction(userId, actionId, payload = {}) {
 
 export async function deleteUserAction(userId, actionId) {
   await ensureActionsSchema();
-
-  const current = await query(
-    "select id, repeat_group_id from actions where user_id = $1 and id = $2 limit 1",
+  const result = await query(
+    `
+      with target as materialized (
+        select id, repeat_group_id
+        from actions
+        where user_id = $1
+          and id = $2
+        limit 1
+      ), target_actions as materialized (
+        select candidate.id
+        from actions candidate
+        cross join target
+        where candidate.user_id = $1
+          and (
+            (target.repeat_group_id is not null and candidate.repeat_group_id = target.repeat_group_id)
+            or (target.repeat_group_id is null and candidate.id = target.id)
+          )
+      ), deleted_overrides as (
+        delete from action_status_overrides overrides
+        using target
+        where overrides.user_id = $1
+          and (
+            (target.repeat_group_id is not null and overrides.repeat_group_id = target.repeat_group_id)
+            or (target.repeat_group_id is null and overrides.action_id = target.id)
+          )
+        returning overrides.id
+      ), deleted_runtime as (
+        delete from project200_runtime_state runtime
+        using target_actions
+        where runtime.user_id = $1
+          and runtime.action_id = target_actions.id
+        returning runtime.action_id
+      ), deleted_actions as (
+        delete from actions target_action
+        using target_actions
+        where target_action.user_id = $1
+          and target_action.id = target_actions.id
+        returning target_action.id
+      )
+      select
+        (select count(*)::integer from deleted_actions) as deleted,
+        (select count(*)::integer from deleted_overrides) as deleted_overrides,
+        (select count(*)::integer from deleted_runtime) as deleted_runtime
+    `,
     [userId, String(actionId || "").trim()]
   );
-
-  const action = current.rows[0];
-
-  if (!action) {
-    return { deleted: 0 };
-  }
-
-  if (action.repeat_group_id) {
-    await query(
-      "delete from action_status_overrides where user_id = $1 and repeat_group_id = $2",
-      [userId, action.repeat_group_id]
-    );
-    const deletedGroup = await query(
-      "delete from actions where user_id = $1 and repeat_group_id = $2",
-      [userId, action.repeat_group_id]
-    );
-
-    return { deleted: deletedGroup.rowCount || 0 };
-  }
-
-  await query("delete from action_status_overrides where user_id = $1 and action_id = $2", [userId, action.id]);
-  const deletedSingle = await query(
-    "delete from actions where user_id = $1 and id = $2",
-    [userId, action.id]
-  );
-
-  return { deleted: deletedSingle.rowCount || 0 };
+  return {
+    deleted: Number(result.rows[0]?.deleted || 0),
+    deletedOverrides: Number(result.rows[0]?.deleted_overrides || 0),
+    deletedRuntime: Number(result.rows[0]?.deleted_runtime || 0)
+  };
 }

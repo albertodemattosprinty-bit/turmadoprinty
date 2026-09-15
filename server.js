@@ -4667,7 +4667,7 @@ const PROJECT200_EXERCISE_DEFINITIONS_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["exerciseId", "exerciseName", "alternativeNames", "category", "trackingType", "difficulty", "popularity", "equipment", "cue", "muscles"],
+        required: ["exerciseId", "exerciseName", "alternativeNames", "category", "trackingType", "difficulty", "popularity", "equipment", "cue", "muscles", "energyPerMinute", "strengthPerMinute", "resistancePerMinute"],
         properties: {
           exerciseId: { type: "string" },
           exerciseName: { type: "string" },
@@ -4678,6 +4678,9 @@ const PROJECT200_EXERCISE_DEFINITIONS_SCHEMA = {
           popularity: { type: "integer", minimum: 1, maximum: 5 },
           equipment: { type: "string" },
           cue: { type: "string" },
+          energyPerMinute: { type: "number", minimum: 1, maximum: 5, multipleOf: .05 },
+          strengthPerMinute: { type: "number", minimum: .5, maximum: 5, multipleOf: .05 },
+          resistancePerMinute: { type: "number", minimum: .5, maximum: 5, multipleOf: .05 },
           muscles: {
             type: "array",
             minItems: 1,
@@ -4717,10 +4720,12 @@ async function createProject200ExerciseDefinitionsWithAi(apiKey, exercises, mode
         "Avalie difficulty de 1 a 5: 1 e iniciante e simples de executar; 5 exige tecnica, coordenacao, mobilidade ou forca avancada.",
         "Avalie popularity de 1 a 5 pelo quanto o exercicio e conhecido, praticado e mencionado na web: 1 e raro; 5 e extremamente popular.",
         "A carga muscular e uma participacao relativa: 1.00 e o musculo principal muito exigido; o minimo e 0.25. Use somente passos de 0.05 entre 0.25 e 1.00.",
+        "Defina tres taxas para exatamente 1 minuto real ou estimado do exercicio, sempre em passos de 0.05: energyPerMinute mede gasto/exaustao de 1.00 a 5.00; strengthPerMinute mede ganho de forca de 0.50 a 5.00; resistancePerMinute mede ganho de resistencia de 0.50 a 5.00.",
+        "Use 1.00 de energia para caminhada leve e reserve 5.00 para exercicios musculares muito pesados, corrida pesada e esforcos realmente exaustivos. Cardio costuma priorizar resistencia; musculacao pesada costuma priorizar forca.",
         `Use exclusivamente muscleId desta base fechada; nunca invente nomes ou IDs: ${PROJECT200_MUSCLES.map(({ id, name }) => `${id}=${name}`).join(", ")}.`,
         "Nao confunda carga muscular relativa com peso, porcentagem de ativacao EMG ou recomendacao medica. Nao diagnostique nem prescreva tratamento.",
         mode === "missing"
-          ? "Preserve exatamente exerciseId, exerciseName, category, trackingType, equipment e cue recebidos; complete alternativeNames, difficulty, popularity, musculos e suas cargas."
+          ? "Preserve exatamente exerciseId, exerciseName, category, trackingType, equipment e cue recebidos; complete alternativeNames, difficulty, popularity, musculos, cargas e as tres taxas por minuto."
           : "Crie o cadastro completo a partir de cada nome. Use series em musculacao/calistenia, minutes em cardio por tempo e gps apenas em caminhada, corrida ou bicicleta ao ar livre."
       ].join("\n"),
       input: JSON.stringify({ mode, exercises }),

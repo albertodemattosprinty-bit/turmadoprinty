@@ -1250,6 +1250,7 @@ let platformLongPressHandledOccurrenceId = "";
 let actionsDelayTicker = null;
 let missionHealthTicker = null;
 let missionListLastScrollAt = 0;
+const pendingDailyMissionEvents = new Set();
 let limitHistoryInsightTicker = null;
 let limitHistoryRecordsTicker = null;
 let historyDeleteHoldTimer = null;
@@ -6474,8 +6475,10 @@ async function apiRequest(path, options = {}) {
     skipGlobalLoading,
     ...fetchOptions
   } = options;
+  const requestMethod = String(options.method || "GET").toUpperCase();
+  const requestPath = String(path || "");
   const resolvedOfflineInvalidates = offlineInvalidates || (
-    String(options.method || "GET").toUpperCase() !== "GET" && String(path || "").startsWith("/api/200/extra-goals")
+    requestMethod !== "GET" && (requestPath.startsWith("/api/200/extra-goals") || requestPath.startsWith("/api/actions"))
       ? ["/api/200/extra-goals", "/api/actions"]
       : undefined
   );
@@ -7470,7 +7473,7 @@ function openModal(id) {
     }
     startActionsTimeTicker();
     actionsDelayTicker = window.setInterval(() => {
-      renderActions();
+      refreshActionsTimeSensitiveUi();
     }, 30000);
   }
 
@@ -7530,7 +7533,7 @@ function openModal(id) {
       if (document.hidden || !historyModal?.classList.contains("active")) return;
       if (state.missionKindFilter !== "limit") return;
       if ((Date.now() - missionListLastScrollAt) < 400) return;
-      renderMissions();
+      refreshMissionLimitHealthUi();
     }, 2000);
   }
 
@@ -8452,6 +8455,50 @@ function getDelayClassByMinutes(minutes) {
   return " task-delay-red";
 }
 
+function refreshActionsTimeSensitiveUi() {
+  if (!actionsList || !actionsModal?.classList.contains("active")) return;
+
+  const actionById = new Map(getVisibleActions().map((action) => [String(action?.id || ""), action]));
+  actionsList.querySelectorAll("[data-action-id]").forEach((row) => {
+    const action = actionById.get(String(row.dataset.actionId || ""));
+    if (!action) return;
+    const status = normalizeActionStatus(action.status);
+    const delayMinutes = getPendingDelayMinutes(action);
+    row.classList.remove("task-delay-soft", "task-delay-yellow", "task-delay-orange", "task-delay-red", "task-pending-clean");
+    const delayClass = getDelayClassByMinutes(delayMinutes).trim();
+    if (delayClass) row.classList.add(delayClass);
+    if (status === actionStatuses.pending && delayMinutes <= 0) row.classList.add("task-pending-clean");
+    if (delayMinutes > 0 && delayMinutes <= 15) {
+      row.style.setProperty("--delay-soft-rgb", getDelaySoftRgbByMinutes(delayMinutes));
+    } else {
+      row.style.removeProperty("--delay-soft-rgb");
+    }
+    const statusDot = row.querySelector(".task-status-dot");
+    if (statusDot) statusDot.style.setProperty("--task-dot-color", getActionThemeDotColor(action, { delayMinutes }));
+  });
+
+  const dynamicMissionDeckActive = normalizeMissionActionsMode(state.options.missionActionsMode) === "dynamic"
+    && state.actionsDynamicMissionsVisible
+    && !state.actionsMissionOnly;
+  if (!dynamicMissionDeckActive) return;
+  const expectedEntries = buildActionsDynamicMissionDeckEntries(buildMissionInstallments());
+  const cards = [...actionsList.querySelectorAll(".actions-dynamic-mission-card")];
+  const expectedIds = expectedEntries.map((entry) => String(entry.goalId || ""));
+  const renderedIds = cards.map((card) => String(card.dataset.missionGoalId || ""));
+  if (expectedIds.join("|") !== renderedIds.join("|")) {
+    suppressActionsAutoAnchorOnce = true;
+    renderActions();
+    return;
+  }
+  cards.forEach((card, index) => {
+    const visual = getMissionInstallmentVisual(expectedEntries[index]?.delayMinutes || 0);
+    card.classList.remove("mission-dynamic-blue", "mission-dynamic-gradient", "mission-dynamic-extreme");
+    if (visual.className) card.classList.add(visual.className);
+    card.style.setProperty("--mission-delay-rgb", visual.rgb);
+    card.style.setProperty("--mission-delay-darkness", String(visual.darkness || 0));
+  });
+}
+
 function renderActionsProgress() {
   if (!getToken()) {
     actionsProgress.hidden = true;
@@ -8510,7 +8557,8 @@ async function loadActions(options = {}) {
   }
   try {
     const payload = await apiRequestWithTimeout(actionsPath, {
-      skipGlobalLoading: options.silent === true
+      skipGlobalLoading: options.silent === true,
+      forceNetwork: options.forceNetwork === true
     }, 7000);
     state.actions = Array.isArray(payload.actions) ? payload.actions : [];
     const nextRunningLocalStarts = {};
@@ -8531,7 +8579,7 @@ async function loadActions(options = {}) {
       state.homeSnapshotReady = false;
     }
     try {
-      if (hasLocalActions) throw new Error("runtime-local");
+      if (hasLocalActions && options.forceNetwork !== true) throw new Error("runtime-local");
       const runtimePayload = await apiRequestWithTimeout(runtimeStateEndpoint, {}, 5000);
       state.runtimeState = runtimePayload?.runtimeState || null;
       const runtimeActionId = String(state.runtimeState?.actionId || "").trim();
@@ -8554,8 +8602,10 @@ async function loadActions(options = {}) {
     registerDayCloseEventIfNeeded();
   } catch (error) {
     state.homeSnapshotReady = false;
-    actionsProgress.hidden = true;
-    actionsList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+    if (options.silent !== true || !state.actions.length) {
+      actionsProgress.hidden = true;
+      actionsList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+    }
   }
   renderHomeRunningTask();
 }
@@ -8705,8 +8755,11 @@ async function toggleActionStatus(actionId, options = {}) {
       return;
     }
     if (rootChoice === "remove") {
-      await apiRequest(`/api/actions/${encodeURIComponent(targetAction.id)}`, { method: "DELETE" });
-      await loadActions();
+      try {
+        await deleteActionWithServerConfirmation(targetAction.id);
+      } catch (error) {
+        showFloatingNotice(error instanceof Error ? error.message : "Não foi possível excluir a tarefa.");
+      }
       return;
     }
     if (rootChoice === "complete") {
@@ -9902,9 +9955,14 @@ function renderTaskComposerModal() {
         if (!window.confirm("Excluir essa tarefa? Se for repetida, toda a rede sera removida.")) {
           return;
         }
-        await apiRequest(`/api/actions/${encodeURIComponent(action.id)}`, { method: "DELETE" });
-        closeStartDecisionModalWith("remove");
-        await loadActions();
+        try {
+          await deleteActionWithServerConfirmation(action.id);
+          closeStartDecisionModalWith("remove");
+        } catch (error) {
+          if (startDecisionMessage) {
+            startDecisionMessage.textContent = error instanceof Error ? error.message : "Não foi possível excluir a tarefa.";
+          }
+        }
       });
       startDecisionActions.appendChild(removeButton);
     }
@@ -10457,8 +10515,8 @@ async function applyPostponeTaskConfirm({ allowReplace = false } = {}) {
     return;
   }
   if (allowReplace && overlaps.length) {
-    for (const entry of overlaps) {
-      await apiRequest(`/api/actions/${encodeURIComponent(entry.id)}`, { method: "DELETE" });
+    for (const entry of getUniqueActionDeletionTargets(overlaps)) {
+      await deleteActionWithServerConfirmation(entry.id, { refresh: false, render: false, skipGlobalLoading: true });
     }
   }
   const payload = {
@@ -10475,7 +10533,7 @@ async function applyPostponeTaskConfirm({ allowReplace = false } = {}) {
   });
   closePostponeReplaceModalView();
   closePostponeTaskModalView();
-  await loadActions();
+  await loadActions({ forceNetwork: true });
 }
 
 async function patchActionTime(action, startAt, endAt) {
@@ -10641,6 +10699,66 @@ function cacheCurrentActionsState() {
   const path = `/api/actions?from=${encodeURIComponent(startOfDayIso(rangeStartDate))}&to=${encodeURIComponent(nextDayIso(date))}`;
   const cached = window.Project200Offline.peek(path) || {};
   window.Project200Offline.put(path, { ...cached, actions: state.actions, serverNow: new Date(getServerNowMs()).toISOString() });
+}
+
+function removeActionFromLocalState(actionId) {
+  const safeId = String(actionId || "").trim();
+  const target = (Array.isArray(state.actions) ? state.actions : []).find((action) => String(action?.id || "") === safeId);
+  const repeatGroupId = String(target?.repeatGroupId || "").trim();
+  const removedIds = new Set();
+  const shouldRemoveAction = (action) => {
+    const currentId = String(action?.id || "").trim();
+    const sameSeries = repeatGroupId && String(action?.repeatGroupId || "").trim() === repeatGroupId;
+    return currentId === safeId || sameSeries;
+  };
+  window.Project200Offline?.updateCached?.("/api/actions", (payload) => ({
+    ...(payload || {}),
+    actions: (Array.isArray(payload?.actions) ? payload.actions : []).filter((action) => !shouldRemoveAction(action))
+  }));
+  state.actions = (Array.isArray(state.actions) ? state.actions : []).filter((action) => {
+    const currentId = String(action?.id || "").trim();
+    const shouldRemove = shouldRemoveAction(action);
+    if (shouldRemove) removedIds.add(currentId);
+    return !shouldRemove;
+  });
+  removedIds.forEach((id) => delete state.runningLocalStarts[id]);
+  state.optimisticActionIds = (Array.isArray(state.optimisticActionIds) ? state.optimisticActionIds : [])
+    .filter((id) => !removedIds.has(String(id || "")));
+  if (removedIds.has(String(state.runtimeState?.actionId || ""))) state.runtimeState = null;
+  cacheCurrentActionsState();
+  return removedIds;
+}
+
+function getUniqueActionDeletionTargets(actions) {
+  const seen = new Set();
+  return (Array.isArray(actions) ? actions : []).filter((action) => {
+    const repeatGroupId = String(action?.repeatGroupId || "").trim();
+    const actionId = String(action?.id || "").trim();
+    if (!repeatGroupId && !actionId) return false;
+    const key = repeatGroupId ? `series:${repeatGroupId}` : `action:${actionId}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function deleteActionWithServerConfirmation(actionId, options = {}) {
+  const safeId = String(actionId || "").trim();
+  if (!safeId) throw new Error("Tarefa inválida.");
+  const payload = await apiRequest(`/api/actions/${encodeURIComponent(safeId)}`, {
+    method: "DELETE",
+    forceNetwork: true,
+    offlineQueue: false,
+    skipGlobalLoading: options.skipGlobalLoading === true,
+    offlineInvalidates: ["/api/actions", "/api/200/extra-goals"]
+  });
+  if (!payload?.ok || Number(payload?.deleted || 0) < 1) {
+    throw new Error("O Postgres não confirmou a exclusão da tarefa.");
+  }
+  removeActionFromLocalState(safeId);
+  if (options.render !== false) renderActions();
+  if (options.refresh !== false) void loadActions({ silent: true, forceNetwork: true });
+  return payload;
 }
 
 function updateMissionInState(nextGoal) {
@@ -11637,8 +11755,8 @@ async function saveAction() {
       }
       if (decision.type === "replace") {
         replaceOverlaps = true;
-        for (const item of overlaps) {
-          await apiRequest(`/api/actions/${encodeURIComponent(item.id)}`, { method: "DELETE" });
+        for (const item of getUniqueActionDeletionTargets(overlaps)) {
+          await deleteActionWithServerConfirmation(item.id, { refresh: false, render: false, skipGlobalLoading: true });
         }
       }
       state.wizard.replaceOverlaps = replaceOverlaps;
@@ -11744,8 +11862,11 @@ async function openActionLongPressMenu(actionId) {
     if (!window.confirm("Excluir essa tarefa? Se for repetida, toda a rede sera removida.")) {
       return;
     }
-    await apiRequest(`/api/actions/${encodeURIComponent(actionId)}`, { method: "DELETE" });
-    await loadActions();
+    try {
+      await deleteActionWithServerConfirmation(actionId);
+    } catch (error) {
+      showFloatingNotice(error instanceof Error ? error.message : "Não foi possível excluir a tarefa.");
+    }
     return;
   }
 
@@ -15213,9 +15334,70 @@ function applyMissionDefinitionLocally(goalId, patch) {
   const scope = getMissionHistoryScope();
   const scopePath = `/api/200/extra-goals?profile=${encodeURIComponent(profile)}&scope=${encodeURIComponent(scope.key)}`;
   const todayPath = `/api/200/extra-goals?profile=${encodeURIComponent(profile)}&scope=today`;
+  window.Project200Offline?.updateCached?.("/api/200/extra-goals", (payload) => ({
+    ...(payload || {}),
+    goals: updateMissionDefinitionCollection(payload?.goals, goalId, patch)
+  }));
   window.Project200Offline?.put?.(scopePath, { ...(window.Project200Offline.peek(scopePath) || {}), goals: state.missions });
   window.Project200Offline?.put?.(todayPath, { ...(window.Project200Offline.peek(todayPath) || {}), goals: state.actionMissions });
   refreshStatsMissionsFromLocalState();
+}
+
+function removeMissionFromLocalState(goalId) {
+  const safeId = String(goalId || "").trim();
+  const withoutGoal = (collection) => (Array.isArray(collection) ? collection : [])
+    .filter((goal) => String(goal?.id || "") !== safeId);
+  state.missions = withoutGoal(state.missions);
+  state.actionMissions = withoutGoal(state.actionMissions);
+  state.statsScopeMissions = withoutGoal(state.statsScopeMissions);
+  if (state.statsAspectLinks) state.statsAspectLinks.missions = withoutGoal(state.statsAspectLinks.missions);
+  missionVariantsCache.delete(getMissionVariantsCacheKey(safeId));
+  window.Project200Offline?.updateCached?.("/api/200/extra-goals", (payload) => ({
+    ...(payload || {}),
+    goals: withoutGoal(payload?.goals)
+  }));
+
+  const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
+  const scope = getMissionHistoryScope();
+  const scopePath = `/api/200/extra-goals?profile=${encodeURIComponent(profile)}&scope=${encodeURIComponent(scope.key)}`;
+  const todayPath = `/api/200/extra-goals?profile=${encodeURIComponent(profile)}&scope=today`;
+  window.Project200Offline?.put?.(scopePath, { ...(window.Project200Offline.peek(scopePath) || {}), goals: state.missions });
+  window.Project200Offline?.put?.(todayPath, { ...(window.Project200Offline.peek(todayPath) || {}), goals: state.actionMissions });
+  refreshStatsMissionsFromLocalState();
+}
+
+async function deleteMissionWithServerConfirmation(goalId) {
+  const safeId = String(goalId || "").trim();
+  if (!safeId) throw new Error("Missão inválida.");
+  const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
+  const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(safeId)}?profile=${encodeURIComponent(profile)}`, {
+    method: "DELETE",
+    forceNetwork: true,
+    offlineQueue: false,
+    skipGlobalLoading: true,
+    offlineInvalidates: ["/api/200/extra-goals", "/api/actions"]
+  });
+  const serverStillHasGoal = Array.isArray(payload?.goals)
+    && payload.goals.some((goal) => String(goal?.id || "") === safeId);
+  if (!payload?.ok || serverStillHasGoal) {
+    throw new Error("O Postgres não confirmou a exclusão da missão.");
+  }
+  removeMissionFromLocalState(safeId);
+  return payload;
+}
+
+function renderMissionSurfacesAfterDelete() {
+  renderMissions();
+  renderRunningMissionQuickButtons();
+  if (actionsModal?.classList.contains("active")) renderActions();
+  else renderActionsMissionsPanel();
+}
+
+function reconcileMissionsAfterConfirmedDelete() {
+  void Promise.all([
+    loadMissions({ forceNetwork: true }),
+    loadActionMissions({ forceNetwork: true })
+  ]).then(renderMissionSurfacesAfterDelete).catch(() => {});
 }
 
 function refreshStatsMissionsFromLocalState() {
@@ -15552,8 +15734,8 @@ async function saveTaskComposer() {
       }
       if (decision.type === "replace") {
         replaceOverlaps = true;
-        for (const item of overlaps) {
-          await apiRequest(`/api/actions/${encodeURIComponent(item.id)}`, { method: "DELETE" });
+        for (const item of getUniqueActionDeletionTargets(overlaps)) {
+          await deleteActionWithServerConfirmation(item.id, { refresh: false, render: false, skipGlobalLoading: true });
         }
       }
       state.wizard.replaceOverlaps = replaceOverlaps;
@@ -16870,13 +17052,12 @@ function getMissionVariantsDailyProgress(variants, nowMs = getServerNowMs()) {
 
 function syncMissionVariantsIntoMissionState(goalId, items) {
   const variants = Array.isArray(items) ? items : [];
-  const syncCollection = (collection) => (Array.isArray(collection) ? collection : []).map((goal) => (
-    String(goal?.id || "") === String(goalId || "")
-      ? { ...goal, variants, variantCount: variants.length, isFolder: goal?.isFolder === true || variants.length > 0 }
-      : goal
-  ));
-  state.missions = syncCollection(state.missions);
-  state.actionMissions = syncCollection(state.actionMissions);
+  const currentGoal = getAvailableMissionById(goalId);
+  applyMissionDefinitionLocally(goalId, {
+    variants,
+    variantCount: variants.length,
+    isFolder: currentGoal?.isFolder === true || variants.length > 0
+  });
   renderActionsMissionsPanel();
 }
 
@@ -17915,6 +18096,41 @@ function createMissionCard(goal, initialPercent = null) {
   return card;
 }
 
+function refreshMissionLimitHealthUi() {
+  if (!missionList || state.missionKindFilter !== "limit") return;
+  const historyRangeActive = isMissionHistoryRangeActive();
+  const showLimitRatio = !historyRangeActive && Math.floor(getServerNowMs() / 2000) % 2 === 1;
+  const cardsByGoalId = new Map([...missionList.querySelectorAll("[data-goal-id]")]
+    .map((card) => [String(card.dataset.goalId || ""), card]));
+  (Array.isArray(state.missions) ? state.missions : []).filter(isLimitGoal).forEach((goal) => {
+    const goalId = String(goal?.id || "");
+    const card = cardsByGoalId.get(goalId);
+    if (!card) return;
+    const visual = getLimitProgressVisual(goal, historyRangeActive);
+    const previousPercent = Number(card.dataset.progressPercent);
+    card.dataset.progressPercent = String(visual.width);
+    const label = card.querySelector(".history-mission-card-progress");
+    if (label) {
+      label.classList.toggle("is-limit-ratio", showLimitRatio);
+      label.style.background = showLimitRatio ? visual.labelBackground : "";
+      label.textContent = historyRangeActive
+        ? formatMissionRangeProgress(goal?.progressValue, getMissionHistoryScope().days)
+        : showLimitRatio
+          ? `${visual.ratio.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% do esperado`
+          : formatLimitLastProgress(goal);
+    }
+    const fill = card.querySelector(".history-mission-progress-fill");
+    if (fill) {
+      fill.style.background = visual.background;
+      if (!Number.isFinite(previousPercent) || Math.abs(previousPercent - visual.width) < 0.1) {
+        fill.style.width = `${visual.width}%`;
+      } else {
+        animateProgressFillWidth(fill, visual.width, previousPercent);
+      }
+    }
+  });
+}
+
 function renderMissions() {
   const allGoals = Array.isArray(state.missions) ? state.missions : [];
   const showingLimits = state.missionKindFilter === "limit";
@@ -17970,8 +18186,10 @@ function registerDailyMissionEvents() {
     }
     const todayKey = `${toLocalDateKey(new Date())}:${assignee}:star`;
     const exists = state.historySystem.some((entry) => entry.scopeDate === todayKey);
-    if (!exists) {
-      void pushSystemHistoryEvent({ type: "star", assignee, scopeDate: todayKey });
+    if (!exists && !pendingDailyMissionEvents.has(todayKey)) {
+      pendingDailyMissionEvents.add(todayKey);
+      void pushSystemHistoryEvent({ type: "star", assignee, scopeDate: todayKey })
+        .finally(() => pendingDailyMissionEvents.delete(todayKey));
     }
   });
 }
@@ -20678,9 +20896,7 @@ missionAdjustDeleteButton?.addEventListener("click", () => {
         missionAdjustStatus.textContent = "Excluindo...";
       }
       try {
-        await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}?profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`, {
-          method: "DELETE"
-        });
+        await deleteMissionWithServerConfirmation(goalId);
         state.missionQuickSlots = missionQuickDefinitions.map((definition) => {
           const slot = getMissionQuickSlotByKey(definition.key) || { key: definition.key, title: definition.defaultTitle, goalId: "" };
           return String(slot.goalId || "") === goalId
@@ -20689,10 +20905,8 @@ missionAdjustDeleteButton?.addEventListener("click", () => {
         });
         persistMissionQuickSlots();
         closeModal("missionAdjustModal");
-        await Promise.all([loadMissions({ forceNetwork: true }), loadActionMissions({ forceNetwork: true })]);
-        renderMissions();
-        renderActionsMissionsPanel();
-        renderRunningMissionQuickButtons();
+        renderMissionSurfacesAfterDelete();
+        reconcileMissionsAfterConfirmedDelete();
       } catch (error) {
         if (missionAdjustStatus) {
           missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao excluir missão.";
@@ -20997,7 +21211,15 @@ missionVariantsList?.addEventListener("click", async (event) => {
       void (async () => {
         try {
           const profile = encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim());
-          const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(state.missionVariants.goalId)}/variants/${encodeURIComponent(id)}?profile=${profile}`, { method: "DELETE" });
+          const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(state.missionVariants.goalId)}/variants/${encodeURIComponent(id)}?profile=${profile}`, {
+            method: "DELETE",
+            forceNetwork: true,
+            offlineQueue: false,
+            skipGlobalLoading: true
+          });
+          if (!payload?.ok || (Array.isArray(payload?.variants) && payload.variants.some((item) => String(item?.id || "") === id))) {
+            throw new Error("O Postgres não confirmou a exclusão da microtarefa.");
+          }
           state.missionVariants.items = Array.isArray(payload?.variants) ? payload.variants : [];
           missionVariantsCache.set(getMissionVariantsCacheKey(state.missionVariants.goalId), { loadedAt: Date.now(), items: state.missionVariants.items });
           syncMissionVariantsIntoMissionState(state.missionVariants.goalId, state.missionVariants.items);
@@ -23847,7 +24069,7 @@ window.project200ProjectsContext = {
     if (!finishLoading) return;
     try {
       status.textContent = "Excluindo pasta...";
-      await apiRequest("/api/200/extra-goals/" + encodeURIComponent(goalId) + "?profile=" + encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim()), { method: "DELETE" });
+      await deleteMissionWithServerConfirmation(goalId);
       state.missionQuickSlots = missionQuickDefinitions.map((definition) => {
         const slot = getMissionQuickSlotByKey(definition.key) || { key: definition.key, title: definition.defaultTitle, goalId: "" };
         return String(slot.goalId || "") === goalId ? { key: definition.key, title: definition.defaultTitle, goalId: "" } : slot;
@@ -23855,7 +24077,8 @@ window.project200ProjectsContext = {
       persistMissionQuickSlots();
       closeModal("missionVariantsModal");
       closeFolderManagerModal();
-      await refreshAfterFolderMutation();
+      renderMissionSurfacesAfterDelete();
+      reconcileMissionsAfterConfirmedDelete();
     } catch (error) {
       status.textContent = error instanceof Error ? error.message : "Falha ao excluir a pasta.";
     } finally {

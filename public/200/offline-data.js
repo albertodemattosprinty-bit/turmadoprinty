@@ -124,6 +124,22 @@
     if (changed) writeJson(cacheStorageKey(), records);
   }
 
+  function updateCached(prefixes, updater) {
+    if (typeof updater !== "function") return;
+    const values = (Array.isArray(prefixes) ? prefixes : [prefixes]).map(normalizePath).filter(Boolean);
+    if (!values.length) return;
+    const records = readJson(cacheStorageKey(), {});
+    let changed = false;
+    Object.entries(records).forEach(([path, record]) => {
+      if (!values.some((prefix) => path.startsWith(prefix))) return;
+      const nextPayload = updater(clone(record?.payload), path);
+      if (nextPayload === undefined) return;
+      records[path] = { ...record, payload: clone(nextPayload) };
+      changed = true;
+    });
+    if (changed) writeJson(cacheStorageKey(), records);
+  }
+
   function ensureFeedback() {
     let feedback = document.getElementById("project200OfflineFeedback");
     if (feedback) return feedback;
@@ -342,6 +358,7 @@
     hasCached,
     invalidate,
     markStale,
+    updateCached,
     isOnline: () => global.navigator?.onLine !== false,
     pendingCount: () => readJson(outboxStorageKey(), []).length,
     activity: async (task) => {

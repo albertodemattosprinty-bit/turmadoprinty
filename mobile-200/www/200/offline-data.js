@@ -44,6 +44,7 @@
   function hasCached(path) { return Boolean(getCacheRecord(path)); }
   function invalidate(prefixes) { const values = (Array.isArray(prefixes) ? prefixes : [prefixes]).map(normalizePath).filter(Boolean); if (!values.length) return; const records = readJson(cacheStorageKey(), {}); let changed = false; Object.keys(records).forEach((path) => { if (values.some((prefix) => path.startsWith(prefix))) { delete records[path]; changed = true; } }); if (changed) writeJson(cacheStorageKey(), records); }
   function markStale(prefixes) { const values = (Array.isArray(prefixes) ? prefixes : [prefixes]).map(normalizePath).filter(Boolean); if (!values.length) return; const records = readJson(cacheStorageKey(), {}); let changed = false; Object.keys(records).forEach((path) => { if (!values.some((prefix) => path.startsWith(prefix))) return; records[path] = { ...records[path], savedAt: 0 }; changed = true; }); if (changed) writeJson(cacheStorageKey(), records); }
+  function updateCached(prefixes, updater) { if (typeof updater !== "function") return; const values = (Array.isArray(prefixes) ? prefixes : [prefixes]).map(normalizePath).filter(Boolean); if (!values.length) return; const records = readJson(cacheStorageKey(), {}); let changed = false; Object.entries(records).forEach(([path, record]) => { if (!values.some((prefix) => path.startsWith(prefix))) return; const nextPayload = updater(clone(record?.payload), path); if (nextPayload === undefined) return; records[path] = { ...record, payload: clone(nextPayload) }; changed = true; }); if (changed) writeJson(cacheStorageKey(), records); }
 
   function ensureFeedback() {
     let feedback = document.getElementById("project200OfflineFeedback");
@@ -69,5 +70,5 @@
   global.addEventListener("online", () => void sync());
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && global.navigator?.onLine !== false) void sync(); });
   global.setTimeout(() => { ensureFeedback(); if (global.navigator?.onLine !== false) void sync(); }, 0);
-  global.Project200Offline = { request, sync, peek, put, hasCached, invalidate, markStale, isOnline: () => global.navigator?.onLine !== false, pendingCount: () => readJson(outboxStorageKey(), []).length, activity: async (task) => { beginActivity(); try { return await task(); } finally { endActivity(); } } };
+  global.Project200Offline = { request, sync, peek, put, hasCached, invalidate, markStale, updateCached, isOnline: () => global.navigator?.onLine !== false, pendingCount: () => readJson(outboxStorageKey(), []).length, activity: async (task) => { beginActivity(); try { return await task(); } finally { endActivity(); } } };
 })(window);

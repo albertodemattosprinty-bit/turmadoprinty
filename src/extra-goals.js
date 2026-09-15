@@ -7,6 +7,7 @@ const EXTRA_GOAL_MAX_DURATION_SECONDS = 180 * 60;
 const EXTRA_GOAL_MAX_CYCLES = 12;
 const DEFAULT_ACTIVE_TIME_START_MINUTES = 8 * 60;
 const DEFAULT_ACTIVE_TIME_END_MINUTES = 24 * 60;
+let extraGoalsSchemaPromise = null;
 const EXTRA_GOAL_CATEGORY_IDS = new Set([
   "alimentacao", "hidratacao", "aprendizado", "trabalho", "casa", "exercicios",
   "social", "planejamento", "higiene", "lazer", "aspecto"
@@ -537,7 +538,9 @@ export function summarizeExtraGoals(goals = []) {
 }
 
 export async function ensureExtraGoalsSchema() {
-  await query(`
+  if (!extraGoalsSchemaPromise) {
+    extraGoalsSchemaPromise = (async () => {
+      await query(`
     create table if not exists extra_goal_profiles (
       user_id uuid not null references users(id) on delete cascade,
       assigned_profile text not null default 'Usuario',
@@ -739,7 +742,7 @@ export async function ensureExtraGoalsSchema() {
       constraint project200_active_time_not_equal check (active_start_minutes <> active_end_minutes)
     );
   `);
-  await query(`
+      await query(`
     create table if not exists project200_mission_installment_orders (
       user_id uuid not null references users(id) on delete cascade,
       assigned_profile text not null default 'Usuario',
@@ -747,7 +750,13 @@ export async function ensureExtraGoalsSchema() {
       updated_at timestamptz not null default now(),
       primary key (user_id, assigned_profile)
     );
-  `);
+      `);
+    })().catch((error) => {
+      extraGoalsSchemaPromise = null;
+      throw error;
+    });
+  }
+  return extraGoalsSchemaPromise;
 }
 
 export async function getProject200ActiveTime(userId) {
@@ -951,8 +960,9 @@ export async function updateExtraGoalVariant(userId, profileName, goalId, varian
 export async function deleteExtraGoalVariant(userId, profileName, goalId, variantId) {
   await ensureExtraGoalsSchema();
   const normalizedProfile = normalizeExtraGoalProfile(profileName);
-  await query(`delete from extra_goal_variants where id = $4 and goal_id = $3 and user_id = $1 and assigned_profile = $2`,
+  const deleted = await query(`delete from extra_goal_variants where id = $4 and goal_id = $3 and user_id = $1 and assigned_profile = $2 returning id`,
     [userId, normalizedProfile, goalId, variantId]);
+  if (!deleted.rows[0]) throw new Error("Micro-tarefa nao encontrada.");
   return listExtraGoalVariants(userId, normalizedProfile, goalId);
 }
 
@@ -1648,14 +1658,18 @@ export async function deleteExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   if (!safeGoalId) {
     throw new Error("Missao invalida.");
   }
-  await query(
+  const deleted = await query(
     `
       delete from extra_goals
       where id = $1
         and user_id = $2
         and assigned_profile = $3
+      returning id
     `,
     [safeGoalId, userId, normalizedProfile]
   );
+  if (!deleted.rows[0]) {
+    throw new Error("Missao nao encontrada.");
+  }
   return listExtraGoals(userId, normalizedProfile);
 }

@@ -3,10 +3,16 @@ import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME }
 import { ensureExtraGoalsSchema } from "./extra-goals.js";
 import { normalizeProject200MuscleSelections } from "../public/200/exercise-muscles.js";
 import {
-  calculateProject200ExerciseMuscleGains,
+  calculateProject200TimedMuscleGains,
   project200DecayedMusclePoints,
   PROJECT200_MUSCLE_POINTS_PER_PERCENT
 } from "../public/200/exercise-muscle-progress.js";
+import {
+  calculateProject200ExerciseMetricGains,
+  defaultProject200ExerciseMuscleLoads,
+  normalizeProject200ExerciseMetrics,
+  project200ExerciseDurationMinutes
+} from "../public/200/exercise-performance.js";
 
 const PROJECT200_TIME_ZONE = process.env.PROJECT200_TIME_ZONE || "America/Sao_Paulo";
 const TRACKING_TYPES = new Set(["steps", "minutes", "series", "gps"]);
@@ -97,6 +103,9 @@ function normalizeWorkoutRow(row) {
     targetReps: Math.max(0, Math.trunc(Number(row.target_reps || 0) || 0)),
     targetMinutes: Math.max(0, Number(row.target_minutes || 0)),
     targetDistanceMeters: Math.max(0, Math.trunc(Number(row.target_distance_meters || 0))),
+    energyPoints: Math.max(0, Number(row.energy_points || 0)),
+    strengthPoints: Math.max(0, Number(row.strength_points || 0)),
+    resistancePoints: Math.max(0, Number(row.resistance_points || 0)),
     totalReps: Math.max(0, Math.trunc(Number(row.total_reps || 0) || 0)), seriesCount: Math.max(0, Math.trunc(Number(row.series_count || 0) || 0)),
     series: (Array.isArray(row.series_items) ? row.series_items : []).map((item) => ({
       seriesNumber: Math.max(1, Math.trunc(Number(item?.seriesNumber || item?.series_number || 1))),
@@ -154,6 +163,7 @@ export function normalizeProject200ExerciseDefinition(payload = {}) {
   const trackingValue = String(payload.trackingType ?? payload.tracking_type ?? "series").trim().toLowerCase();
   const muscles = normalizeProject200MuscleSelections(payload.muscles, { quantize: quantizeProject200MuscleLoad });
   const alternativeNames = normalizeExerciseAlternativeNames(payload.alternativeNames ?? payload.alternative_names, exerciseName);
+  const metrics = normalizeProject200ExerciseMetrics(payload, { exerciseId, category: categoryValue, difficulty: payload.difficulty });
   return {
     exerciseId,
     exerciseName,
@@ -166,6 +176,7 @@ export function normalizeProject200ExerciseDefinition(payload = {}) {
     equipment: String(payload.equipment || "").trim().slice(0, 160),
     cue: String(payload.cue || "").trim().slice(0, 500),
     muscles,
+    ...metrics,
     source: String(payload.source || "luna").trim().slice(0, 40) || "luna",
     updatedAt: payload.updated_at || payload.updatedAt ? new Date(payload.updated_at || payload.updatedAt).toISOString() : null
   };
@@ -182,6 +193,36 @@ async function migrateProject200ExerciseMuscles() {
     }
   })().catch((error) => { exerciseMuscleMigrationPromise = null; throw error; });
   return exerciseMuscleMigrationPromise;
+}
+let exercisePerformanceMigrationPromise = null;
+async function migrateProject200ExercisePerformanceMetrics() {
+  if (!exercisePerformanceMigrationPromise) exercisePerformanceMigrationPromise = (async () => {
+    const result = await query(`select * from project200_exercise_definitions
+      where energy_per_minute is null or strength_per_minute is null or resistance_per_minute is null`);
+    const rows = result.rows.map((row) => {
+      const definition = normalizeProject200ExerciseDefinition(row);
+      return {
+        exercise_id: definition.exerciseId,
+        energy_per_minute: definition.energyPerMinute,
+        strength_per_minute: definition.strengthPerMinute,
+        resistance_per_minute: definition.resistancePerMinute
+      };
+    });
+    if (!rows.length) return;
+    await query(
+      `update project200_exercise_definitions definition set
+         energy_per_minute = metric_values.energy_per_minute,
+         strength_per_minute = metric_values.strength_per_minute,
+         resistance_per_minute = metric_values.resistance_per_minute,
+         updated_at = now()
+       from jsonb_to_recordset($1::jsonb) as metric_values(
+         exercise_id text, energy_per_minute numeric, strength_per_minute numeric, resistance_per_minute numeric
+       )
+       where definition.exercise_id = metric_values.exercise_id`,
+      [JSON.stringify(rows)]
+    );
+  })().catch((error) => { exercisePerformanceMigrationPromise = null; throw error; });
+  return exercisePerformanceMigrationPromise;
 }
 function normalizeWeightRow(row) {
   if (!row?.id) return null;
@@ -211,6 +252,9 @@ async function prepareProject200WellnessSchema() {
   await query(`alter table project200_exercise_sessions add column if not exists target_minutes numeric(10,2) not null default 0`);
   await query(`alter table project200_exercise_sessions add column if not exists target_distance_meters integer not null default 0`);
   await query(`alter table project200_exercise_sessions add column if not exists distance_meters integer not null default 0`);
+  await query(`alter table project200_exercise_sessions add column if not exists energy_points numeric(14,2) not null default 0`);
+  await query(`alter table project200_exercise_sessions add column if not exists strength_points numeric(14,2) not null default 0`);
+  await query(`alter table project200_exercise_sessions add column if not exists resistance_points numeric(14,2) not null default 0`);
   await query(`create index if not exists idx_project200_exercise_user_profile_date on project200_exercise_sessions(user_id, assigned_profile, started_at desc)`);
   await query(`create unique index if not exists idx_project200_exercise_active on project200_exercise_sessions(user_id, assigned_profile) where status = 'active'`);
   await query(`create table if not exists project200_exercise_series (
@@ -254,6 +298,9 @@ async function prepareProject200WellnessSchema() {
   await query(`alter table project200_exercise_definitions add column if not exists alternative_names jsonb not null default '[]'::jsonb`);
   await query(`alter table project200_exercise_definitions add column if not exists difficulty integer not null default 0`);
   await query(`alter table project200_exercise_definitions add column if not exists popularity integer not null default 0`);
+  await query(`alter table project200_exercise_definitions add column if not exists energy_per_minute numeric(4,2)`);
+  await query(`alter table project200_exercise_definitions add column if not exists strength_per_minute numeric(4,2)`);
+  await query(`alter table project200_exercise_definitions add column if not exists resistance_per_minute numeric(4,2)`);
   await query(`create table if not exists project200_exercise_muscle_state (
     user_id uuid not null references users(id) on delete cascade,
     assigned_profile text not null default 'Usuario', muscle_id text not null,
@@ -282,6 +329,7 @@ async function prepareProject200WellnessSchema() {
   )`);
   await query(`create index if not exists idx_project200_weight_user_profile_date on project200_weight_entries(user_id, assigned_profile, measured_at desc)`);
   await migrateProject200ExerciseMuscles();
+  await migrateProject200ExercisePerformanceMetrics();
 }
 
 let project200WellnessSchemaPromise = null;
@@ -552,15 +600,19 @@ export async function saveProject200ExerciseDefinitions(userId, definitions = []
     if (!definition.exerciseId || !definition.exerciseName || !definition.muscles.length) continue;
     const result = await query(
       `insert into project200_exercise_definitions (
-         exercise_id, exercise_name, alternative_names, category, tracking_type, difficulty, popularity, equipment, cue, muscles, source, generated_by
-       ) values ($1,$2,$3::jsonb,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12)
+         exercise_id, exercise_name, alternative_names, category, tracking_type, difficulty, popularity, equipment, cue, muscles,
+         energy_per_minute, strength_per_minute, resistance_per_minute, source, generated_by
+       ) values ($1,$2,$3::jsonb,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15)
        on conflict (exercise_id) do update set exercise_name=excluded.exercise_name, category=excluded.category,
          alternative_names=excluded.alternative_names, tracking_type=excluded.tracking_type,
          difficulty=excluded.difficulty, popularity=excluded.popularity, equipment=excluded.equipment, cue=excluded.cue,
-         muscles=excluded.muscles, source=excluded.source, generated_by=excluded.generated_by, updated_at=now()
+         muscles=excluded.muscles, energy_per_minute=excluded.energy_per_minute,
+         strength_per_minute=excluded.strength_per_minute, resistance_per_minute=excluded.resistance_per_minute,
+         source=excluded.source, generated_by=excluded.generated_by, updated_at=now()
        returning *`,
       [definition.exerciseId, definition.exerciseName, JSON.stringify(definition.alternativeNames), definition.category, definition.trackingType,
-        definition.difficulty, definition.popularity, definition.equipment, definition.cue, JSON.stringify(definition.muscles), definition.source, userId]
+        definition.difficulty, definition.popularity, definition.equipment, definition.cue, JSON.stringify(definition.muscles),
+        definition.energyPerMinute, definition.strengthPerMinute, definition.resistancePerMinute, definition.source, userId]
     );
     saved.push(normalizeProject200ExerciseDefinition(result.rows[0]));
   }
@@ -878,14 +930,39 @@ export async function addProject200ExerciseSeries(userId, sessionId, repetitions
   return { seriesNumber, repetitions: reps, targetRepetitions: target, workout: normalizeWorkoutRow(await getActiveWorkoutRow(userId, session.assigned_profile)) };
 }
 
-async function creditProject200ExerciseMuscles(userId, workoutRow) {
-  if (!workoutRow?.id || workoutRow.tracking_type !== "series") return [];
+async function creditProject200ExercisePerformance(userId, workoutRow) {
+  if (!workoutRow?.id) return workoutRow;
   const [seriesResult, definitionResult] = await Promise.all([
     query(`select repetitions from project200_exercise_series where session_id = $1 order by series_number`, [workoutRow.id]),
     query(`select * from project200_exercise_definitions where exercise_id = $1 limit 1`, [workoutRow.exercise_id])
   ]);
-  const definition = definitionResult.rows[0] ? normalizeProject200ExerciseDefinition(definitionResult.rows[0]) : null;
-  const gains = calculateProject200ExerciseMuscleGains(seriesResult.rows, definition?.muscles);
+  const definition = definitionResult.rows[0]
+    ? normalizeProject200ExerciseDefinition(definitionResult.rows[0])
+    : normalizeProject200ExerciseDefinition({
+      exerciseId: workoutRow.exercise_id,
+      exerciseName: workoutRow.exercise_name,
+      category: workoutRow.category,
+      trackingType: workoutRow.tracking_type,
+      difficulty: 3,
+      muscles: defaultProject200ExerciseMuscleLoads({ exerciseId: workoutRow.exercise_id })
+    });
+  const workout = {
+    ...workoutRow,
+    trackingType: workoutRow.tracking_type,
+    durationMinutes: workoutRow.duration_minutes,
+    totalReps: workoutRow.total_reps,
+    series: seriesResult.rows
+  };
+  const durationMinutes = project200ExerciseDurationMinutes(workout);
+  const metrics = calculateProject200ExerciseMetricGains({ ...workout, durationMinutes }, definition);
+  const updatedResult = await query(
+    `update project200_exercise_sessions set duration_minutes = greatest(duration_minutes, $3),
+       energy_points = $4, strength_points = $5, resistance_points = $6, updated_at = now()
+     where id = $1 and user_id = $2 returning *`,
+    [workoutRow.id, userId, durationMinutes, metrics.energy, metrics.strength, metrics.resistance]
+  );
+  const fixedMuscleLoads = defaultProject200ExerciseMuscleLoads({ exerciseId: workoutRow.exercise_id });
+  const gains = calculateProject200TimedMuscleGains(durationMinutes, fixedMuscleLoads.length ? fixedMuscleLoads : definition.muscles);
   const profile = normalizeProfileName(workoutRow.assigned_profile);
   for (const gain of gains) {
     await query(
@@ -907,13 +984,13 @@ async function creditProject200ExerciseMuscles(userId, workoutRow) {
       [workoutRow.id, userId, profile, gain.muscleId, gain.points, PROJECT200_MUSCLE_POINTS_PER_PERCENT]
     );
   }
-  return gains;
+  return updatedResult.rows[0] || workoutRow;
 }
 
 export async function finishProject200ExerciseSession(userId, sessionId, payload = {}) {
   await ensureProject200WellnessSchema();
   const currentResult = await query(
-    `select status from project200_exercise_sessions where id = $1 and user_id = $2 limit 1`,
+    `select status, energy_points, strength_points, resistance_points from project200_exercise_sessions where id = $1 and user_id = $2 limit 1`,
     [sessionId, userId]
   );
   const currentStatus = String(currentResult.rows[0]?.status || "");
@@ -939,7 +1016,8 @@ export async function finishProject200ExerciseSession(userId, sessionId, payload
     workoutRow = completedResult.rows[0];
   }
   if (!workoutRow) throw new Error("Treino ativo nao encontrado.");
-  await creditProject200ExerciseMuscles(userId, workoutRow);
+  const alreadyCredited = currentStatus === "completed" && [currentResult.rows[0]?.energy_points, currentResult.rows[0]?.strength_points, currentResult.rows[0]?.resistance_points].some((value) => Number(value) > 0);
+  if (!alreadyCredited) workoutRow = await creditProject200ExercisePerformance(userId, workoutRow);
   const countResult = await query(`select count(*)::integer as series_count from project200_exercise_series where session_id = $1`, [sessionId]);
   return normalizeWorkoutRow({ ...workoutRow, series_count: countResult.rows[0]?.series_count || 0 });
 }

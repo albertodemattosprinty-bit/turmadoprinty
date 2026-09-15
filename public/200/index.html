@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="/200/quality.css?v=20260906-1" />
   <link rel="stylesheet" href="/200/books.css?v=20260909-home-icons-v1" />
   <link rel="stylesheet" href="/200/wellness.css?v=20260911-exercise-background-v1" />
-  <link rel="stylesheet" href="/200/wellness-pack.css?v=20260914-prime-pack-v1" />
+  <link rel="stylesheet" href="/200/wellness-pack.css?v=20260915-performance-pack-v1" />
   <link rel="stylesheet" href="/200/performance.css?v=20260906-scroll-v1" />
 </head>
 <body data-background-theme="edge">
@@ -2210,6 +2210,7 @@
           <h2 id="wellnessExerciseInfoName">Agachamento</h2>
           <section class="wellness-exercise-info-aliases" id="wellnessExerciseInfoAliases" hidden><span>Também conhecido como</span><strong></strong></section>
           <section class="wellness-exercise-info-equipment"><span>Equipamento</span><strong id="wellnessExerciseInfoEquipment">Sem equipamento</strong></section>
+          <section class="wellness-exercise-performance-rates" id="wellnessExerciseInfoPerformance" aria-label="Ganhos estimados por minuto"></section>
           <section class="wellness-exercise-muscle-loads" id="wellnessExerciseInfoMuscles" aria-label="Carga muscular relativa"></section>
           <ol class="wellness-instruction-list" id="wellnessExerciseInstructions"></ol>
         </article>
@@ -2220,7 +2221,7 @@
           <button class="wellness-phase-close" type="button" id="wellnessExerciseAdminClose" aria-label="Fechar painel da Luna"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
           <span class="wellness-phase-kicker">ADMIN · LUNA</span>
           <h2>Inteligência muscular</h2>
-          <p>A Luna define nomes usados no Brasil, dificuldade, popularidade e até três músculos com carga relativa de 0,25 a 1,00.</p>
+          <p>A Luna define nomes usados no Brasil, dificuldade, popularidade, músculos e as taxas por minuto de Energia, Força e Resistência.</p>
           <section class="wellness-exercise-admin-progress">
             <div><strong id="wellnessExerciseAdminProgress">0%</strong><span id="wellnessExerciseAdminProgressCount">0 de 0 exercícios definidos</span></div>
             <div class="wellness-exercise-admin-track" aria-hidden="true"><i id="wellnessExerciseAdminProgressFill"></i></div>
@@ -2318,6 +2319,14 @@
           <div class="wellness-workout-complete-portrait" id="wellnessWorkoutCompletePortrait" data-fixed-exercise-video-shell><img id="wellnessWorkoutCompleteImage" src="/200/apps/exercicios.png" alt="" /><video id="wellnessWorkoutCompleteVideo" muted loop playsinline preload="metadata" hidden></video><i aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.6-8"/></svg></i></div>
           <h2 id="wellnessWorkoutCompleteName">Exercício</h2>
           <div class="wellness-workout-complete-progress"><span aria-hidden="true"><i id="wellnessWorkoutCompleteProgressFill"></i></span><strong id="wellnessWorkoutCompleteProgressText">Progresso do Exercício 0%</strong></div>
+          <section class="wellness-workout-metric-stage" id="wellnessWorkoutMetricStage" hidden aria-live="polite">
+            <strong id="wellnessWorkoutMetricTitle">+ ENERGIA</strong>
+            <div class="wellness-workout-metric-ring" id="wellnessWorkoutMetricRing">
+              <svg id="wellnessWorkoutMetricIcon" viewBox="0 0 120 120" role="img" aria-label="Energia"><path d="M68 7 29 66h28l-6 47 40-64H63L68 7Z"/></svg>
+              <b id="wellnessWorkoutMetricValue">0</b>
+            </div>
+            <small id="wellnessWorkoutMetricRate">0 por minuto</small>
+          </section>
           <div class="wellness-workout-complete-map" id="wellnessWorkoutCompleteMap" aria-live="polite"></div>
           <div class="wellness-muscle-map-dots wellness-workout-complete-dots" id="wellnessWorkoutCompleteDots" aria-hidden="true"></div>
         </article>
@@ -2352,10 +2361,10 @@
   </button>
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
-  <script src="/200/offline-data.js?v=1.10-offline-refresh-v1"></script>
-  <script type="module" src="/200/project.js?v=20260915-optional-update-v1"></script>
+  <script src="/200/offline-data.js?v=20260915-delete-sync-v1"></script>
+  <script type="module" src="/200/project.js?v=20260915-missions-actions-fluency-v1"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
-  <script type="module" src="/200/wellness.js?v=20260914-prime-pack-v1"></script>
+  <script type="module" src="/200/wellness.js?v=20260915-performance-pack-v1"></script>
   <script src="/200/books.js?v=20260904-biblia-plano-v7"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260908-readonly-v1"></script>
