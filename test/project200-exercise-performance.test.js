@@ -79,3 +79,32 @@ test("GPS presentation advances one visual meter at a time", async () => {
   assert.match(source, /state\.gpsDisplayDistanceMeters\+=1;renderGpsDistanceReadout\(\)/);
   assert.match(source, /minimumUpdateInterval:1000,interval:1000/);
 });
+
+test("GPS workout keeps distance in the circle and exposes temporary speed readouts", async () => {
+  const [source, markup] = await Promise.all([
+    readFile(new URL("../public/200/wellness.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/200/index.html", import.meta.url), "utf8")
+  ]);
+  assert.match(markup, /id="wellnessWorkoutCurrentSpeed"/);
+  assert.match(markup, /id="wellnessWorkoutAverageSpeed"/);
+  assert.match(markup, /id="wellnessWorkoutGpsValue"/);
+  assert.match(source, /state\.gpsReadoutTimer=window\.setTimeout\([\s\S]*?,2000\)/);
+  assert.match(source, /if\(elements\.phaseUnit\)elements\.phaseUnit\.textContent=""/);
+});
+
+test("GPS-capable exercises let the user choose time or GPS distance", async () => {
+  const [source, markup] = await Promise.all([
+    readFile(new URL("../public/200/wellness.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/200/index.html", import.meta.url), "utf8")
+  ]);
+  assert.match(markup, /data-goal-tracking="minutes"/);
+  assert.match(markup, /data-goal-tracking="gps"/);
+  assert.match(source, /\["minutes","gps"\]\.includes\(state\.goalTrackingType\)/);
+  assert.match(source, /trackingType:goals\.trackingType\|\|exercise\.tracking/);
+});
+
+test("completion metric charts use an outlined ring instead of a filled pie", async () => {
+  const styles = await readFile(new URL("../public/200/wellness-pack.css", import.meta.url), "utf8");
+  assert.match(styles, /\.wellness-workout-metric-ring\{box-sizing:border-box;border:[^}]+background:transparent\}/);
+  assert.match(styles, /\.wellness-workout-metric-ring::after\{[^}]+mask-composite:exclude/);
+});
