@@ -13,9 +13,12 @@ import {
 } from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
-const project200AppVersion = "1.31";
+const project200AppVersion = "1.45";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
+const project200UpdateBypassPassword = "1444";
+const project200UpdateBypassSessionKey = "project_200_update_bypass_v1";
+let project200UpdateBypassVersion = "";
 
 function isProject200NativeApp() {
   try {
@@ -60,6 +63,27 @@ function isProject200AppOutdated(config) {
   return compareProject200Versions(project200AppVersion, config?.minimumVersion) < 0;
 }
 
+function hasProject200UpdateBypass(config) {
+  const minimumVersion = String(config?.minimumVersion || "").trim();
+  if (!minimumVersion) return false;
+  if (project200UpdateBypassVersion === minimumVersion) return true;
+  try {
+    return window.sessionStorage.getItem(project200UpdateBypassSessionKey) === minimumVersion;
+  } catch {
+    return false;
+  }
+}
+
+function grantProject200UpdateBypass(config) {
+  const minimumVersion = String(config?.minimumVersion || "").trim();
+  project200UpdateBypassVersion = minimumVersion;
+  try {
+    window.sessionStorage.setItem(project200UpdateBypassSessionKey, minimumVersion);
+  } catch {
+    // O desbloqueio em memoria ainda vale durante esta execucao do aplicativo.
+  }
+}
+
 function buildProject200AppDownloadUrl(config) {
   const downloadUrl = new URL(config?.downloadUrl || project200LatestDebugApkUrl);
   downloadUrl.searchParams.set("download", "1");
@@ -85,6 +109,15 @@ function ensureProject200UpdateModal() {
     '<p id="project200RequiredUpdateMessage">Baixe a versao mais recente do aplicativo para continuar.</p>',
     '<p class="project200-required-update-version" id="project200RequiredUpdateVersion"></p>',
     '<button class="primary-btn" type="button" id="project200RequiredUpdateDownloadButton">Baixar APK atualizado</button>',
+    '<button class="project200-required-update-continue" type="button" id="project200RequiredUpdateContinueButton">Continuar sem autalizar</button>',
+    '<form class="project200-required-update-password" id="project200RequiredUpdatePasswordForm" hidden novalidate>',
+    '<label for="project200RequiredUpdatePassword">Digite a senha de acesso</label>',
+    '<div class="project200-required-update-password-row">',
+    '<input id="project200RequiredUpdatePassword" type="password" inputmode="numeric" autocomplete="off" maxlength="4" aria-describedby="project200RequiredUpdatePasswordFeedback" />',
+    '<button type="submit">Desbloquear</button>',
+    '</div>',
+    '<p id="project200RequiredUpdatePasswordFeedback" class="project200-required-update-password-feedback" role="alert" aria-live="polite"></p>',
+    '</form>',
     '</div>'
   ].join("");
   document.body.appendChild(modal);
@@ -98,7 +131,15 @@ function ensureProject200UpdateModal() {
     '.project200-required-update-content h2{margin:0;font-size:clamp(1.7rem,7vw,3rem);line-height:1;letter-spacing:0}',
     '.project200-required-update-content p{margin:14px 0 0;color:#495866;line-height:1.5}',
     '.project200-required-update-version{font-size:.92rem;font-weight:800;color:#0b7285!important}',
-    '#project200RequiredUpdateDownloadButton{width:100%;min-height:52px;margin-top:18px;border-radius:8px}'
+    '#project200RequiredUpdateDownloadButton{width:100%;min-height:52px;margin-top:18px;border-radius:8px}',
+    '.project200-required-update-continue{width:100%;min-height:48px;margin-top:10px;border:1px solid #adb5bd;border-radius:8px;background:#fff;color:#34404b;font:inherit;font-weight:800;cursor:pointer}',
+    '.project200-required-update-password{margin-top:14px;padding-top:14px;border-top:1px solid #e9ecef;text-align:left}',
+    '.project200-required-update-password label{display:block;margin-bottom:7px;color:#34404b;font-size:.9rem;font-weight:800}',
+    '.project200-required-update-password-row{display:grid;grid-template-columns:1fr auto;gap:8px}',
+    '.project200-required-update-password input{min-width:0;height:48px;border:1px solid #adb5bd;border-radius:8px;padding:0 13px;font:inherit;font-size:1.15rem;letter-spacing:.22em}',
+    '.project200-required-update-password button{min-height:48px;border:0;border-radius:8px;padding:0 16px;background:#17212b;color:#fff;font:inherit;font-weight:800;cursor:pointer}',
+    '.project200-required-update-password-feedback{min-height:1.35em;margin:8px 0 0!important;color:#c92a2a!important;font-size:.86rem;font-weight:700}',
+    '@media(max-width:390px){.project200-required-update-password-row{grid-template-columns:1fr}.project200-required-update-password button{width:100%}}'
   ].join('');
   document.head.appendChild(style);
   return modal;
@@ -110,12 +151,42 @@ function openProject200RequiredUpdateModal(config) {
   const message = document.getElementById("project200RequiredUpdateMessage");
   const version = document.getElementById("project200RequiredUpdateVersion");
   const button = document.getElementById("project200RequiredUpdateDownloadButton");
+  const continueButton = document.getElementById("project200RequiredUpdateContinueButton");
+  const passwordForm = document.getElementById("project200RequiredUpdatePasswordForm");
+  const passwordInput = document.getElementById("project200RequiredUpdatePassword");
+  const passwordFeedback = document.getElementById("project200RequiredUpdatePasswordFeedback");
   if (title) title.textContent = config.title;
   if (message) message.textContent = config.message;
   if (version) version.textContent = "Versao instalada " + project200AppVersion + " - minima " + config.minimumVersion;
   if (button) {
     button.textContent = config.buttonLabel;
     button.onclick = () => triggerProject200ApkDownload(config);
+  }
+  if (passwordForm) passwordForm.hidden = true;
+  if (passwordInput) passwordInput.value = "";
+  if (passwordFeedback) passwordFeedback.textContent = "";
+  if (continueButton) {
+    continueButton.hidden = false;
+    continueButton.onclick = () => {
+      continueButton.hidden = true;
+      if (passwordForm) passwordForm.hidden = false;
+      window.requestAnimationFrame(() => passwordInput?.focus());
+    };
+  }
+  if (passwordForm) {
+    passwordForm.onsubmit = (event) => {
+      event.preventDefault();
+      if (passwordInput?.value !== project200UpdateBypassPassword) {
+        if (passwordFeedback) passwordFeedback.textContent = "Senha incorreta. Tente novamente.";
+        passwordInput?.select();
+        return;
+      }
+      grantProject200UpdateBypass(config);
+      modal.classList.remove("active");
+      modal.setAttribute("aria-hidden", "true");
+      if (!document.querySelector(".workspace-modal.active")) document.body.classList.remove("modal-open");
+      void continueProject200Startup();
+    };
   }
   modal.classList.add("active");
   modal.setAttribute("aria-hidden", "false");
@@ -140,6 +211,7 @@ async function checkProject200AppUpdate({ userInitiated = false } = {}) {
   if (!isProject200NativeApp()) return false;
   const config = await loadProject200AppUpdateConfig();
   if (isProject200AppOutdated(config)) {
+    if (hasProject200UpdateBypass(config)) return false;
     openProject200RequiredUpdateModal(config);
     return true;
   }
@@ -22158,16 +22230,24 @@ historyTextForm?.addEventListener("submit", (event) => {
 state.profileLock = "";
 beginStartupLoading(loadingIconByArea.actions);
 applySelectedProfile(readSelectedProfile());
+let project200StartupPromise = null;
+function continueProject200Startup() {
+  if (project200StartupPromise) return project200StartupPromise;
+  project200StartupPromise = (async () => {
+    scheduleProject200AppUpdateChecks();
+    await loadOptionsConfig();
+    project200TutorsUi?.refreshNotificationPreferences();
+    await bootstrapProject200App();
+  })();
+  return project200StartupPromise;
+}
 void (async () => {
   try {
     if (await enforceProject200MinimumAppVersion()) return;
   } catch (error) {
     console.warn("Nao foi possivel verificar a versao minima do aplicativo.", error);
   }
-  scheduleProject200AppUpdateChecks();
-  await loadOptionsConfig();
-  project200TutorsUi?.refreshNotificationPreferences();
-  await bootstrapProject200App();
+  await continueProject200Startup();
 })();
 
 (function installProject200OfflineRefreshBridge() {
