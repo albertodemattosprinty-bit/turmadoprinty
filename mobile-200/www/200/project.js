@@ -1,4 +1,5 @@
 import { getApiUrl } from "../api.js";
+import { buildGradualFinancialGoalSchedule } from "./finance-goal-schedule.js?v=20260917-finance-missions-v1";
 import { initializeProject200MarinUi } from "./marin.js?v=20260908-native-aspects-v1";
 import { initializeProject200TutorsUi } from "./tutors-ui.js?v=0.83-chat-history-v1";
 import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260908-native-aspects-v1";
@@ -2537,6 +2538,7 @@ function getActiveTimeWindow(nowMs = getServerNowMs()) {
 }
 
 function getMissionExpectation(goal, nowMs = getServerNowMs()) {
+  if (goal?.scheduleConfig?.nativeType === "financial_goal") return { tone: "blue", delayMinutes: 0 };
   const target = Math.max(1, Math.trunc(Number(goal?.targetValue || 1)));
   const completed = Math.max(0, Math.trunc(Number(goal?.progressValue || 0)));
   const windowState = getActiveTimeWindow(nowMs);
@@ -2614,7 +2616,7 @@ function getOrderedMissionUnits() {
 
 function buildMissionScheduleUnits(nowMs = getServerNowMs()) {
   const windowState = getActiveTimeWindow(nowMs);
-  const goals = (Array.isArray(state.actionMissions) ? state.actionMissions : []).filter((goal) => !isLimitGoal(goal) && !isMissionFolder(goal) && isMissionScheduledForToday(goal));
+  const goals = (Array.isArray(state.actionMissions) ? state.actionMissions : []).filter((goal) => goal?.scheduleConfig?.nativeType !== "financial_goal" && !isLimitGoal(goal) && !isMissionFolder(goal) && isMissionScheduledForToday(goal));
   const goalsById = new Map(goals.map((goal) => [String(goal?.id || ""), goal]));
   const sharedUnits = getOrderedMissionUnits();
   const sharedIntervalMs = (windowState.endMs - windowState.startMs) / Math.max(1, sharedUnits.length);
@@ -2947,6 +2949,7 @@ function getAvailableMissionById(goalId) {
 }
 
 function getActionsMissionProgress(goal) {
+  if (goal?.financialGoal) return { progress: goal.financialGoal.progressCents, target: goal.financialGoal.targetAmountCents, percent: goal.financialGoal.progressPercent };
   const variants = Array.isArray(goal?.variants) ? goal.variants : [];
   const folder = isMissionFolder(goal);
   if (folder && !variants.length) return { progress: 0, target: 0, percent: 0 };
@@ -3030,7 +3033,7 @@ function renderActionsMissionsPanel() {
       <img class="actions-mission-card-icon" src="${escapeHtml(String(goalIcon?.src || "/200/icons/target.svg"))}" alt="${escapeHtml(String(goalIcon?.alt || "Ícone da missão"))}" />
       <div class="actions-mission-card-copy">
         <h3>${escapeHtml(String(goal?.title || "Missão"))}${folder ? `<span class="actions-mission-folder-summary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5h7l2 2h9v11H3v-13Zm2 4v7h14v-7H5Z" fill="currentColor"/></svg><small>${variantCount}</small></span>` : ""}</h3>
-        <p>${folder && variantCount === 0 ? "Clique para criar uma tarefa" : `${progress.progress} de ${progress.target}`}</p>
+        <p>${goal.financialGoal ? `${escapeHtml(formatMoney(goal.financialGoal.progressCents))} de ${escapeHtml(formatMoney(goal.financialGoal.targetAmountCents))}` : folder && variantCount === 0 ? "Clique para criar uma tarefa" : `${progress.progress} de ${progress.target}`}</p>
       </div>
       ${folder ? `<button class="actions-mission-card-edit" type="button" data-actions-mission-folder-edit="${escapeHtml(goalId)}" aria-label="Editar tarefas de ${escapeHtml(String(goal?.title || "Pasta"))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16.5V20h3.5L18 9.5 14.5 6 4 16.5Zm16.7-9.8a1 1 0 0 0 0-1.4l-2-2a1 1 0 0 0-1.4 0L15.5 5.1 19 8.6l1.7-1.9Z" fill="currentColor"/></svg></button>` : ""}
       <div class="actions-mission-card-track" role="progressbar" aria-label="Progresso de ${escapeHtml(String(goal?.title || "missão"))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}">
@@ -6478,7 +6481,9 @@ async function apiRequest(path, options = {}) {
   const requestMethod = String(options.method || "GET").toUpperCase();
   const requestPath = String(path || "");
   const resolvedOfflineInvalidates = offlineInvalidates || (
-    requestMethod !== "GET" && (requestPath.startsWith("/api/200/extra-goals") || requestPath.startsWith("/api/actions"))
+    requestMethod !== "GET" && requestPath.startsWith("/api/200/finance/")
+      ? ["/api/200/finance/ledger", "/api/200/finance/goals", "/api/200/extra-goals"]
+      : requestMethod !== "GET" && (requestPath.startsWith("/api/200/extra-goals") || requestPath.startsWith("/api/actions"))
       ? ["/api/200/extra-goals", "/api/actions"]
       : undefined
   );
@@ -6833,6 +6838,9 @@ function formatIlifeFinanceGoalDuration() {
 
 function buildIlifeFinanceGoalPreview() {
   const amount = parseIlifeFinanceAmount(ilifeFinanceGoalAmount?.value);
+  if (ilifeFinanceGoalGradual?.checked) {
+    return buildGradualFinancialGoalSchedule({ startOn: getProjectTodayDateKey(), targetOn: getIlifeFinanceGoalTargetDate(), targetAmountCents: amount, initialDepositCents: parseIlifeFinanceAmount(getIlifeFinanceEl("ilifeFinanceGoalInitialDeposit")?.value) });
+  }
   const durationDays = getIlifeFinanceGoalDurationDays();
   const count = state.ilifeFinance.goalDurationUnit === "days" ? durationDays : state.ilifeFinance.goalDurationValue;
   const gradual = Boolean(ilifeFinanceGoalGradual?.checked);
@@ -6855,7 +6863,18 @@ function renderIlifeFinanceGoalWizard() {
   if (ilifeFinanceGoalRequiredDay) ilifeFinanceGoalRequiredDay.textContent = `${formatMoney(Math.ceil(amount / getIlifeFinanceGoalDurationDays()))} por dia`;
   if (ilifeFinanceGoalSchedule) {
     ilifeFinanceGoalSchedule.hidden = !ilifeFinanceGoalGradual?.checked;
-    ilifeFinanceGoalSchedule.innerHTML = ilifeFinanceGoalGradual?.checked ? buildIlifeFinanceGoalPreview().map((value, index) => `<div><span>${state.ilifeFinance.goalDurationUnit === "days" ? `Dia ${index + 1}` : index < 12 ? `Mês ${index + 1}` : `${Math.floor(index / 12)}a ${index % 12 + 1}m`}</span><b>${escapeHtml(formatMoney(value))}</b></div>`).join("") : "";
+    getIlifeFinanceEl("ilifeFinanceGoalInitialDepositWrap").hidden = !ilifeFinanceGoalGradual?.checked;
+    const note = getIlifeFinanceEl("ilifeFinanceGoalScheduleNote");
+    note.hidden = !ilifeFinanceGoalGradual?.checked;
+    ilifeFinanceGoalSchedule.innerHTML = "";
+    if (ilifeFinanceGoalGradual?.checked) {
+      try {
+        const schedule = buildIlifeFinanceGoalPreview();
+        const visible = schedule.length > 31 ? [...schedule.slice(0, 30), schedule.at(-1)] : schedule;
+        ilifeFinanceGoalSchedule.innerHTML = visible.map((item, index) => `${schedule.length > 31 && index === 30 ? '<p>… demais dias do plano …</p>' : ""}<div><span>${item.label} · ${escapeHtml(formatIlifeFinanceDate(item.until))}</span><b>${escapeHtml(formatMoney(item.amountCents))}</b></div>`).join("");
+        note.textContent = schedule[1]?.amountCents < schedule[0].amountCents ? "O depósito de hoje foi preservado. O restante começa menor e cresce até completar a meta." : "Depósitos diários do primeiro dia até a data final, somando o valor exato da meta.";
+      } catch (error) { note.textContent = error.message; }
+    }
   }
 }
 
@@ -6899,6 +6918,7 @@ function openIlifeFinanceGoalModal() {
   if (ilifeFinanceGoalName) ilifeFinanceGoalName.value = "";
   if (ilifeFinanceGoalAmount) ilifeFinanceGoalAmount.value = "";
   if (ilifeFinanceGoalGradual) ilifeFinanceGoalGradual.checked = false;
+  if (getIlifeFinanceEl("ilifeFinanceGoalInitialDeposit")) getIlifeFinanceEl("ilifeFinanceGoalInitialDeposit").value = "";
   if (ilifeFinanceGoalStatus) ilifeFinanceGoalStatus.textContent = "";
   renderIlifeFinanceGoalWizard();
   if (ilifeFinanceGoalModal) { ilifeFinanceGoalModal.hidden = false; ilifeFinanceGoalModal.classList.add("is-open"); ilifeFinanceGoalModal.setAttribute("aria-hidden", "false"); }
@@ -6916,16 +6936,35 @@ function renderIlifeFinanceGoals() {
   if (overview) overview.innerHTML = goals.length ? goals.map((goal) => `<article><div><span>PROJETO FINANCEIRO</span><strong>${escapeHtml(goal.name)}</strong><small>${escapeHtml(formatMoney(goal.progressCents))} de ${escapeHtml(formatMoney(goal.targetAmountCents))}</small></div><b>${goal.progressPercent}%</b><i><em style="width:${goal.progressPercent}%"></em></i></article>`).join("") : '<button type="button" data-create-finance-goal>Crie sua primeira meta financeira</button>';
   const select = getIlifeFinanceEl("ilifeFinanceGoalSelect");
   if (select) {
-    const selected = select.value || state.ilifeFinance.editingEntry?.financialGoalId || "";
+    const selected = state.ilifeFinance.depositGoalId || select.value || state.ilifeFinance.editingEntry?.financialGoalId || "";
     select.innerHTML = '<option value="">Sem meta financeira</option>' + goals.filter((goal) => goal.status === "ACTIVE").map((goal) => `<option value="${escapeHtml(goal.id)}">${escapeHtml(goal.name)}</option>`).join("");
     if ([...select.options].some((option) => option.value === selected)) select.value = selected;
+    select.disabled = Boolean(state.ilifeFinance.depositGoalId);
   }
+  renderIlifeFinanceDepositProgress();
+}
+
+function renderIlifeFinanceDepositProgress() {
+  const panel = getIlifeFinanceEl("ilifeFinanceDepositProgress");
+  if (!panel) return;
+  const goalId = state.ilifeFinance.depositGoalId || getIlifeFinanceEl("ilifeFinanceGoalSelect")?.value;
+  const goal = state.ilifeFinance.goals?.find((item) => item.id === goalId);
+  panel.hidden = !goal || state.ilifeFinance.wizard?.kind !== "INCOME";
+  panel.innerHTML = goal ? `<article><div><span>PROGRESSO DA META</span><strong>${escapeHtml(goal.name)}</strong><small>${escapeHtml(formatMoney(goal.progressCents))} de ${escapeHtml(formatMoney(goal.targetAmountCents))}</small></div><b>${goal.progressPercent}%</b><i role="progressbar" aria-label="Progresso financeiro" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${goal.progressPercent}"><em style="width:${goal.progressPercent}%"></em></i></article>` : "";
+}
+
+async function refreshIlifeFinanceMissions() {
+  await Promise.all([loadMissions({ forceNetwork: true }), loadActionMissions({ forceNetwork: true })]);
+  renderMissions();
+  if (actionsModal?.classList.contains("active")) renderActions();
 }
 
 async function loadIlifeFinanceGoals() {
   if (!getToken()) return;
+  const profile = state.selectedProfile || getDefaultProfileName();
   try {
-    const payload = await apiRequest(`/api/200/finance/goals?profile=${encodeURIComponent(state.selectedProfile || getDefaultProfileName())}`, { skipGlobalLoading: true });
+    const payload = await apiRequest(`/api/200/finance/goals?profile=${encodeURIComponent(profile)}`, { skipGlobalLoading: true, forceNetwork: true });
+    if (profile !== (state.selectedProfile || getDefaultProfileName())) return;
     state.ilifeFinance.goals = Array.isArray(payload?.goals) ? payload.goals : [];
     renderIlifeFinanceGoals();
   } catch (error) { setIlifeFinanceToast(error instanceof Error ? error.message : "Não foi possível carregar as metas."); }
@@ -6935,12 +6974,20 @@ async function saveIlifeFinanceGoal() {
   const name = String(ilifeFinanceGoalName?.value || "").trim();
   const targetAmountCents = parseIlifeFinanceAmount(ilifeFinanceGoalAmount?.value);
   if (name.length < 2 || !targetAmountCents) { if (ilifeFinanceGoalStatus) ilifeFinanceGoalStatus.textContent = "Informe o nome e o valor da meta."; return; }
+  const gradualModel = Boolean(ilifeFinanceGoalGradual?.checked);
+  const initialValue = String(getIlifeFinanceEl("ilifeFinanceGoalInitialDeposit")?.value || "").trim();
+  const initialDepositCents = gradualModel ? parseIlifeFinanceAmount(initialValue) : null;
+  if (gradualModel && (!initialValue || initialValue.includes("-") || initialDepositCents > targetAmountCents)) {
+    if (ilifeFinanceGoalStatus) ilifeFinanceGoalStatus.textContent = "Informe o depósito de hoje entre zero e o valor da meta.";
+    return;
+  }
   if (ilifeFinanceGoalStatus) ilifeFinanceGoalStatus.textContent = "Criando sua meta...";
   if (ilifeFinanceGoalNext) ilifeFinanceGoalNext.disabled = true;
   try {
-    await apiRequest("/api/200/finance/goals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ profile: state.selectedProfile || getDefaultProfileName(), name, targetAmountCents, startOn: getProjectTodayDateKey(), targetOn: getIlifeFinanceGoalTargetDate(), gradualModel: Boolean(ilifeFinanceGoalGradual?.checked) }) });
+    await apiRequest("/api/200/finance/goals", { method: "POST", headers: { "Content-Type": "application/json" }, offlineInvalidates: ["/api/200/finance/goals", "/api/200/extra-goals"], body: JSON.stringify({ profile: state.selectedProfile || getDefaultProfileName(), name, targetAmountCents, startOn: getProjectTodayDateKey(), targetOn: getIlifeFinanceGoalTargetDate(), gradualModel, initialDepositCents }) });
     closeIlifeFinanceGoalModal();
     await loadIlifeFinanceGoals();
+    await refreshIlifeFinanceMissions();
     setIlifeFinanceToast("Meta financeira criada.");
   } catch (error) { if (ilifeFinanceGoalStatus) ilifeFinanceGoalStatus.textContent = error instanceof Error ? error.message : "Não foi possível criar a meta."; }
   finally { if (ilifeFinanceGoalNext) ilifeFinanceGoalNext.disabled = false; }
@@ -7106,7 +7153,9 @@ function moveIlifeFinanceMonth(direction) {
   void loadIlifeFinanceLedger();
 }
 
-function openIlifeFinanceWizard(kind) {
+function openIlifeFinanceWizard(kind, { goalId = null } = {}) {
+  state.ilifeFinance.depositGoalId = goalId;
+  document.getElementById("ilifeFinanceModal")?.classList.toggle("is-goal-deposit", Boolean(goalId));
   state.ilifeFinance.wizard = buildIlifeFinanceWizard(kind);
   const titleInput = getIlifeFinanceEl("ilifeFinanceTitleInput");
   const amountInput = getIlifeFinanceEl("ilifeFinanceAmountInput");
@@ -7126,6 +7175,7 @@ function openIlifeFinanceWizard(kind) {
   if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "";
   renderIlifeFinanceCustomFields();
   renderIlifeFinanceWizard();
+  renderIlifeFinanceGoals();
   if (ilifeFinanceEntryWizard) {
     ilifeFinanceEntryWizard.hidden = false;
     ilifeFinanceEntryWizard.classList.add("is-open");
@@ -7135,12 +7185,29 @@ function openIlifeFinanceWizard(kind) {
 }
 
 function closeIlifeFinanceWizard() {
+  const wasDeposit = Boolean(state.ilifeFinance.depositGoalId);
+  state.ilifeFinance.depositGoalId = null;
+  document.getElementById("ilifeFinanceModal")?.classList.remove("is-goal-deposit");
+  const goalSelect = getIlifeFinanceEl("ilifeFinanceGoalSelect");
+  if (goalSelect) goalSelect.disabled = false;
   if (ilifeFinanceEntryWizard) {
     ilifeFinanceEntryWizard.classList.remove("is-open");
     ilifeFinanceEntryWizard.hidden = true;
     ilifeFinanceEntryWizard.setAttribute("aria-hidden", "true");
   }
   state.ilifeFinance.wizard = null;
+  if (wasDeposit) closeModal("ilifeFinanceModal");
+}
+
+function openIlifeFinanceMissionDeposit(goal) {
+  const financialGoal = goal.financialGoal;
+  if (!financialGoal) return;
+  if (!state.ilifeFinance.goals?.some((item) => item.id === financialGoal.id)) state.ilifeFinance.goals = [...(state.ilifeFinance.goals || []), financialGoal];
+  openModal("ilifeFinanceModal");
+  openIlifeFinanceWizard("INCOME", { goalId: financialGoal.id });
+  getIlifeFinanceEl("ilifeFinanceTitleInput").value = `Depósito: ${financialGoal.name}`.slice(0, 90);
+  getIlifeFinanceEl("ilifeFinanceSettlementSelect").value = "CASH";
+  renderIlifeFinanceWizard();
 }
 
 function getOwnIlifeLaxKey() {
@@ -7218,32 +7285,45 @@ function renderIlifeFinanceWizard() {
   const wizard = state.ilifeFinance.wizard;
   if (!wizard) return;
   const income = wizard.kind === "INCOME";
+  const deposit = Boolean(state.ilifeFinance.depositGoalId);
   if (ilifeFinanceWizardTitle) ilifeFinanceWizardTitle.textContent = state.ilifeFinance.editingEntry ? "Editar movimenta\u00e7\u00e3o" : (income ? "Nova entrada" : "Nova sa\u00edda");
   document.querySelectorAll("[data-ilife-finance-kind-switch]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.ilifeFinanceKindSwitch === wizard.kind);
   });
   const goalWrap = getIlifeFinanceEl("ilifeFinanceGoalSelectWrap");
   if (goalWrap) goalWrap.hidden = !income;
+  const typeSwitch = getIlifeFinanceEl("ilifeFinanceForm")?.querySelector(".finance-nano-type-switch");
+  if (typeSwitch) typeSwitch.hidden = deposit;
+  const advanced = getIlifeFinanceEl("ilifeFinanceForm")?.querySelector(".finance-nano-advanced");
+  if (advanced) advanced.hidden = deposit;
+  if (deposit && ilifeFinanceWizardTitle) ilifeFinanceWizardTitle.textContent = "Adicionar valor à meta";
+  if (ilifeFinanceSave) ilifeFinanceSave.textContent = deposit ? "Confirmar depósito" : "Salvar lançamento";
+  const settlement = getIlifeFinanceEl("ilifeFinanceSettlementSelect");
+  if (settlement) settlement.disabled = deposit;
+  const date = getIlifeFinanceEl("ilifeFinanceOnceDate");
+  if (date) date.disabled = deposit;
+  renderIlifeFinanceDepositProgress();
 }
 
 function buildIlifeFinancePayload() {
   const wizard = state.ilifeFinance.wizard || buildIlifeFinanceWizard("INCOME");
   const settlementChoice = getCheckedIlifeFinanceChoice("[data-ilife-finance-settlement]");
   const valueModeChoice = getCheckedIlifeFinanceChoice("[data-ilife-finance-value-mode]");
-  const settlementType = String(getIlifeFinanceEl("ilifeFinanceSettlementSelect")?.value || settlementChoice?.ilifeFinanceSettlement || "").toUpperCase();
+  const deposit = Boolean(state.ilifeFinance.depositGoalId);
+  const settlementType = deposit ? "CASH" : String(getIlifeFinanceEl("ilifeFinanceSettlementSelect")?.value || settlementChoice?.ilifeFinanceSettlement || "").toUpperCase();
   const valueMode = String(valueModeChoice?.ilifeFinanceValueMode || "FIXED").toUpperCase();
   const selectedDates = [...new Set(Array.isArray(state.ilifeFinance.customDates) ? state.ilifeFinance.customDates : [])].sort();
-  const multiDate = Boolean(getIlifeFinanceEl("ilifeFinanceMultiDate")?.checked);
-  const startsOn = multiDate && selectedDates.length ? selectedDates[0] : (getIlifeFinanceEl("ilifeFinanceOnceDate")?.value || getProjectTodayDateKey());
-  const recurring = Boolean(getIlifeFinanceEl("ilifeFinanceRecurring")?.checked) && !multiDate;
+  const multiDate = !deposit && Boolean(getIlifeFinanceEl("ilifeFinanceMultiDate")?.checked);
+  const startsOn = deposit ? getProjectTodayDateKey() : multiDate && selectedDates.length ? selectedDates[0] : (getIlifeFinanceEl("ilifeFinanceOnceDate")?.value || getProjectTodayDateKey());
+  const recurring = !deposit && Boolean(getIlifeFinanceEl("ilifeFinanceRecurring")?.checked) && !multiDate;
   const endsOn = getIlifeFinanceEl("ilifeFinanceEndDate")?.value || null;
   return {
     title: String(getIlifeFinanceEl("ilifeFinanceTitleInput")?.value || "").trim(),
     amountCents: parseIlifeFinanceAmount(getIlifeFinanceEl("ilifeFinanceAmountInput")?.value),
     accountName: normalizeIlifeFinanceName(getIlifeFinanceEl("ilifeFinanceAccountSelect")?.value, "Conta principal"),
     category: normalizeIlifeFinanceName(getIlifeFinanceEl("ilifeFinanceCategorySelect")?.value, "Outros"),
-    financialGoalId: wizard.kind === "INCOME" ? (getIlifeFinanceEl("ilifeFinanceGoalSelect")?.value || null) : null,
-    kind: wizard.kind,
+    financialGoalId: wizard.kind === "INCOME" ? (state.ilifeFinance.depositGoalId || getIlifeFinanceEl("ilifeFinanceGoalSelect")?.value || null) : null,
+    kind: deposit ? "INCOME" : wizard.kind,
     settlementType,
     valueMode,
     scheduleMode: multiDate ? "RECURRING" : (recurring ? (endsOn ? "FINITE" : "RECURRING") : "ONCE"),
@@ -7353,6 +7433,7 @@ async function settleIlifeFinanceOccurrence({ remainderDueOn = null } = {}) {
     await apiRequest("/api/200/finance/ledger/occurrences/" + encodeURIComponent(entry.id) + "/settle", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     closeIlifeFinanceSettleModal(); closeIlifeFinanceRemainderModal(); state.ilifeFinance.settleEntry = null;
     await Promise.all([loadIlifeFinanceLedger(), loadIlifeFinanceGoals()]);
+    await refreshIlifeFinanceMissions();
     setIlifeFinanceToast("Movimentacao confirmada.");
   } catch (error) { if (statusEl) statusEl.textContent = error instanceof Error ? error.message : "Nao foi possivel confirmar."; }
 }
@@ -7361,6 +7442,7 @@ async function deleteIlifeFinanceItem(itemId) {
   try {
     await apiRequest(`/api/200/finance/ledger/${encodeURIComponent(itemId)}`, { method: "DELETE" });
     await Promise.all([loadIlifeFinanceLedger(), loadIlifeFinanceGoals()]);
+    await refreshIlifeFinanceMissions();
     setIlifeFinanceToast("Movimenta\u00e7\u00e3o exclu\u00edda.");
   } catch (error) {
     setIlifeFinanceToast(error instanceof Error ? error.message : "N\u00e3o foi poss\u00edvel excluir.");
@@ -7407,6 +7489,7 @@ async function saveIlifeFinanceItem() {
     });
     closeIlifeFinanceWizard();
     await Promise.all([loadIlifeFinanceLedger(), loadIlifeFinanceGoals()]);
+    await refreshIlifeFinanceMissions();
     setIlifeFinanceToast(state.ilifeFinance.editingEntry ? "Movimenta\u00e7\u00e3o atualizada." : "Lan\u00e7amento salvo no seu m\u00eas.");
   } catch (error) {
     if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = error instanceof Error ? error.message : "N\u00e3o foi poss\u00edvel salvar.";
@@ -17531,6 +17614,7 @@ async function openMissionFolderModal(goalId, mode = "edit") {
 
 function openMissionEditorModal(goalId) {
   const goal = getAvailableMissionById(goalId);
+  if (goal?.scheduleConfig?.nativeType === "financial_goal") { openIlifeFinanceMissionDeposit(goal); return; }
   if (goal?.scheduleConfig?.nativeType === "bible_reading") {
     window.Project200Books?.openBible?.();
     return;
@@ -17549,6 +17633,7 @@ function openMissionEditorModal(goalId) {
 function openMissionEntryModal(goalId) {
   const goal = getAvailableMissionById(goalId);
   if (!goal) return;
+  if (goal?.scheduleConfig?.nativeType === "financial_goal") { openIlifeFinanceMissionDeposit(goal); return; }
   if (goal?.scheduleConfig?.nativeType === "bible_reading") {
     closeModal("historyModal");
     window.Project200Books?.openBible?.();
@@ -18046,6 +18131,7 @@ function createMissionCard(goal, initialPercent = null) {
   const goalIcon = getMissionDisplayIcon(goal);
   const nativeBibleReading = goal?.scheduleConfig?.nativeType === "bible_reading";
   const nativeExercisePlan = goal?.scheduleConfig?.nativeType === "exercise_plan";
+  const financialGoal = goal?.financialGoal;
   const historyRangeActive = isMissionHistoryRangeActive();
   const limit = isLimitGoal(goal);
   const variants = Array.isArray(goal?.variants) ? goal.variants : [];
@@ -18054,12 +18140,12 @@ function createMissionCard(goal, initialPercent = null) {
   const dailyVariantProgress = !limit && !historyRangeActive && variants.length > 0 ? getMissionVariantsDailyProgress(variants) : null;
   const progress = dailyVariantProgress ? dailyVariantProgress.completed : Math.max(0, Number(goal.progressValue || 0));
   const target = dailyVariantProgress ? dailyVariantProgress.total : Math.max(1, Number(goal.targetValue || 1));
-  const regularPercent = dailyVariantProgress ? dailyVariantProgress.percent : Math.max(0, Math.min(100, Math.round((progress / target) * 100)));
+  const regularPercent = financialGoal ? financialGoal.progressPercent : dailyVariantProgress ? dailyVariantProgress.percent : Math.max(0, Math.min(100, Math.round((progress / target) * 100)));
   const limitVisual = limit ? getLimitProgressVisual(goal, historyRangeActive) : null;
   const percent = limitVisual ? limitVisual.width : regularPercent;
   const expectation = !limit && !historyRangeActive ? getMissionExpectation(goal) : null;
   const showLimitRatio = limit && !historyRangeActive && Math.floor(getServerNowMs() / 2000) % 2 === 1;
-  const progressLabel = historyRangeActive
+  const progressLabel = financialGoal ? `${formatMoney(financialGoal.progressCents)} de ${formatMoney(financialGoal.targetAmountCents)} · ${financialGoal.progressPercent}%` : historyRangeActive
     ? formatMissionRangeProgress(progress, getMissionHistoryScope().days)
     : dailyVariantProgress
       ? dailyVariantProgress.label
@@ -19026,6 +19112,8 @@ ilifeFinanceGoalClose?.addEventListener("click", closeIlifeFinanceGoalModal);
 ilifeFinanceGoalModal?.addEventListener("click", (event) => { if (event.target === ilifeFinanceGoalModal) closeIlifeFinanceGoalModal(); });
 ilifeFinanceGoalAmount?.addEventListener("input", renderIlifeFinanceGoalWizard);
 ilifeFinanceGoalGradual?.addEventListener("change", renderIlifeFinanceGoalWizard);
+getIlifeFinanceEl("ilifeFinanceGoalInitialDeposit")?.addEventListener("input", renderIlifeFinanceGoalWizard);
+getIlifeFinanceEl("ilifeFinanceGoalSelect")?.addEventListener("change", renderIlifeFinanceDepositProgress);
 [[ilifeFinanceGoalDurationMinus, -1], [ilifeFinanceGoalDurationPlus, 1]].forEach(([button, direction]) => {
   button?.addEventListener("pointerdown", () => startIlifeFinanceGoalHold(direction));
   button?.addEventListener("pointerup", () => { stopIlifeFinanceGoalHold(); if (!state.ilifeFinance.goalHoldTriggered) changeIlifeFinanceGoalDuration(direction); });
@@ -20223,6 +20311,7 @@ missionList?.addEventListener("click", (event) => {
   const missionCard = event.target.closest("[data-goal-id]");
   if (avatar && missionCard) {
     const goal = getAvailableMissionById(missionCard.dataset.goalId || "");
+    if (goal?.scheduleConfig?.nativeType === "financial_goal") { openIlifeFinanceMissionDeposit(goal); return; }
     if (isMissionFolder(goal) && !Math.max(0, Number(goal?.variantCount || goal?.variants?.length || 0))) {
       openMissionEntryModal(missionCard.dataset.goalId || "");
     } else {

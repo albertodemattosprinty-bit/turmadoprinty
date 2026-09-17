@@ -1,6 +1,8 @@
 import { db, query } from "./db.js";
 import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 import { getProject200ConfirmedSleepOverlapSeconds, subtractProject200ConfirmedSleepFromIntervals } from "./project200-sleep.js";
+import { ensureProject200FinanceLedgerSchema } from "./project200-finance-ledger.js";
+import { listProject200FinancialGoals, financialGoalToProject200Mission } from "./project200-financial-goals.js";
 
 const EXTRA_GOALS_TIME_ZONE = "America/Sao_Paulo";
 const EXTRA_GOAL_MAX_DURATION_SECONDS = 180 * 60;
@@ -1091,7 +1093,9 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
     };
   }));
   await syncCurrentExtraGoalHistory(userId, goalsWithVariants, dateKey);
-  return goalsWithVariants;
+  await ensureProject200FinanceLedgerSchema();
+  const financialGoals = await listProject200FinancialGoals(userId, normalizedProfile);
+  return [...goalsWithVariants, ...financialGoals.map(financialGoalToProject200Mission)];
 }
 
 export async function listExtraGoalsByScope(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, scopeKey = "today") {
@@ -1152,6 +1156,7 @@ export async function listExtraGoalsByScope(userId, profileName = PROJECT200_DEF
       endDateKey
     },
     goals: goals.flatMap((goal) => {
+      if (goal.scheduleConfig?.nativeType === "financial_goal") return [goal];
       const history = historyByGoalId.get(String(goal.id || "").trim());
       if (!history?.first_scope_date_key || history.first_scope_date_key > startDateKey) {
         return [];
@@ -1217,7 +1222,10 @@ export async function getExtraGoalById(userId, profileName = PROJECT200_DEFAULT_
     [userId, normalizedProfile, safeGoalId]
   );
   const row = result.rows[0];
-  return row ? normalizeExtraGoalRow(row, dateKey) : null;
+  if (row) return normalizeExtraGoalRow(row, dateKey);
+  await ensureProject200FinanceLedgerSchema();
+  const financialGoal = (await listProject200FinancialGoals(userId, normalizedProfile)).find((goal) => goal.id === safeGoalId);
+  return financialGoal ? financialGoalToProject200Mission(financialGoal) : null;
 }
 
 export async function createExtraGoal(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, payload = {}) {

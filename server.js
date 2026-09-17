@@ -5890,7 +5890,7 @@ async function handleExtraGoalProgressRequest(request, response, goalId) {
   try {
     const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
     const currentGoal = await getExtraGoalById(user.id, selectedProfile, goalId);
-    if (["bible_reading", "exercise_plan"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("O progresso desta missão é atualizado somente pelo aplicativo nativo correspondente.");
+    if (["bible_reading", "exercise_plan", "financial_goal"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("O progresso desta missão é atualizado somente pelo aplicativo nativo correspondente.");
     const isLimit = String(currentGoal?.goalKind || "goal").trim().toLowerCase() === "limit";
     const shouldTrackPointsUpdate = !isLimit && Math.trunc(Number(body?.delta || 0) || 0) !== 0;
     const pointsSnapshotPrepared = body?.pointsSnapshotPrepared === true;
@@ -5982,7 +5982,7 @@ async function handleExtraGoalProgressBatchRequest(request, response) {
       if (!delta) continue;
       const currentGoal = await getExtraGoalById(user.id, selectedProfile, goalId);
       if (!currentGoal) throw new Error("Missão não encontrada durante a sincronização.");
-      if (["bible_reading", "exercise_plan"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("O progresso desta missão é atualizado somente pelo aplicativo nativo correspondente.");
+      if (["bible_reading", "exercise_plan", "financial_goal"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("O progresso desta missão é atualizado somente pelo aplicativo nativo correspondente.");
       const isLimit = String(currentGoal?.goalKind || "goal").trim().toLowerCase() === "limit";
       if (!isLimit) {
         shouldTrackPointsUpdate = true;
@@ -6149,7 +6149,7 @@ async function handleExtraGoalUpdateRequest(request, response, goalId) {
   try {
     const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
     const currentGoal = await getExtraGoalById(user.id, selectedProfile, goalId);
-    if (["bible_reading", "exercise_plan"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("Edite esta missão dentro do aplicativo nativo correspondente.");
+    if (["bible_reading", "exercise_plan", "financial_goal"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("Edite esta missão dentro do aplicativo nativo correspondente.");
     const goals = await updateExtraGoal(user.id, selectedProfile, goalId, body);
     const summary = summarizeExtraGoals(goals);
     sendJson(response, 200, { ok: true, profile: selectedProfile, goals, summary });
@@ -6170,7 +6170,7 @@ async function handleExtraGoalDeleteRequest(request, response, goalId) {
     const requestUrl = new URL(request.url || "/api/200/extra-goals", `http://${request.headers.host || "localhost"}`);
     const selectedProfile = await resolveProject200ProfileName(user.id, requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
     const currentGoal = await getExtraGoalById(user.id, selectedProfile, goalId);
-    if (["bible_reading", "exercise_plan"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("Esta missão só pode ser alterada dentro do aplicativo nativo correspondente.");
+    if (["bible_reading", "exercise_plan", "financial_goal"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("Esta missão só pode ser alterada dentro do aplicativo nativo correspondente.");
     const goals = await deleteExtraGoal(user.id, selectedProfile, goalId);
     const summary = summarizeExtraGoals(goals);
     sendJson(response, 200, { ok: true, profile: selectedProfile, goals, summary });

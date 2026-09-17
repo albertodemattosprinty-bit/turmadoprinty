@@ -1,5 +1,6 @@
 import { query } from "./db.js";
 import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
+import { buildGradualFinancialGoalSchedule } from "../public/200/finance-goal-schedule.js";
 
 const DAY_MS = 86400000;
 const MAX_TARGET_CENTS = 999999999999;
@@ -53,7 +54,10 @@ function distributeProgressively(totalCents, periodCount) {
   return values;
 }
 
-export function buildProject200FinancialGoalSchedule({ startOn, targetOn, targetAmountCents, gradualModel }) {
+export function buildProject200FinancialGoalSchedule({ startOn, targetOn, targetAmountCents, gradualModel, initialDepositCents = null }) {
+  if (gradualModel && initialDepositCents !== null) {
+    return buildGradualFinancialGoalSchedule({ startOn, targetOn, targetAmountCents, initialDepositCents });
+  }
   const durationDays = Math.max(1, daysBetween(startOn, targetOn));
   const amount = Math.max(0, Math.trunc(Number(targetAmountCents || 0) || 0));
   const useDays = durationDays < 30;
@@ -97,6 +101,7 @@ export async function ensureProject200FinancialGoalsSchema() {
     updated_at timestamptz not null default now(),
     check (target_on > start_on)
   )`);
+  await query("alter table project200_financial_goals add column if not exists initial_deposit_cents bigint check (initial_deposit_cents >= 0 and initial_deposit_cents <= target_amount_cents)");
   await query("create index if not exists idx_project200_financial_goals_user_profile on project200_financial_goals(user_id, assigned_profile, status, target_on);");
 }
 
@@ -119,8 +124,9 @@ function normalizeGoalRow(row) {
     durationDays,
     requiredPerDayCents: Math.ceil(Math.max(0, targetAmountCents - progressCents) / Math.max(1, daysBetween(dateToKey(new Date()), targetOn))),
     gradualModel: Boolean(row.gradual_model),
+    initialDepositCents: row.initial_deposit_cents == null ? null : Number(row.initial_deposit_cents),
     status: String(row.status || "ACTIVE"),
-    schedule: buildProject200FinancialGoalSchedule({ startOn, targetOn, targetAmountCents, gradualModel: Boolean(row.gradual_model) })
+    schedule: buildProject200FinancialGoalSchedule({ startOn, targetOn, targetAmountCents, gradualModel: Boolean(row.gradual_model), initialDepositCents: row.initial_deposit_cents == null ? null : Number(row.initial_deposit_cents) })
   };
 }
 
@@ -152,11 +158,26 @@ export async function createProject200FinancialGoal(userId, payload = {}) {
   const durationDays = daysBetween(startOn, targetOn);
   if (durationDays < 15) throw new Error("A meta financeira precisa ter pelo menos 15 dias.");
   if (durationDays > 10958) throw new Error("A meta financeira pode durar no máximo 30 anos.");
+  const initialDepositCents = payload.gradualModel && payload.initialDepositCents != null ? Number(payload.initialDepositCents) : null;
+  if (initialDepositCents !== null) buildGradualFinancialGoalSchedule({ startOn, targetOn, targetAmountCents, initialDepositCents });
   const result = await query(`insert into project200_financial_goals (
-      user_id,assigned_profile,name,target_amount_cents,start_on,target_on,gradual_model
-    ) values ($1,$2,$3,$4,$5::date,$6::date,$7) returning *,0::bigint as progress_cents`,
-    [userId, profile, name, targetAmountCents, startOn, targetOn, Boolean(payload.gradualModel)]);
+      user_id,assigned_profile,name,target_amount_cents,start_on,target_on,gradual_model,initial_deposit_cents
+    ) values ($1,$2,$3,$4,$5::date,$6::date,$7,$8) returning *,0::bigint as progress_cents`,
+    [userId, profile, name, targetAmountCents, startOn, targetOn, Boolean(payload.gradualModel), initialDepositCents]);
   return normalizeGoalRow(result.rows[0]);
+}
+
+export function financialGoalToProject200Mission(goal) {
+  const { schedule, ...financialGoal } = goal;
+  return {
+    id: goal.id, title: goal.name, profileName: goal.profileName,
+    categoryId: "planejamento", goalKind: "goal", targetValue: 100,
+    progressValue: Math.min(100, (goal.progressCents / Math.max(1, goal.targetAmountCents)) * 100), isFolder: false, variants: [], variantCount: 0,
+    repeatDays: [0, 1, 2, 3, 4, 5, 6],
+    svgIconUrl: "/200/apps/financas.png", svgIconLabel: "Finanças",
+    scheduleConfig: { nativeType: "financial_goal", financialGoalId: goal.id, locked: true, frequency: "daily", startsOn: goal.startOn, endMode: "never", notification: { mode: "none" } },
+    financialGoal
+  };
 }
 
 export async function assertProject200FinancialGoal(userId, goalId) {

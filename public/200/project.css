@@ -15132,6 +15132,15 @@ body[data-background-theme="white"] .marin-message-audio-card.is-viewed {
 .finance-goal-gradual small { color:var(--finance-nano-muted); line-height:1.4; }
 .finance-goal-schedule { max-height:190px; display:grid; gap:7px; overflow:auto; overscroll-behavior:contain; }
 .finance-goal-schedule div { display:flex; justify-content:space-between; gap:12px; padding:9px 11px; border-radius:12px; background:#f1f6f4; font-size:11px; }
+.finance-goal-deposit-progress { grid-column:1 / -1; margin:0; }
+.finance-nano-modal.is-goal-deposit { background:rgba(2,24,21,.48) !important; }
+.finance-nano-modal.is-goal-deposit .finance-nano-shell > :not(#ilifeFinanceEntryWizard) { display:none; }
+.finance-nano-modal.is-goal-deposit .finance-nano-shell { background:transparent; }
+.finance-nano-modal.is-goal-deposit .finance-nano-type-switch,
+.finance-nano-modal.is-goal-deposit .finance-nano-advanced,
+.finance-nano-modal.is-goal-deposit #ilifeFinanceCreateAccountButton,
+.finance-nano-modal.is-goal-deposit #ilifeFinanceCreateCategoryButton { display:none; }
+.finance-nano-field[hidden], .finance-goal-schedule[hidden], .finance-goal-deposit-progress[hidden] { display:none; }
 .finance-goal-footer { display:flex; gap:10px; margin-top:auto; }
 .finance-goal-footer > button { flex:1; min-height:48px; border:1px solid var(--finance-nano-line); border-radius:14px; font:inherit; font-weight:850; cursor:pointer; }
 .finance-goal-footer > button:first-child { color:var(--finance-nano-muted); background:#fff; }

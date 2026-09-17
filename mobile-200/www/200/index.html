@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260908-native-aspects-v1" />
+  <link rel="stylesheet" href="/200/project.css?v=20260917-finance-missions-v1" />
   <link rel="stylesheet" href="/200/life-capture.css?v=20260802-gallery-inline-v1" />
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
   <link rel="stylesheet" href="/200/quality.css?v=20260906-1" />
@@ -1117,6 +1117,7 @@
               <div class="finance-nano-chip-row" id="ilifeFinanceAccountChips" aria-label="Contas cadastradas"></div>
               <label class="finance-nano-field"><span>Categoria</span><div class="finance-nano-select-action"><select id="ilifeFinanceCategorySelect"></select><button type="button" id="ilifeFinanceCreateCategoryButton" aria-label="Criar nova categoria"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button></div></label>
               <label class="finance-nano-field full" id="ilifeFinanceGoalSelectWrap"><span>Projeto financeiro</span><select id="ilifeFinanceGoalSelect"><option value="">Sem meta financeira</option></select><small>Somente entradas vinculadas a uma meta geram progresso nela.</small></label>
+              <section class="finance-goal-overview finance-goal-deposit-progress" id="ilifeFinanceDepositProgress" aria-live="polite" hidden></section>
 
             </div>
 
@@ -1165,6 +1166,8 @@
             <div class="finance-goal-step" data-finance-goal-step="3">
               <article class="finance-goal-required"><span>Você precisa de</span><strong id="ilifeFinanceGoalRequiredDay">R$ 0,00 por dia</strong></article>
               <label class="finance-goal-gradual"><input type="checkbox" id="ilifeFinanceGoalGradual" /><span><b>Modelo Gradativo</b><small>Começa mais leve e aumenta progressivamente até a data final.</small></span></label>
+              <label class="finance-nano-field full" id="ilifeFinanceGoalInitialDepositWrap" hidden><span>Quanto quer depositar hoje?</span><div class="finance-nano-money-input"><b>R$</b><input type="text" id="ilifeFinanceGoalInitialDeposit" inputmode="decimal" autocomplete="off" placeholder="0,00" /></div><small>Este valor inicia o plano. O progresso aumenta quando você confirma o depósito.</small></label>
+              <p class="finance-goal-hold-copy" id="ilifeFinanceGoalScheduleNote" hidden></p>
               <div class="finance-goal-schedule" id="ilifeFinanceGoalSchedule"></div>
             </div>
             <p class="finance-nano-dialog-status" id="ilifeFinanceGoalStatus" aria-live="polite"></p>
@@ -2369,7 +2372,7 @@
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
   <script src="/200/offline-data.js?v=20260915-delete-sync-v1"></script>
-  <script type="module" src="/200/project.js?v=20260915-missions-actions-fluency-v1"></script>
+  <script type="module" src="/200/project.js?v=20260917-finance-missions-v1"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
   <script type="module" src="/200/wellness.js?v=20260915-gps-speed-v2"></script>
   <script src="/200/books.js?v=20260904-biblia-plano-v7"></script>
