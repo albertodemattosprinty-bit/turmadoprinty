@@ -1,9 +1,10 @@
 (function initProject200Books() {
   const TOKEN_KEY = "turma_do_printy_token";
   const byId = (id) => document.getElementById(id);
-  const state = { books: [], loading: false, pollTimer: 0, literaryStyle: "Romance", isAdmin: false, coverEditorBook: null, bible: null, bibleLoading: null, bibleBook: 0, bibleChapter: 0, bibleVerse: 0, bibleVersions: new Map(), bibleVersionLoading: new Map(), bibleGeneratingKey: "", bibleCompletingKey: "", activeChunk: 0, reading: null, pendingBlocks: [], savingBlocks: [], readingSavePromise: null, pendingReadingPosition: null, readingPositionTimer: 0, readingPositionPromise: null, readingFeedbackTimer: 0, readingBlocksSinceFeedback: 0, queuedBlockKeys: new Set(), currentChunks: [], currentContext: null, chunkStartedAt: 0, readerTouch: null, offlineCoverUrls: new Map(), planStep: 0, planStartedAt: 0, planLetters: 0, plan: { lettersPerSecond: 14.7, durationMonths: 12, durationDays: 0, repeatDays: [0,1,2,3,4,5,6], scheduleConfig: null, scheduleLabel: "Todos os dias" } };
+  const state = { books: [], loading: false, pollTimer: 0, literaryStyle: "Romance", isAdmin: false, coverEditorBook: null, bible: null, bibleLoading: null, bibleBook: 0, bibleChapter: 0, bibleVerse: 0, bibleVersions: new Map(), bibleVersionLoading: new Map(), bibleGeneratingKey: "", bibleCompletingKey: "", activeChunk: 0, reading: null, pendingBlocks: [], savingBlocks: [], readingSavePromise: null, pendingReadingPosition: null, readingPositionTimer: 0, readingPositionPromise: null, readingFeedbackTimer: 0, readingRhythmInterval: 0, readingRhythmTimer: 0, readingBlocksSinceFeedback: 0, queuedBlockKeys: new Set(), currentChunks: [], currentContext: null, chunkStartedAt: 0, readerTouch: null, offlineCoverUrls: new Map(), planStep: 0, planStartedAt: 0, planLetters: 0, plan: { lettersPerSecond: 14.7, durationMonths: 12, durationDays: 0, repeatDays: [0,1,2,3,4,5,6], scheduleConfig: null, scheduleLabel: "Todos os dias" } };
   const BIBLE_TOTAL_CHARACTERS = 3809122;
   const BIBLE_TOTAL_CHAPTERS = 1189;
+  const READING_CHARACTERS_PER_SECOND = 25;
   const OFFLINE_CACHE_NAME = "project200-books-v1";
   const OFFLINE_INDEX_KEY = "project_200_offline_books_v1";
   const LOCAL_READING_POSITIONS_KEY = "project_200_reading_positions_v1";
@@ -332,10 +333,43 @@
     overlay = document.createElement("section"); overlay.id = id; overlay.className = "books-fullscreen-overlay"; overlay.hidden = true; document.body.appendChild(overlay); return overlay;
   }
 
-  function showRhythmControl(remainingMs) {
-    const modal = ensureBooksOverlay("readingRhythmOverlay"); const seconds = Math.max(1, Math.ceil(remainingMs / 1000));
-    modal.innerHTML = `<div class="reading-feedback-card"><span>CONTROLE DE RITMO</span><div class="reading-clock">◷</div><strong>${seconds}s</strong><p>Ajuste o ritmo da leitura...</p><div class="reading-wait-track"><i style="animation-duration:${Math.max(1, remainingMs)}ms"></i></div></div>`;
-    modal.hidden = false; window.setTimeout(() => { modal.hidden = true; }, 1000);
+  function hideRhythmControl() {
+    window.clearInterval(state.readingRhythmInterval);
+    window.clearTimeout(state.readingRhythmTimer);
+    state.readingRhythmInterval = 0;
+    state.readingRhythmTimer = 0;
+    const modal = byId("readingRhythmOverlay");
+    if (modal) modal.hidden = true;
+  }
+
+  function showRhythmControl(minimumMs) {
+    const modal = ensureBooksOverlay("readingRhythmOverlay");
+    modal.classList.add("reading-rhythm-overlay");
+    modal.innerHTML = `<div class="reading-feedback-card" role="status" aria-live="polite"><span data-reading-rhythm-label>CONTROLE DE RITMO</span><div class="reading-clock">◷</div><strong data-reading-rhythm-seconds></strong><p data-reading-rhythm-message>Continue lendo este trecho para liberar o próximo.</p><div class="reading-wait-track" aria-hidden="true"><i data-reading-rhythm-progress></i></div></div>`;
+    modal.hidden = false;
+    window.clearInterval(state.readingRhythmInterval);
+    window.clearTimeout(state.readingRhythmTimer);
+    state.readingRhythmInterval = 0;
+    state.readingRhythmTimer = 0;
+    const update = () => {
+      const elapsed = Math.max(0, Date.now() - state.chunkStartedAt);
+      const remainingMs = Math.max(0, minimumMs - elapsed);
+      const progress = Math.max(0, Math.min(100, elapsed * 100 / Math.max(1, minimumMs)));
+      const seconds = modal.querySelector("[data-reading-rhythm-seconds]");
+      const bar = modal.querySelector("[data-reading-rhythm-progress]");
+      if (seconds) seconds.textContent = remainingMs > 0 ? `${Math.max(1, Math.ceil(remainingMs / 1000))}s` : "Agora";
+      if (bar) bar.style.width = `${progress}%`;
+      if (remainingMs > 0) return;
+      window.clearInterval(state.readingRhythmInterval);
+      state.readingRhythmInterval = 0;
+      const label = modal.querySelector("[data-reading-rhythm-label]");
+      const message = modal.querySelector("[data-reading-rhythm-message]");
+      if (label) label.textContent = "PRÓXIMO TRECHO LIBERADO";
+      if (message) message.textContent = "Pode deslizar para avançar.";
+      state.readingRhythmTimer = window.setTimeout(hideRhythmControl, 900);
+    };
+    update();
+    if (!modal.hidden && !state.readingRhythmTimer) state.readingRhythmInterval = window.setInterval(update, 100);
   }
 
   function getReadingBlockKey(index = state.activeChunk) {
@@ -352,6 +386,7 @@
 
   function selectReadingChunk(index, { scroll = true } = {}) {
     const chunks = [...document.querySelectorAll("[data-reading-chunk]")]; if (!chunks.length) return;
+    hideRhythmControl();
     const next = Math.max(0, Math.min(chunks.length - 1, index)); state.activeChunk = next;
     if (!state.queuedBlockKeys.has(getReadingBlockKey(next))) state.chunkStartedAt = Date.now();
     chunks.forEach((item, itemIndex) => item.classList.toggle("is-active", itemIndex === next));
@@ -389,7 +424,7 @@
     try {
       const saved = await flushAllReadingBlocks();
       if (!saved) throw new Error("Não foi possível salvar sua leitura. Confira a conexão e tente avançar novamente.");
-      const payload = await apiFetch("/api/200/reading/bible-chapter", { method: "POST", body: JSON.stringify({ bookKey: context.bookKey, chapterNumber: context.chapterNumber }) });
+      const payload = await apiFetch("/api/200/reading/bible-chapter", { method: "POST", body: JSON.stringify({ bookKey: context.bookKey, chapterNumber: context.chapterNumber, expectedBlocks: state.currentChunks.length }) });
       state.reading = payload?.reading || state.reading;
       window.dispatchEvent(new CustomEvent("project200:reading-updated"));
       const book = state.bible?.[state.bibleBook];
@@ -418,8 +453,9 @@
       selectReadingChunk(index + 1);
       return;
     }
-    const characters = String(chunk.textContent || "").trim().length; const minimumMs = (characters / 25) * 1000; const elapsed = Date.now() - state.chunkStartedAt;
-    if (context.type !== "bible" && elapsed < minimumMs) { showRhythmControl(minimumMs - elapsed); return; }
+    const characters = String(chunk.textContent || "").trim().length; const minimumMs = (characters / READING_CHARACTERS_PER_SECOND) * 1000; const elapsed = Date.now() - state.chunkStartedAt;
+    if (elapsed < minimumMs) { showRhythmControl(minimumMs); return; }
+    hideRhythmControl();
     if (!state.queuedBlockKeys.has(key)) {
       state.queuedBlockKeys.add(key);
       state.pendingBlocks.push({ key, characters, readingType: context.type || "book", bookKey: context.bookKey, chapterNumber: context.chapterNumber });

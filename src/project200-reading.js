@@ -188,13 +188,28 @@ export async function saveProject200ReadingPosition(userId, position = {}) {
   return serializeReadingPosition(result.rows[0]);
 }
 
-export async function completeProject200BibleChapter(userId, bookKey, chapterNumber) {
+export async function completeProject200BibleChapter(userId, bookKey, chapterNumber, expectedBlocks) {
   await ensureProject200ReadingSchema();
   const canonical = await getCanonicalProject200BibleChapter(bookKey, chapterNumber);
   const chapterKey = `${canonical.bookKey}:${canonical.chapterNumber}`;
+  const requiredBlocks = Math.trunc(Number(expectedBlocks || 0));
+  if (!Number.isInteger(requiredBlocks) || requiredBlocks < 1 || requiredBlocks > 10000) throw new Error("Quantidade de trechos inválida para concluir o capítulo.");
   const client = await db.connect();
   try {
     await client.query("begin");
+    const completed = await client.query(
+      `select 1 from project200_bible_chapter_progress where user_id=$1 and book_key=$2 and chapter_number=$3`,
+      [userId, canonical.bookKey, canonical.chapterNumber]
+    );
+    if (!completed.rows[0]) {
+      const readBlocks = await client.query(
+        `select count(*)::integer as total
+           from project200_reading_events
+          where user_id=$1 and reading_type='bible' and book_key=$2 and chapter_number=$3`,
+        [userId, canonical.bookKey, canonical.chapterNumber]
+      );
+      if (Number(readBlocks.rows[0]?.total || 0) < requiredBlocks) throw new Error("Leia todos os trechos deste capítulo antes de concluí-lo.");
+    }
     await client.query(
       `insert into project200_bible_chapter_progress(user_id,book_key,chapter_number)
        values($1,$2,$3)
