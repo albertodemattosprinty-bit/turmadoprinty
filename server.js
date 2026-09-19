@@ -91,6 +91,7 @@ import { completeProject200Onboarding, ensureProject200OnboardingSchema, getProj
 import { getQualityAssessment, saveQualityAssessment } from "./src/project200-quality.js";
 import { createProject200BooksRuntime } from "./src/project200-books-runtime.js";
 import { completeProject200BibleChapter, getProject200Reading, recordProject200ReadingBlocks, saveProject200BiblePlan } from "./src/project200-reading.js";
+import { getProject200BibleVersion, rewriteProject200BibleChapter } from "./src/project200-bible-versions.js";
 import { getProject201AppUpdateConfig, saveProject201AppUpdateConfig } from "./src/project201-app-update.js";
 import { decryptUserBuffer, encryptUserBuffer } from "./src/privacy-crypto.js";
 
@@ -15007,6 +15008,15 @@ const server = http.createServer(async (request, response) => {
       if (!user) return;
       if (request.method === "GET" && pathname === "/api/200/reading") {
         sendJson(response, 200, { ok: true, reading: await getProject200Reading(user.id) });
+      } else if (request.method === "GET" && pathname === "/api/200/reading/bible-version") {
+        const version = await getProject200BibleVersion(requestUrl.searchParams.get("bookKey"), requestUrl.searchParams.get("chapterNumber"));
+        sendJson(response, 200, { ok: true, version });
+      } else if (request.method === "POST" && pathname === "/api/200/reading/bible-version") {
+        const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+        if (!apiKey) return sendJson(response, 503, { error: "OPENAI_API_KEY não configurada no backend." });
+        const body = await readJsonBody(request);
+        const version = await rewriteProject200BibleChapter(user.id, body?.bookKey, body?.chapterNumber, apiKey);
+        sendJson(response, 200, { ok: true, version });
       } else if (request.method === "POST" && pathname === "/api/200/reading/blocks") {
         const body = await readJsonBody(request);
         sendJson(response, 200, { ok: true, reading: await recordProject200ReadingBlocks(user.id, body?.blocks) });

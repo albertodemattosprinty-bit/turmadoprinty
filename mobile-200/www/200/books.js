@@ -1,8 +1,10 @@
 (function initProject200Books() {
   const TOKEN_KEY = "turma_do_printy_token";
   const byId = (id) => document.getElementById(id);
-  const state = { books: [], loading: false, pollTimer: 0, literaryStyle: "Romance", isAdmin: false, coverEditorBook: null, bible: null, bibleLoading: null, bibleBook: 0, bibleChapter: 0, bibleVerse: 0, activeChunk: 0, reading: null, pendingBlocks: [], savingBlocks: [], readingSavePromise: null, readingBlocksSinceFeedback: 0, queuedBlockKeys: new Set(), currentChunks: [], currentContext: null, chunkStartedAt: 0, readerTouch: null, planStep: 0, planStartedAt: 0, planLetters: 0, plan: { lettersPerSecond: 14.7, durationMonths: 12, durationDays: 0, repeatDays: [0,1,2,3,4,5,6], scheduleConfig: null, scheduleLabel: "Todos os dias" } };
+  const state = { books: [], loading: false, pollTimer: 0, literaryStyle: "Romance", isAdmin: false, coverEditorBook: null, bible: null, bibleLoading: null, bibleBook: 0, bibleChapter: 0, bibleVerse: 0, bibleVersions: new Map(), bibleVersionLoading: new Map(), bibleGeneratingKey: "", activeChunk: 0, reading: null, pendingBlocks: [], savingBlocks: [], readingSavePromise: null, readingBlocksSinceFeedback: 0, queuedBlockKeys: new Set(), currentChunks: [], currentContext: null, chunkStartedAt: 0, readerTouch: null, offlineCoverUrls: new Map(), planStep: 0, planStartedAt: 0, planLetters: 0, plan: { lettersPerSecond: 14.7, durationMonths: 12, durationDays: 0, repeatDays: [0,1,2,3,4,5,6], scheduleConfig: null, scheduleLabel: "Todos os dias" } };
   const BIBLE_TOTAL_CHARACTERS = 3809122;
+  const OFFLINE_CACHE_NAME = "project200-books-v1";
+  const OFFLINE_INDEX_KEY = "project_200_offline_books_v1";
   const COVER_STYLES = ["Editorial cinematográfica", "Minimalista premium", "Ilustração 3D", "Aquarela artística", "Fantasia épica", "Fotográfica realista", "Vintage clássica", "Anime contemporâneo", "Infantil colorida", "Sombria e misteriosa"];
 
   function getToken() {
@@ -37,6 +39,56 @@
     return payload;
   }
 
+  function offlineRequest(kind, id = "default") {
+    return new Request(`https://offline.project200.local/${encodeURIComponent(kind)}/${encodeURIComponent(String(id || "default"))}`);
+  }
+
+  function readOfflineIndex() {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(OFFLINE_INDEX_KEY) || "[]");
+      return Array.isArray(parsed) ? parsed.filter((item) => item && (item.type === "book" || item.type === "bible")) : [];
+    } catch { return []; }
+  }
+
+  function writeOfflineIndex(items) {
+    window.localStorage.setItem(OFFLINE_INDEX_KEY, JSON.stringify(items));
+  }
+
+  function upsertOfflineIndex(entry) {
+    const items = readOfflineIndex().filter((item) => !(item.type === entry.type && String(item.id || "") === String(entry.id || "")));
+    items.push(entry);
+    writeOfflineIndex(items);
+  }
+
+  function isOfflineDownloaded(type, id = "default") {
+    return readOfflineIndex().some((item) => item.type === type && String(item.id || "") === String(id || ""));
+  }
+
+  function offlineBooks() {
+    return readOfflineIndex().filter((item) => item.type === "book").map((item) => ({ ...item.book, offlineDownloaded: true }));
+  }
+
+  async function putOfflineResponse(kind, id, response) {
+    if (!("caches" in window)) throw new Error("O armazenamento offline não está disponível neste aparelho.");
+    const cache = await caches.open(OFFLINE_CACHE_NAME);
+    await cache.put(offlineRequest(kind, id), response);
+  }
+
+  async function getOfflineResponse(kind, id) {
+    if (!("caches" in window)) return null;
+    const cache = await caches.open(OFFLINE_CACHE_NAME);
+    return cache.match(offlineRequest(kind, id));
+  }
+
+  async function putOfflineJson(kind, id, payload) {
+    await putOfflineResponse(kind, id, new Response(JSON.stringify(payload), { headers: { "Content-Type": "application/json; charset=utf-8" } }));
+  }
+
+  async function getOfflineJson(kind, id) {
+    const response = await getOfflineResponse(kind, id);
+    return response ? response.json().catch(() => null) : null;
+  }
+
   function escapeHtml(value) {
     return String(value || "").replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char]);
   }
@@ -48,8 +100,30 @@
   }
 
   function bookCoverMarkup(book, className = "book-card-cover", progress = "") {
-    const image = book?.coverImageUrl ? `<img src="${escapeHtml(book.coverImageUrl)}" alt="" loading="lazy" />` : '<span class="book-cover-fallback" aria-hidden="true"></span>';
+    const image = book?.coverImageUrl ? `<img src="${escapeHtml(book.coverImageUrl)}" data-offline-cover-id="${escapeHtml(book.id)}" alt="" loading="lazy" />` : '<span class="book-cover-fallback" aria-hidden="true"></span>';
     return `<span class="${className} book-cover-composed">${image}${progress ? `<span class="book-card-progress">${escapeHtml(progress)}</span>` : ""}</span>`;
+  }
+
+  function downloadIconMarkup(downloaded) {
+    return downloaded
+      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+
+  async function hydrateOfflineCoverImages() {
+    const images = [...document.querySelectorAll("[data-offline-cover-id]")];
+    await Promise.all(images.map(async (image) => {
+      const id = String(image.dataset.offlineCoverId || "");
+      if (!id || !isOfflineDownloaded("book", id)) return;
+      if (state.offlineCoverUrls.has(id)) { image.src = state.offlineCoverUrls.get(id); return; }
+      const response = await getOfflineResponse("book-cover", id);
+      if (!response) return;
+      const blob = await response.blob().catch(() => null);
+      if (!blob?.size) return;
+      const url = URL.createObjectURL(blob);
+      state.offlineCoverUrls.set(id, url);
+      image.src = url;
+    }));
   }
 
   function readingWithQueuedBlocks() {
@@ -71,14 +145,61 @@
     const grid = byId("booksGrid");
     if (!grid) return;
     renderReadingPointsSummary();
-    const bibleCard = `<button class="book-card bible-book-card" type="button" data-open-bible aria-label="Bíblia Sagrada">
-      <span class="book-card-cover bible-book-cover"><span class="bible-book-cross">✦</span><span class="book-card-progress">66 livros</span></span>
-    </button>`;
+    const bibleDownloaded = isOfflineDownloaded("bible");
+    const bibleCard = `<article class="book-card bible-book-card">
+      <button class="book-card-open" type="button" data-open-bible aria-label="Bíblia Sagrada"><span class="book-card-cover bible-book-cover"><span class="bible-book-cross">✦</span><span class="book-card-progress">66 livros</span></span></button>
+      <button class="book-download-button${bibleDownloaded ? " is-downloaded" : ""}" type="button" data-download-bible aria-label="${bibleDownloaded ? "Bíblia disponível offline" : "Baixar Bíblia para ler offline"}" title="${bibleDownloaded ? "Disponível offline" : "Baixar para ler offline"}">${downloadIconMarkup(bibleDownloaded)}</button>
+    </article>`;
     grid.innerHTML = bibleCard + state.books.map((book) => `
-      <button class="book-card" type="button" data-book-id="${escapeHtml(book.id)}" aria-label="${escapeHtml(book.title)}, um livro de ${escapeHtml(book.authorName)}" ${book.status === "ready" ? "" : "data-book-pending=\"true\""}>
-        ${bookCoverMarkup(book, "book-card-cover", statusLabel(book))}
-      </button>
+      <article class="book-card">
+        <button class="book-card-open" type="button" data-book-id="${escapeHtml(book.id)}" aria-label="${escapeHtml(book.title)}, um livro de ${escapeHtml(book.authorName)}" ${book.status === "ready" ? "" : "data-book-pending=\"true\""}>${bookCoverMarkup(book, "book-card-cover", statusLabel(book))}</button>
+        <button class="book-download-button${isOfflineDownloaded("book", book.id) ? " is-downloaded" : ""}" type="button" data-download-book-id="${escapeHtml(book.id)}" aria-label="${isOfflineDownloaded("book", book.id) ? `${escapeHtml(book.title)} disponível offline` : `Baixar ${escapeHtml(book.title)} para ler offline`}" title="${isOfflineDownloaded("book", book.id) ? "Disponível offline" : "Baixar para ler offline"}" ${book.status === "ready" ? "" : "disabled"}>${downloadIconMarkup(isOfflineDownloaded("book", book.id))}</button>
+      </article>
     `).join("") + (!state.books.length ? '<div class="books-empty">A Bíblia já está disponível. Toque em + para criar o primeiro livro com Luna.</div>' : "");
+    void hydrateOfflineCoverImages();
+  }
+
+  async function downloadBook(bookId, button) {
+    const book = state.books.find((item) => String(item.id) === String(bookId));
+    const status = byId("booksStatus");
+    if (!book || book.status !== "ready") { if (status) status.textContent = "Aguarde o livro ficar pronto antes de baixar."; return; }
+    if (button) button.disabled = true;
+    if (status) status.textContent = `Baixando “${book.title}” para leitura offline...`;
+    try {
+      const payload = await apiFetch(`/api/200/books/${encodeURIComponent(book.id)}`);
+      if (!payload?.book) throw new Error("Livro indisponível para download.");
+      await putOfflineJson("book", book.id, payload);
+      if (book.coverImageUrl) {
+        try {
+          const coverResponse = await fetch(book.coverImageUrl);
+          if (coverResponse.ok) await putOfflineResponse("book-cover", book.id, coverResponse.clone());
+        } catch { /* O conteúdo do livro continua disponível offline sem a arte da capa. */ }
+      }
+      upsertOfflineIndex({ type: "book", id: book.id, downloadedAt: new Date().toISOString(), book: { ...book, status: "ready", offlineDownloaded: true } });
+      renderLibrary();
+      if (status) status.textContent = `“${book.title}” já pode ser lido sem internet.`;
+    } catch (error) {
+      if (status) status.textContent = error instanceof Error ? error.message : "Não foi possível baixar o livro.";
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function downloadBible(button) {
+    const status = byId("booksStatus");
+    if (button) button.disabled = true;
+    if (status) status.textContent = "Baixando a Bíblia para leitura offline...";
+    try {
+      const response = await fetch(`${apiOrigin()}/200/biblia-sagrada.txt`);
+      if (!response.ok) throw new Error("Não foi possível baixar a Bíblia.");
+      const buffer = await response.arrayBuffer();
+      await putOfflineResponse("bible", "complete", new Response(buffer, { headers: { "Content-Type": "text/plain; charset=iso-8859-1" } }));
+      upsertOfflineIndex({ type: "bible", id: "default", downloadedAt: new Date().toISOString() });
+      renderLibrary();
+      if (status) status.textContent = "A Bíblia já pode ser lida sem internet.";
+    } catch (error) {
+      if (status) status.textContent = error instanceof Error ? error.message : "Não foi possível baixar a Bíblia.";
+      if (button) button.disabled = false;
+    }
   }
 
   async function loadReadingProgress() {
@@ -249,9 +370,56 @@
     if (state.bible) return state.bible;
     if (!state.bibleLoading) state.bibleLoading = fetch(`${apiOrigin()}/200/biblia-sagrada.txt`)
       .then((response) => { if (!response.ok) throw new Error("Não foi possível carregar a Bíblia."); return response.arrayBuffer(); })
+      .catch(async () => {
+        const offline = await getOfflineResponse("bible", "complete");
+        if (!offline) throw new Error("Não foi possível carregar a Bíblia. Baixe antes para ler sem internet.");
+        return offline.arrayBuffer();
+      })
       .then((buffer) => { state.bible = parseBible(new TextDecoder("iso-8859-1").decode(buffer)); return state.bible; })
       .finally(() => { state.bibleLoading = null; });
     return state.bibleLoading;
+  }
+
+  function bibleChapterKey(book, chapter) {
+    return `${book?.key || ""}:${Number(chapter?.number || 0)}`;
+  }
+
+  function setBibleReaderControls(visible, hasVersion = false) {
+    const wand = byId("bibleRewriteButton");
+    const nav = byId("bibleNav");
+    if (wand) {
+      wand.hidden = !visible;
+      wand.classList.toggle("has-version", Boolean(visible && hasVersion));
+      wand.disabled = Boolean(visible && state.bibleGeneratingKey);
+      wand.setAttribute("aria-label", hasVersion ? "Substituir versão simples deste capítulo" : "Criar versão simples deste capítulo com Luna");
+      wand.title = hasVersion ? "Atualizar versão simples" : "Criar versão simples com Luna";
+    }
+    if (nav) nav.hidden = !visible;
+  }
+
+  async function loadBibleVersion(book, chapter) {
+    const key = bibleChapterKey(book, chapter);
+    if (!key || key.endsWith(":0")) return null;
+    if (state.bibleVersionLoading.has(key)) return state.bibleVersionLoading.get(key);
+    const loading = (async () => {
+      const cacheId = `${book.key}-${chapter.number}`;
+      try {
+        const payload = await apiFetch(`/api/200/reading/bible-version?bookKey=${encodeURIComponent(book.key)}&chapterNumber=${encodeURIComponent(chapter.number)}`);
+        const version = payload?.version || null;
+        state.bibleVersions.set(key, version);
+        if (version) await putOfflineJson("bible-version", cacheId, { version }).catch(() => {});
+        return version;
+      } catch (error) {
+        const offline = await getOfflineJson("bible-version", cacheId);
+        if (offline && Object.prototype.hasOwnProperty.call(offline, "version")) {
+          state.bibleVersions.set(key, offline.version || null);
+          return offline.version || null;
+        }
+        throw error;
+      } finally { state.bibleVersionLoading.delete(key); }
+    })();
+    state.bibleVersionLoading.set(key, loading);
+    return loading;
   }
 
   function renderSelectableReader({ title, subtitle, chunks, selected = 0, chapterLabel = "", context = null }) {
@@ -259,6 +427,7 @@
     if (!scroll) return;
     scroll.innerHTML = `<section class="book-reader-hero book-reader-compact"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(subtitle)}</p><small class="book-reader-gesture-hint">Deslize para cima ou para baixo para trocar de trecho</small></section><section class="book-reader-pages book-reader-chunks">${chapterLabel ? `<span class="book-page-number">${escapeHtml(chapterLabel)}</span>` : ""}${chunks.map((chunk, index) => `<button type="button" class="book-reading-chunk${index === selected ? " is-active" : ""}" data-reading-chunk="${index}">${escapeHtml(chunk)}</button>`).join("")}</section>`;
     state.currentChunks = chunks; state.currentContext = context; state.activeChunk = selected; state.chunkStartedAt = Date.now();
+    if (context?.type !== "bible") setBibleReaderControls(false);
     setReaderOpen(true);
     window.requestAnimationFrame(() => anchorActiveChunk({ smooth: false }));
   }
@@ -266,28 +435,65 @@
   function renderBibleReader() {
     const book = state.bible?.[state.bibleBook]; const chapter = book?.chapters?.[state.bibleChapter];
     if (!book || !chapter) return;
-    const paragraphs = splitReadingParagraphs(chapter.verses.map((verse) => verse.text).join(" "));
-    const verseOffset = chapter.verses.slice(0, state.bibleVerse).reduce((sum, verse) => sum + verse.text.length + 1, 0);
+    const version = state.bibleVersions.get(bibleChapterKey(book, chapter)) || null;
+    const verses = Array.isArray(version?.verses) && version.verses.length === chapter.verses.length ? version.verses : chapter.verses;
+    const paragraphs = splitReadingParagraphs(verses.map((verse) => verse.text).join(" "));
+    const verseOffset = verses.slice(0, state.bibleVerse).reduce((sum, verse) => sum + verse.text.length + 1, 0);
     let coveredCharacters = 0;
     const selected = Math.max(0, paragraphs.findIndex((paragraph) => { const includesOffset = verseOffset < coveredCharacters + paragraph.length + 1; coveredCharacters += paragraph.length + 1; return includesOffset; }));
     state.activeChunk = selected;
     const completed = new Set(state.reading?.completedBibleChapters || []);
-    const selector = `<div class="bible-nav"><select id="bibleBookSelect">${state.bible.map((item, index) => `<option value="${index}" ${item.chapters.every((part) => completed.has(`${item.key}:${part.number}`)) ? "class=\"is-complete\"" : ""}>${escapeHtml(item.name)}</option>`).join("")}</select><select id="bibleChapterSelect">${book.chapters.map((item, index) => `<option value="${index}" ${completed.has(`${book.key}:${item.number}`) ? "class=\"is-complete\"" : ""}>Cap. ${item.number}</option>`).join("")}</select><select id="bibleVerseSelect">${chapter.verses.map((item, index) => `<option value="${index}">V. ${item.number}</option>`).join("")}</select></div>`;
+    const selector = `<select id="bibleBookSelect" aria-label="Livro da Bíblia">${state.bible.map((item, index) => `<option value="${index}" ${item.chapters.every((part) => completed.has(`${item.key}:${part.number}`)) ? "class=\"is-complete\"" : ""}>${escapeHtml(item.name)}</option>`).join("")}</select><select id="bibleChapterSelect" aria-label="Capítulo da Bíblia">${book.chapters.map((item, index) => `<option value="${index}" ${completed.has(`${book.key}:${item.number}`) ? "class=\"is-complete\"" : ""}>Cap. ${item.number}</option>`).join("")}</select><select id="bibleVerseSelect" aria-label="Versículo da Bíblia">${verses.map((item, index) => `<option value="${index}">V. ${item.number}</option>`).join("")}</select>`;
     const percent = Math.min(100, Number(state.reading?.bibleCharacters || 0) * 100 / BIBLE_TOTAL_CHARACTERS);
-    renderSelectableReader({ title: `${book.name} | Capítulo ${chapter.number}`, subtitle: `${percent.toFixed(2)}% completo`, chunks: paragraphs, selected, chapterLabel: `${book.name} ${chapter.number}`, context: { type: "bible", bookKey: book.key, chapterNumber: chapter.number } });
-    const scroll = byId("bookReaderScroll");
-    scroll.insertAdjacentHTML("afterbegin", selector);
+    renderSelectableReader({ title: `${book.name} | Capítulo ${chapter.number}`, subtitle: `${percent.toFixed(2)}% completo${version ? " · versão simples por Luna" : ""}`, chunks: paragraphs, selected, chapterLabel: `${book.name} ${chapter.number}`, context: { type: "bible", bookKey: book.key, chapterNumber: chapter.number } });
+    const nav = byId("bibleNav");
+    if (nav) nav.innerHTML = selector;
+    setBibleReaderControls(true, Boolean(version));
     byId("bibleBookSelect").value = String(state.bibleBook); byId("bibleChapterSelect").value = String(state.bibleChapter); byId("bibleVerseSelect").value = String(state.bibleVerse);
     byId("bibleBookSelect").classList.toggle("is-complete", book.chapters.every((part) => completed.has(`${book.key}:${part.number}`)));
     byId("bibleChapterSelect").classList.toggle("is-complete", completed.has(`${book.key}:${chapter.number}`));
-    byId("bibleBookSelect").onchange = (event) => { state.bibleBook = Number(event.target.value); state.bibleChapter = 0; state.bibleVerse = 0; renderBibleReader(); };
-    byId("bibleChapterSelect").onchange = (event) => { state.bibleChapter = Number(event.target.value); state.bibleVerse = 0; renderBibleReader(); };
+    byId("bibleBookSelect").onchange = (event) => { state.bibleBook = Number(event.target.value); state.bibleChapter = 0; state.bibleVerse = 0; void showBibleChapter(); };
+    byId("bibleChapterSelect").onchange = (event) => { state.bibleChapter = Number(event.target.value); state.bibleVerse = 0; void showBibleChapter(); };
     byId("bibleVerseSelect").onchange = (event) => { state.bibleVerse = Number(event.target.value); renderBibleReader(); };
+  }
+
+  async function showBibleChapter() {
+    const book = state.bible?.[state.bibleBook]; const chapter = book?.chapters?.[state.bibleChapter];
+    if (!book || !chapter) return;
+    renderBibleReader();
+    try { await loadBibleVersion(book, chapter); renderBibleReader(); } catch { /* A versão original continua disponível. */ }
+  }
+
+  async function rewriteCurrentBibleChapter() {
+    const book = state.bible?.[state.bibleBook]; const chapter = book?.chapters?.[state.bibleChapter];
+    if (!book || !chapter || state.bibleGeneratingKey) return;
+    const key = bibleChapterKey(book, chapter);
+    const existing = state.bibleVersions.get(key);
+    if (existing && !window.confirm("Tem certeza substituir essa versão?")) return;
+    const overlay = ensureBooksOverlay("bibleRewriteOverlay");
+    overlay.innerHTML = `<div class="reading-feedback-card"><span>LUNA</span><div class="reading-clock">✦</div><h2>Reescrevendo ${escapeHtml(book.name)} ${chapter.number}</h2><p>Preservando cada versículo e deixando a linguagem mais simples e atual...</p></div>`;
+    overlay.hidden = false;
+    state.bibleGeneratingKey = key;
+    setBibleReaderControls(true, Boolean(existing));
+    try {
+      const payload = await apiFetch("/api/200/reading/bible-version", { method: "POST", body: JSON.stringify({ bookKey: book.key, chapterNumber: chapter.number }) });
+      if (!payload?.version) throw new Error("Luna não devolveu uma nova versão do capítulo.");
+      state.bibleVersions.set(key, payload.version);
+      await putOfflineJson("bible-version", `${book.key}-${chapter.number}`, { version: payload.version }).catch(() => {});
+      renderBibleReader();
+    } catch (error) {
+      const status = byId("booksStatus");
+      if (status) status.textContent = error instanceof Error ? error.message : "Não foi possível criar a versão simples.";
+    } finally {
+      state.bibleGeneratingKey = "";
+      overlay.hidden = true;
+      setBibleReaderControls(true, Boolean(state.bibleVersions.get(key)));
+    }
   }
 
   async function enterBibleReader() {
     const status = byId("booksStatus"); if (status) status.textContent = "Abrindo Bíblia Sagrada...";
-    try { await Promise.all([loadBible(), loadReadingProgress()]); renderBibleReader(); if (status) status.textContent = ""; } catch (error) { if (status) status.textContent = error.message; }
+    try { await Promise.all([loadBible(), loadReadingProgress()]); await showBibleChapter(); if (status) status.textContent = ""; } catch (error) { if (status) status.textContent = error.message; }
   }
 
   function ensureBooksWorkspaceOpen() {
@@ -382,7 +588,9 @@
     if (!quiet && byId("booksStatus")) byId("booksStatus").textContent = "Abrindo a biblioteca geral...";
     try {
       const payload = await apiFetch("/api/200/books");
-      state.books = Array.isArray(payload?.books) ? payload.books : [];
+      const downloaded = new Map(offlineBooks().map((book) => [String(book.id), book]));
+      state.books = Array.isArray(payload?.books) ? payload.books.map((book) => downloaded.has(String(book.id)) ? { ...book, offlineDownloaded: true } : book) : [];
+      downloaded.forEach((book, id) => { if (!state.books.some((item) => String(item.id) === id)) state.books.push(book); });
       state.isAdmin = Boolean(payload?.isAdmin);
       renderLibrary();
       if (byId("booksStatus")) byId("booksStatus").textContent = state.books.some((book) => ["queued", "generating"].includes(book.status))
@@ -390,7 +598,12 @@
         : "";
       schedulePoll();
     } catch (error) {
-      if (byId("booksStatus")) byId("booksStatus").textContent = error instanceof Error ? error.message : "Falha ao abrir a biblioteca.";
+      const downloaded = offlineBooks();
+      if (downloaded.length) {
+        state.books = downloaded;
+        renderLibrary();
+        if (byId("booksStatus")) byId("booksStatus").textContent = "Sem internet: mostrando os livros baixados neste aparelho.";
+      } else if (byId("booksStatus")) byId("booksStatus").textContent = error instanceof Error ? error.message : "Falha ao abrir a biblioteca.";
     } finally {
       state.loading = false;
     }
@@ -409,6 +622,7 @@
     if (!layer) return;
     layer.hidden = !open;
     layer.setAttribute("aria-hidden", open ? "false" : "true");
+    if (!open) setBibleReaderControls(false);
   }
 
   async function openBook(bookId) {
@@ -420,7 +634,12 @@
     }
     if (status) status.textContent = "Carregando páginas...";
     try {
-      const payload = await apiFetch(`/api/200/books/${encodeURIComponent(bookId)}`);
+      let payload = null;
+      try { payload = await apiFetch(`/api/200/books/${encodeURIComponent(bookId)}`); }
+      catch (networkError) {
+        payload = await getOfflineJson("book", bookId);
+        if (!payload) throw networkError;
+      }
       const book = payload?.book;
       const scroll = byId("bookReaderScroll");
       if (!book || !scroll) throw new Error("Livro indisponível.");
@@ -434,6 +653,7 @@
         <section class="book-reader-pages">
           ${pages}
         </section>`;
+      void hydrateOfflineCoverImages();
       scroll.scrollTop = 0;
       state.currentChunks = [...scroll.querySelectorAll("[data-reading-chunk]")].map((item) => item.textContent || "");
       state.currentContext = { type: "book", bookKey: book.id, chapterNumber: 0 };
@@ -507,7 +727,12 @@
     if (event.target.closest("#openBookCreate")) setCreateOpen(true);
     if (event.target.closest("#closeBookCreate")) setCreateOpen(false);
     if (event.target.closest("#closeBookReader")) { void flushReadingBlocks({ force: true }); setReaderOpen(false); }
+    const downloadBookButton = event.target.closest("[data-download-book-id]");
+    if (downloadBookButton) { event.preventDefault(); event.stopPropagation(); void downloadBook(String(downloadBookButton.dataset.downloadBookId || ""), downloadBookButton); return; }
+    const downloadBibleButton = event.target.closest("[data-download-bible]");
+    if (downloadBibleButton) { event.preventDefault(); event.stopPropagation(); void downloadBible(downloadBibleButton); return; }
     if (event.target.closest("[data-open-bible]")) openBible();
+    if (event.target.closest("#bibleRewriteButton")) void rewriteCurrentBibleChapter();
     if (event.target.closest("[data-bible-close]")) byId("bibleWelcomeOverlay").hidden = true;
     if (event.target.closest("[data-bible-read]")) { byId("bibleWelcomeOverlay").hidden = true; void enterBibleReader(); }
     if (event.target.closest("[data-bible-plan]")) void loadReadingProgress().then(() => { byId("bibleWelcomeOverlay").hidden = true; hydrateBiblePlan(); openBiblePlan(1); });
