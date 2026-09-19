@@ -373,9 +373,9 @@
     const scroll = byId("bookReaderScroll");
     if (!scroll) return;
     const reading = readingWithQueuedBlocks();
-    const stats = bibleCompletionStats(new Set(state.reading?.completedBibleChapters || []));
-    const allComplete = stats.completedChapterCount === stats.totalChapters;
-    scroll.innerHTML = `<section class="book-reader-hero bible-finished-card"><span>${allComplete ? "LEITURA CONCLUÍDA" : "FIM DA BÍBLIA"}</span>${approvedSvgMarkup()}<h2>${allComplete ? "Bíblia concluída" : "Você chegou ao fim"}</h2><strong>${stats.percent.toFixed(2)}%</strong><p>${stats.completedChapterCount} de ${stats.totalChapters} capítulos concluídos · ${Math.floor(Number(reading.exactPoints || 0))} pontos de leitura totais.</p><button type="button" data-bible-finished-close>Voltar à biblioteca</button></section>`;
+    const stats = bibleCompletionStats(reading);
+    const allComplete = stats.percent >= 100;
+    scroll.innerHTML = `<section class="book-reader-hero bible-finished-card"><span>${allComplete ? "LEITURA CONCLUÍDA" : "FIM DA BÍBLIA"}</span>${approvedSvgMarkup()}<h2>${allComplete ? "Bíblia concluída" : "Você chegou ao fim"}</h2><strong>${stats.percent.toFixed(2)}%</strong><p>${Math.floor(Number(reading.exactPoints || 0))} pontos de leitura totais.</p><button type="button" data-bible-finished-close>Voltar à biblioteca</button></section>`;
     state.currentChunks = [];
     state.currentContext = null;
     setBibleReaderControls(false);
@@ -568,14 +568,17 @@
     return '<svg class="bible-approved-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor"/><path d="m7.8 12.2 2.6 2.6 5.9-6" fill="none" stroke="#07120d" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
 
-  function bibleCompletionStats(completed) {
+  function bibleCompletionStats(reading = readingWithQueuedBlocks()) {
     const books = Array.isArray(state.bible) ? state.bible : [];
+    const completed = new Set(reading?.completedBibleChapters || []);
     const allChapterKeys = books.flatMap((item) => item.chapters.map((part) => `${item.key}:${part.number}`));
     const completedChapterCount = allChapterKeys.reduce((total, key) => total + (completed.has(key) ? 1 : 0), 0);
+    const bibleCharacters = Math.max(0, Math.min(BIBLE_TOTAL_CHARACTERS, Number(reading?.bibleCharacters || 0)));
     return {
       totalChapters: allChapterKeys.length || BIBLE_TOTAL_CHAPTERS,
       completedChapterCount,
-      percent: completedChapterCount * 100 / (allChapterKeys.length || BIBLE_TOTAL_CHAPTERS)
+      bibleCharacters,
+      percent: bibleCharacters * 100 / BIBLE_TOTAL_CHARACTERS
     };
   }
 
@@ -604,8 +607,9 @@
     let coveredCharacters = 0;
     const selected = Math.max(0, paragraphs.findIndex((paragraph) => { const includesOffset = verseOffset < coveredCharacters + paragraph.length + 1; coveredCharacters += paragraph.length + 1; return includesOffset; }));
     state.activeChunk = selected;
-    const completed = new Set(state.reading?.completedBibleChapters || []);
-    const stats = bibleCompletionStats(completed);
+    const reading = readingWithQueuedBlocks();
+    const completed = new Set(reading.completedBibleChapters || []);
+    const stats = bibleCompletionStats(reading);
     const bookOptions = state.bible.map((item, index) => {
       const approved = item.chapters.every((part) => completed.has(`${item.key}:${part.number}`));
       return `<button type="button" class="bible-picker-option${index === state.bibleBook ? " is-selected" : ""}" data-bible-book-option="${index}" aria-selected="${index === state.bibleBook ? "true" : "false"}"><span>${escapeHtml(item.name)}</span>${approved ? approvedSvgMarkup() : ""}</button>`;
@@ -615,7 +619,7 @@
       return `<button type="button" class="bible-picker-option${index === state.bibleChapter ? " is-selected" : ""}" data-bible-chapter-option="${index}" aria-selected="${index === state.bibleChapter ? "true" : "false"}"><span>Cap. ${item.number}</span>${approved ? approvedSvgMarkup() : ""}</button>`;
     });
     const selector = `${biblePickerMarkup("book", book.name, bookOptions)}${biblePickerMarkup("chapter", `Cap. ${chapter.number}`, chapterOptions)}<select id="bibleVerseSelect" aria-label="Versículo da Bíblia">${verses.map((item, index) => `<option value="${index}">V. ${item.number}</option>`).join("")}</select>`;
-    const progressLabel = `${stats.percent.toFixed(2)}% completo · ${stats.completedChapterCount} de ${stats.totalChapters} capítulos`;
+    const progressLabel = `${stats.percent.toFixed(2)}% completo`;
     renderSelectableReader({ title: `${book.name} | Capítulo ${chapter.number}`, subtitle: `${progressLabel}${version ? " · versão simples por Luna" : ""}`, chunks: paragraphs, selected, chapterLabel: `${book.name} ${chapter.number}`, context: { type: "bible", bookKey: book.key, chapterNumber: chapter.number } });
     const nav = byId("bibleNav");
     if (nav) nav.innerHTML = selector;
@@ -673,9 +677,8 @@
 
   function renderBibleWelcome() {
     const modal = ensureBooksOverlay("bibleWelcomeOverlay");
-    const completed = new Set(state.reading?.completedBibleChapters || []);
-    const stats = bibleCompletionStats(completed);
-    modal.innerHTML = `<div class="bible-welcome-card"><span>BÍBLIA SAGRADA</span><div class="bible-welcome-progress" aria-label="${stats.percent.toFixed(2)}% da Bíblia lida"><strong>${stats.percent.toFixed(2)}%</strong><small>${stats.completedChapterCount} de ${stats.totalChapters} capítulos concluídos</small></div><h2>Continue sua leitura</h2><p>Leia no seu ritmo, acompanhe capítulos e transforme letras em progresso.</p><button type="button" data-bible-read>Iniciar leitura</button><button type="button" class="is-secondary" data-bible-plan>Plano de leitura</button><button type="button" class="is-ghost" data-bible-close>Agora não</button></div>`;
+    const stats = bibleCompletionStats();
+    modal.innerHTML = `<div class="bible-welcome-card"><span>BÍBLIA SAGRADA</span><div class="bible-welcome-progress" aria-label="${stats.percent.toFixed(2)}% da Bíblia lida"><strong>${stats.percent.toFixed(2)}%</strong></div><h2>Continue sua leitura</h2><p>Leia no seu ritmo e transforme cada trecho em progresso.</p><button type="button" data-bible-read>Iniciar leitura</button><button type="button" class="is-secondary" data-bible-plan>Plano de leitura</button><button type="button" class="is-ghost" data-bible-close>Agora não</button></div>`;
     modal.hidden = false;
   }
 
