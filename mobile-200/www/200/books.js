@@ -369,6 +369,19 @@
     return true;
   }
 
+  function renderBibleCompletedScreen() {
+    const scroll = byId("bookReaderScroll");
+    if (!scroll) return;
+    const reading = readingWithQueuedBlocks();
+    const stats = bibleCompletionStats(new Set(state.reading?.completedBibleChapters || []));
+    const allComplete = stats.completedChapterCount === stats.totalChapters;
+    scroll.innerHTML = `<section class="book-reader-hero bible-finished-card"><span>${allComplete ? "LEITURA CONCLUÍDA" : "FIM DA BÍBLIA"}</span>${approvedSvgMarkup()}<h2>${allComplete ? "Bíblia concluída" : "Você chegou ao fim"}</h2><strong>${stats.percent.toFixed(2)}%</strong><p>${stats.completedChapterCount} de ${stats.totalChapters} capítulos concluídos · ${Math.floor(Number(reading.exactPoints || 0))} pontos de leitura totais.</p><button type="button" data-bible-finished-close>Voltar à biblioteca</button></section>`;
+    state.currentChunks = [];
+    state.currentContext = null;
+    setBibleReaderControls(false);
+    setReaderOpen(true);
+  }
+
   async function completeCurrentBibleChapter(context) {
     const completionKey = `${context.bookKey}:${context.chapterNumber}`;
     if (state.bibleCompletingKey) return false;
@@ -382,7 +395,7 @@
       const book = state.bible?.[state.bibleBook];
       const chapter = book?.chapters?.[state.bibleChapter];
       await showBibleChapterCompletion(state.reading, `${book?.name || context.bookKey} ${chapter?.number || context.chapterNumber}`);
-      if (!await advanceToNextBibleChapter()) renderBibleReader();
+      if (!await advanceToNextBibleChapter()) renderBibleCompletedScreen();
       return true;
     } finally {
       if (state.bibleCompletingKey === completionKey) state.bibleCompletingKey = "";
@@ -406,7 +419,7 @@
       return;
     }
     const characters = String(chunk.textContent || "").trim().length; const minimumMs = (characters / 25) * 1000; const elapsed = Date.now() - state.chunkStartedAt;
-    if (elapsed < minimumMs) { showRhythmControl(minimumMs - elapsed); return; }
+    if (context.type !== "bible" && elapsed < minimumMs) { showRhythmControl(minimumMs - elapsed); return; }
     if (!state.queuedBlockKeys.has(key)) {
       state.queuedBlockKeys.add(key);
       state.pendingBlocks.push({ key, characters, readingType: context.type || "book", bookKey: context.bookKey, chapterNumber: context.chapterNumber });
@@ -899,6 +912,7 @@
     if (event.target.closest("[data-open-bible]")) openBible();
     if (event.target.closest("#bibleRewriteButton")) void rewriteCurrentBibleChapter();
     if (event.target.closest("[data-bible-close]")) byId("bibleWelcomeOverlay").hidden = true;
+    if (event.target.closest("[data-bible-finished-close]")) { setReaderOpen(false); return; }
     if (event.target.closest("[data-bible-read]")) { byId("bibleWelcomeOverlay").hidden = true; void enterBibleReader(); }
     if (event.target.closest("[data-bible-plan]")) void loadReadingProgress().then(() => { byId("bibleWelcomeOverlay").hidden = true; hydrateBiblePlan(); openBiblePlan(1); });
     if (event.target.closest("[data-plan-close]")) byId("biblePlanOverlay").hidden = true;

@@ -33,8 +33,12 @@ test("o leitor usa capítulos concluídos para a porcentagem e SVG nos menus de 
   assert.match(source, /bible-welcome-progress/u);
   assert.match(source, /completeCurrentBibleChapter\(context\)/u);
   assert.match(source, /advanceToNextBibleChapter/u);
+  assert.match(source, /renderBibleCompletedScreen/u);
+  assert.match(source, /context\.type !== "bible" && elapsed < minimumMs/u);
+  assert.match(source, /data-bible-finished-close/u);
   assert.doesNotMatch(source, /expectedBlocks: state\.currentChunks\.length/u);
   assert.match(styles, /\.books-shell\.is-reading \.book-download-button\{visibility:hidden\}/u);
   assert.match(backend, /create table if not exists project200_bible_chapter_progress/u);
   assert.match(backend, /getCanonicalProject200BibleChapter\(bookKey, chapterNumber\)/u);
+  assert.match(backend, /\(\$2::bigint\)::numeric\/50/u);
 });
