@@ -1,10 +1,11 @@
 (function initProject200Books() {
   const TOKEN_KEY = "turma_do_printy_token";
   const byId = (id) => document.getElementById(id);
-  const state = { books: [], loading: false, pollTimer: 0, literaryStyle: "Romance", isAdmin: false, coverEditorBook: null, bible: null, bibleLoading: null, bibleBook: 0, bibleChapter: 0, bibleVerse: 0, bibleVersions: new Map(), bibleVersionLoading: new Map(), bibleGeneratingKey: "", activeChunk: 0, reading: null, pendingBlocks: [], savingBlocks: [], readingSavePromise: null, readingBlocksSinceFeedback: 0, queuedBlockKeys: new Set(), currentChunks: [], currentContext: null, chunkStartedAt: 0, readerTouch: null, offlineCoverUrls: new Map(), planStep: 0, planStartedAt: 0, planLetters: 0, plan: { lettersPerSecond: 14.7, durationMonths: 12, durationDays: 0, repeatDays: [0,1,2,3,4,5,6], scheduleConfig: null, scheduleLabel: "Todos os dias" } };
+  const state = { books: [], loading: false, pollTimer: 0, literaryStyle: "Romance", isAdmin: false, coverEditorBook: null, bible: null, bibleLoading: null, bibleBook: 0, bibleChapter: 0, bibleVerse: 0, bibleVersions: new Map(), bibleVersionLoading: new Map(), bibleGeneratingKey: "", activeChunk: 0, reading: null, pendingBlocks: [], savingBlocks: [], readingSavePromise: null, pendingReadingPosition: null, readingPositionTimer: 0, readingPositionPromise: null, readingBlocksSinceFeedback: 0, queuedBlockKeys: new Set(), currentChunks: [], currentContext: null, chunkStartedAt: 0, readerTouch: null, offlineCoverUrls: new Map(), planStep: 0, planStartedAt: 0, planLetters: 0, plan: { lettersPerSecond: 14.7, durationMonths: 12, durationDays: 0, repeatDays: [0,1,2,3,4,5,6], scheduleConfig: null, scheduleLabel: "Todos os dias" } };
   const BIBLE_TOTAL_CHARACTERS = 3809122;
   const OFFLINE_CACHE_NAME = "project200-books-v1";
   const OFFLINE_INDEX_KEY = "project_200_offline_books_v1";
+  const LOCAL_READING_POSITIONS_KEY = "project_200_reading_positions_v1";
   const COVER_STYLES = ["Editorial cinematográfica", "Minimalista premium", "Ilustração 3D", "Aquarela artística", "Fantasia épica", "Fotográfica realista", "Vintage clássica", "Anime contemporâneo", "Infantil colorida", "Sombria e misteriosa"];
 
   function getToken() {
@@ -87,6 +88,71 @@
   async function getOfflineJson(kind, id) {
     const response = await getOfflineResponse(kind, id);
     return response ? response.json().catch(() => null) : null;
+  }
+
+  function readLocalReadingPositions() {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(LOCAL_READING_POSITIONS_KEY) || "{}");
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch { return {}; }
+  }
+
+  function saveLocalBookPosition(bookKey, chunkIndex) {
+    const positions = readLocalReadingPositions();
+    positions[String(bookKey)] = Math.max(0, Math.trunc(Number(chunkIndex || 0)));
+    try { window.localStorage.setItem(LOCAL_READING_POSITIONS_KEY, JSON.stringify(positions)); } catch {}
+  }
+
+  function getBookResumePosition(bookKey, chunkCount) {
+    const serverPosition = (Array.isArray(state.reading?.positions) ? state.reading.positions : [])
+      .find((position) => position?.readingType === "book" && String(position?.bookKey) === String(bookKey));
+    const localPosition = Number(readLocalReadingPositions()[String(bookKey)] || 0);
+    return Math.max(0, Math.min(Math.max(0, chunkCount - 1), Math.max(localPosition, Number(serverPosition?.chunkIndex || 0))));
+  }
+
+  async function flushReadingPosition({ force = false } = {}) {
+    if (state.readingPositionPromise) {
+      const current = await state.readingPositionPromise;
+      if (force && state.pendingReadingPosition) return flushReadingPosition({ force: true });
+      return current;
+    }
+    if (!state.pendingReadingPosition || (!force && state.readingPositionTimer)) return null;
+    window.clearTimeout(state.readingPositionTimer);
+    state.readingPositionTimer = 0;
+    const position = state.pendingReadingPosition;
+    state.pendingReadingPosition = null;
+    const saving = apiFetch("/api/200/reading/position", { method: "PUT", keepalive: true, body: JSON.stringify(position) })
+      .then((payload) => {
+        const saved = payload?.position;
+        if (saved) {
+          const positions = (Array.isArray(state.reading?.positions) ? state.reading.positions : []).filter((item) => !(item.readingType === saved.readingType && String(item.bookKey) === String(saved.bookKey) && Number(item.chapterNumber || 0) === Number(saved.chapterNumber || 0)));
+          state.reading = { ...(state.reading || {}), positions: [saved, ...positions] };
+        }
+        return saved || null;
+      })
+      .catch(() => {
+        if (!state.pendingReadingPosition || Number(state.pendingReadingPosition.chunkIndex || 0) < Number(position.chunkIndex || 0)) state.pendingReadingPosition = position;
+        return null;
+      })
+      .finally(() => {
+        state.readingPositionPromise = null;
+        if (state.pendingReadingPosition) {
+          state.readingPositionTimer = window.setTimeout(() => { state.readingPositionTimer = 0; void flushReadingPosition(); }, 900);
+        }
+      });
+    state.readingPositionPromise = saving;
+    return saving;
+  }
+
+  function queueBookReadingPosition(bookKey, chunkIndex) {
+    const next = Math.max(0, Math.trunc(Number(chunkIndex || 0)));
+    saveLocalBookPosition(bookKey, next);
+    if (!getToken()) return;
+    if (!state.pendingReadingPosition || String(state.pendingReadingPosition.bookKey) !== String(bookKey) || next >= Number(state.pendingReadingPosition.chunkIndex || 0)) {
+      state.pendingReadingPosition = { readingType: "book", bookKey: String(bookKey), chapterNumber: 0, chunkIndex: next };
+    }
+    window.clearTimeout(state.readingPositionTimer);
+    state.readingPositionTimer = window.setTimeout(() => { state.readingPositionTimer = 0; void flushReadingPosition(); }, 900);
   }
 
   function escapeHtml(value) {
@@ -283,13 +349,18 @@
     if (index !== state.activeChunk) { selectReadingChunk(index); return; }
     const context = state.currentContext || {};
     const key = getReadingBlockKey(index);
-    if (state.queuedBlockKeys.has(key)) { selectReadingChunk(index + 1); return; }
+    if (state.queuedBlockKeys.has(key)) {
+      if (context.type === "book") queueBookReadingPosition(context.bookKey, index + 1);
+      selectReadingChunk(index + 1);
+      return;
+    }
     const characters = String(chunk.textContent || "").trim().length; const minimumMs = (characters / 25) * 1000; const elapsed = Date.now() - state.chunkStartedAt;
     if (elapsed < minimumMs) { showRhythmControl(minimumMs - elapsed); return; }
     if (!state.queuedBlockKeys.has(key)) {
       state.queuedBlockKeys.add(key);
       state.pendingBlocks.push({ key, characters, readingType: context.type || "book", bookKey: context.bookKey, chapterNumber: context.chapterNumber });
     }
+    if (context.type === "book") queueBookReadingPosition(context.bookKey, index + 1);
     state.readingBlocksSinceFeedback += 1;
     if (state.readingBlocksSinceFeedback >= 5) {
       state.readingBlocksSinceFeedback = 0;
@@ -432,6 +503,36 @@
     window.requestAnimationFrame(() => anchorActiveChunk({ smooth: false }));
   }
 
+  function approvedSvgMarkup() {
+    return '<svg class="bible-approved-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor"/><path d="m7.8 12.2 2.6 2.6 5.9-6" fill="none" stroke="#07120d" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+
+  function bibleCompletionStats(completed) {
+    const books = Array.isArray(state.bible) ? state.bible : [];
+    const allChapterKeys = books.flatMap((item) => item.chapters.map((part) => `${item.key}:${part.number}`));
+    const completedChapterCount = allChapterKeys.reduce((total, key) => total + (completed.has(key) ? 1 : 0), 0);
+    return {
+      totalChapters: allChapterKeys.length,
+      completedChapterCount,
+      percent: allChapterKeys.length ? completedChapterCount * 100 / allChapterKeys.length : 0
+    };
+  }
+
+  function closeBiblePickerMenus(except = "") {
+    document.querySelectorAll("[data-bible-picker-menu]").forEach((menu) => {
+      const keepOpen = except && menu.dataset.biblePickerMenu === except;
+      menu.hidden = !keepOpen;
+    });
+    document.querySelectorAll("[data-bible-picker-toggle]").forEach((button) => {
+      button.setAttribute("aria-expanded", button.dataset.biblePickerToggle === except ? "true" : "false");
+    });
+  }
+
+  function biblePickerMarkup(type, label, options) {
+    const ariaLabel = type === "book" ? "Escolher livro da Bíblia" : "Escolher capítulo da Bíblia";
+    return `<div class="bible-picker"><button class="bible-picker-trigger" type="button" data-bible-picker-toggle="${type}" aria-label="${ariaLabel}" aria-expanded="false"><span>${escapeHtml(label)}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="bible-picker-menu" data-bible-picker-menu="${type}" hidden>${options.join("")}</div></div>`;
+  }
+
   function renderBibleReader() {
     const book = state.bible?.[state.bibleBook]; const chapter = book?.chapters?.[state.bibleChapter];
     if (!book || !chapter) return;
@@ -443,17 +544,22 @@
     const selected = Math.max(0, paragraphs.findIndex((paragraph) => { const includesOffset = verseOffset < coveredCharacters + paragraph.length + 1; coveredCharacters += paragraph.length + 1; return includesOffset; }));
     state.activeChunk = selected;
     const completed = new Set(state.reading?.completedBibleChapters || []);
-    const selector = `<select id="bibleBookSelect" aria-label="Livro da Bíblia">${state.bible.map((item, index) => `<option value="${index}" ${item.chapters.every((part) => completed.has(`${item.key}:${part.number}`)) ? "class=\"is-complete\"" : ""}>${escapeHtml(item.name)}</option>`).join("")}</select><select id="bibleChapterSelect" aria-label="Capítulo da Bíblia">${book.chapters.map((item, index) => `<option value="${index}" ${completed.has(`${book.key}:${item.number}`) ? "class=\"is-complete\"" : ""}>Cap. ${item.number}</option>`).join("")}</select><select id="bibleVerseSelect" aria-label="Versículo da Bíblia">${verses.map((item, index) => `<option value="${index}">V. ${item.number}</option>`).join("")}</select>`;
-    const percent = Math.min(100, Number(state.reading?.bibleCharacters || 0) * 100 / BIBLE_TOTAL_CHARACTERS);
-    renderSelectableReader({ title: `${book.name} | Capítulo ${chapter.number}`, subtitle: `${percent.toFixed(2)}% completo${version ? " · versão simples por Luna" : ""}`, chunks: paragraphs, selected, chapterLabel: `${book.name} ${chapter.number}`, context: { type: "bible", bookKey: book.key, chapterNumber: chapter.number } });
+    const stats = bibleCompletionStats(completed);
+    const bookOptions = state.bible.map((item, index) => {
+      const approved = item.chapters.every((part) => completed.has(`${item.key}:${part.number}`));
+      return `<button type="button" class="bible-picker-option${index === state.bibleBook ? " is-selected" : ""}" data-bible-book-option="${index}" aria-selected="${index === state.bibleBook ? "true" : "false"}"><span>${escapeHtml(item.name)}</span>${approved ? approvedSvgMarkup() : ""}</button>`;
+    });
+    const chapterOptions = book.chapters.map((item, index) => {
+      const approved = completed.has(`${book.key}:${item.number}`);
+      return `<button type="button" class="bible-picker-option${index === state.bibleChapter ? " is-selected" : ""}" data-bible-chapter-option="${index}" aria-selected="${index === state.bibleChapter ? "true" : "false"}"><span>Cap. ${item.number}</span>${approved ? approvedSvgMarkup() : ""}</button>`;
+    });
+    const selector = `${biblePickerMarkup("book", book.name, bookOptions)}${biblePickerMarkup("chapter", `Cap. ${chapter.number}`, chapterOptions)}<select id="bibleVerseSelect" aria-label="Versículo da Bíblia">${verses.map((item, index) => `<option value="${index}">V. ${item.number}</option>`).join("")}</select>`;
+    const progressLabel = `${stats.percent.toFixed(2)}% completo · ${stats.completedChapterCount} de ${stats.totalChapters} capítulos`;
+    renderSelectableReader({ title: `${book.name} | Capítulo ${chapter.number}`, subtitle: `${progressLabel}${version ? " · versão simples por Luna" : ""}`, chunks: paragraphs, selected, chapterLabel: `${book.name} ${chapter.number}`, context: { type: "bible", bookKey: book.key, chapterNumber: chapter.number } });
     const nav = byId("bibleNav");
     if (nav) nav.innerHTML = selector;
     setBibleReaderControls(true, Boolean(version));
-    byId("bibleBookSelect").value = String(state.bibleBook); byId("bibleChapterSelect").value = String(state.bibleChapter); byId("bibleVerseSelect").value = String(state.bibleVerse);
-    byId("bibleBookSelect").classList.toggle("is-complete", book.chapters.every((part) => completed.has(`${book.key}:${part.number}`)));
-    byId("bibleChapterSelect").classList.toggle("is-complete", completed.has(`${book.key}:${chapter.number}`));
-    byId("bibleBookSelect").onchange = (event) => { state.bibleBook = Number(event.target.value); state.bibleChapter = 0; state.bibleVerse = 0; void showBibleChapter(); };
-    byId("bibleChapterSelect").onchange = (event) => { state.bibleChapter = Number(event.target.value); state.bibleVerse = 0; void showBibleChapter(); };
+    byId("bibleVerseSelect").value = String(state.bibleVerse);
     byId("bibleVerseSelect").onchange = (event) => { state.bibleVerse = Number(event.target.value); renderBibleReader(); };
   }
 
@@ -634,6 +740,7 @@
     }
     if (status) status.textContent = "Carregando páginas...";
     try {
+      const readingProgressPromise = loadReadingProgress();
       let payload = null;
       try { payload = await apiFetch(`/api/200/books/${encodeURIComponent(bookId)}`); }
       catch (networkError) {
@@ -655,9 +762,11 @@
         </section>`;
       void hydrateOfflineCoverImages();
       scroll.scrollTop = 0;
+      await readingProgressPromise;
       state.currentChunks = [...scroll.querySelectorAll("[data-reading-chunk]")].map((item) => item.textContent || "");
       state.currentContext = { type: "book", bookKey: book.id, chapterNumber: 0 };
-      state.activeChunk = 0; state.chunkStartedAt = Date.now();
+      state.activeChunk = getBookResumePosition(book.id, state.currentChunks.length); state.chunkStartedAt = Date.now();
+      [...scroll.querySelectorAll("[data-reading-chunk]")].forEach((item, index) => item.classList.toggle("is-active", index === state.activeChunk));
       setReaderOpen(true);
       window.requestAnimationFrame(() => anchorActiveChunk({ smooth: false }));
       if (status) status.textContent = "";
@@ -726,7 +835,7 @@
     if (openButton) window.setTimeout(() => { void loadLibrary(); void loadReadingProgress(); }, 0);
     if (event.target.closest("#openBookCreate")) setCreateOpen(true);
     if (event.target.closest("#closeBookCreate")) setCreateOpen(false);
-    if (event.target.closest("#closeBookReader")) { void flushReadingBlocks({ force: true }); setReaderOpen(false); }
+    if (event.target.closest("#closeBookReader")) { void flushReadingBlocks({ force: true }); void flushReadingPosition({ force: true }); setReaderOpen(false); }
     const downloadBookButton = event.target.closest("[data-download-book-id]");
     if (downloadBookButton) { event.preventDefault(); event.stopPropagation(); void downloadBook(String(downloadBookButton.dataset.downloadBookId || ""), downloadBookButton); return; }
     const downloadBibleButton = event.target.closest("[data-download-bible]");
@@ -756,6 +865,24 @@
     if (planDay) { const day = Number(planDay.dataset.planDay); state.plan.repeatDays = state.plan.repeatDays.includes(day) ? state.plan.repeatDays.filter((item) => item !== day) : [...state.plan.repeatDays, day].sort(); if (!state.plan.repeatDays.length) state.plan.repeatDays = [day]; renderBiblePlanSchedule(); }
     if (event.target.closest("[data-plan-save]")) void saveBiblePlan();
     if (event.target.closest("[data-cover-editor-close]")) byId("bookCoverEditorOverlay").hidden = true;
+    const pickerToggle = event.target.closest("[data-bible-picker-toggle]");
+    if (pickerToggle) {
+      const type = String(pickerToggle.dataset.biblePickerToggle || "");
+      const menu = document.querySelector(`[data-bible-picker-menu="${type}"]`);
+      closeBiblePickerMenus(menu?.hidden ? type : "");
+      return;
+    }
+    const bookOption = event.target.closest("[data-bible-book-option]");
+    if (bookOption) {
+      state.bibleBook = Number(bookOption.dataset.bibleBookOption || 0); state.bibleChapter = 0; state.bibleVerse = 0;
+      closeBiblePickerMenus(); void showBibleChapter(); return;
+    }
+    const chapterOption = event.target.closest("[data-bible-chapter-option]");
+    if (chapterOption) {
+      state.bibleChapter = Number(chapterOption.dataset.bibleChapterOption || 0); state.bibleVerse = 0;
+      closeBiblePickerMenus(); void showBibleChapter(); return;
+    }
+    if (!event.target.closest(".bible-picker")) closeBiblePickerMenus();
     if (event.target.closest("[data-reading-chunk]")) return;
     const style = event.target.closest("[data-book-style]");
     if (style) {
@@ -812,7 +939,7 @@
     navigateReader(event.key === "ArrowDown" ? 1 : -1);
   });
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) void flushReadingBlocks({ force: true });
+    if (document.hidden) { void flushReadingBlocks({ force: true }); void flushReadingPosition({ force: true }); }
     if (!document.hidden && byId("booksModal")?.classList.contains("active")) void loadLibrary({ quiet: true });
   });
   window.Project200Books = { openBible };

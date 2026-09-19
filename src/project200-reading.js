@@ -10,6 +10,39 @@ function serializeReadingRow(row = {}) {
   return { totalCharacters: Number(row.total_characters || 0), bibleCharacters: Number(row.bible_characters || 0), exactPoints: Number(row.exact_points || 0), visiblePoints: Math.floor(Number(row.exact_points || 0)), completedBibleChapters: row.completed_bible_chapters || [], biblePlan: row.bible_plan || null, updatedAt: row.updated_at };
 }
 
+function serializeReadingPosition(row = {}) {
+  return {
+    readingType: row.reading_type === "bible" ? "bible" : "book",
+    bookKey: String(row.book_key || ""),
+    chapterNumber: Number(row.chapter_number || 0),
+    chunkIndex: Math.max(0, Number(row.chunk_index || 0)),
+    updatedAt: row.updated_at
+  };
+}
+
+export function normalizeProject200ReadingPosition(position = {}) {
+  const readingType = position?.readingType === "bible" ? "bible" : "book";
+  const bookKey = String(position?.bookKey || "").trim().slice(0, 120);
+  if (!bookKey) throw new Error("Livro inválido para salvar a posição de leitura.");
+  return {
+    readingType,
+    bookKey,
+    chapterNumber: readingType === "bible" ? boundedInteger(position?.chapterNumber, 1, 1, 200) : 0,
+    chunkIndex: boundedInteger(position?.chunkIndex, 0, 0, 100000)
+  };
+}
+
+async function listProject200ReadingPositions(userId, client = { query }) {
+  const result = await client.query(
+    `select reading_type, book_key, chapter_number, chunk_index, updated_at
+       from project200_reading_positions
+      where user_id=$1
+      order by updated_at desc`,
+    [userId]
+  );
+  return result.rows.map(serializeReadingPosition);
+}
+
 function normalizeBibleSchedule(value, repeatDays) {
   const raw = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const frequency = ["none", "daily", "weekly", "monthly_custom", "periodic", "yearly"].includes(String(raw.frequency || "")) ? String(raw.frequency) : "daily";
@@ -53,10 +86,20 @@ export async function ensureProject200ReadingSchema() {
       reading_type text not null default 'book',
       created_at timestamptz not null default now(), unique(user_id, block_key)
     )`);
+    await query(`create table if not exists project200_reading_positions (
+      user_id uuid not null references users(id) on delete cascade,
+      reading_type text not null default 'book',
+      book_key text not null,
+      chapter_number integer not null default 0,
+      chunk_index integer not null default 0,
+      updated_at timestamptz not null default now(),
+      primary key(user_id, reading_type, book_key, chapter_number)
+    )`);
     await query("alter table project200_reading_progress add column if not exists bible_characters bigint not null default 0");
     await query("alter table project200_reading_events add column if not exists reading_type text not null default 'book'");
     await query("create index if not exists idx_project200_reading_events_user_created on project200_reading_events(user_id, created_at desc)");
     await query("create index if not exists idx_project200_reading_events_bible_chapter on project200_reading_events(user_id, reading_type, book_key, chapter_number)");
+    await query("create index if not exists idx_project200_reading_positions_user_updated on project200_reading_positions(user_id, updated_at desc)");
   })().catch((error) => { schemaPromise = null; throw error; });
   return schemaPromise;
 }
@@ -64,8 +107,11 @@ export async function ensureProject200ReadingSchema() {
 export async function getProject200Reading(userId) {
   await ensureProject200ReadingSchema();
   await query(`insert into project200_reading_progress(user_id) values($1) on conflict do nothing`, [userId]);
-  const result = await query(`select total_characters, bible_characters, exact_points, completed_bible_chapters, bible_plan, updated_at from project200_reading_progress where user_id=$1`, [userId]);
-  return serializeReadingRow(result.rows[0]);
+  const [result, positions] = await Promise.all([
+    query(`select total_characters, bible_characters, exact_points, completed_bible_chapters, bible_plan, updated_at from project200_reading_progress where user_id=$1`, [userId]),
+    listProject200ReadingPositions(userId)
+  ]);
+  return { ...serializeReadingRow(result.rows[0]), positions };
 }
 
 export async function recordProject200ReadingBlocks(userId, blocks = []) {
@@ -88,13 +134,28 @@ export async function recordProject200ReadingBlocks(userId, blocks = []) {
     const previousVisiblePoints = Math.floor(Math.max(0, progress.totalCharacters - added) / 50); const earnedVisiblePoints = Math.max(0, progress.visiblePoints - previousVisiblePoints);
     if (earnedVisiblePoints > 0) await client.query(`insert into project200_point_events(user_id,source_type,source_key,points,scope_date,metadata) values($1,'reading',$2,$3,$4::date,$5::jsonb) on conflict(user_id,source_type,source_key) do update set points=project200_point_events.points+excluded.points,metadata=excluded.metadata,updated_at=now()`, [userId, `reading-${today}`, earnedVisiblePoints, today, JSON.stringify({ exactPoints: progress.exactPoints, totalCharacters: progress.totalCharacters })]);
     await client.query("commit");
-    return { ...progress, addedCharacters: added, addedPoints: Number((added / 50).toFixed(2)) };
+    const positions = await listProject200ReadingPositions(userId, client);
+    return { ...progress, positions, addedCharacters: added, addedPoints: Number((added / 50).toFixed(2)) };
   } catch (error) {
     await client.query("rollback").catch(() => {});
     throw error;
   } finally {
     client.release();
   }
+}
+
+export async function saveProject200ReadingPosition(userId, position = {}) {
+  await ensureProject200ReadingSchema();
+  const { readingType, bookKey, chapterNumber, chunkIndex } = normalizeProject200ReadingPosition(position);
+  const result = await query(
+    `insert into project200_reading_positions(user_id,reading_type,book_key,chapter_number,chunk_index)
+     values($1,$2,$3,$4,$5)
+     on conflict(user_id,reading_type,book_key,chapter_number) do update
+       set chunk_index=greatest(project200_reading_positions.chunk_index,excluded.chunk_index),updated_at=now()
+     returning reading_type, book_key, chapter_number, chunk_index, updated_at`,
+    [userId, readingType, bookKey, chapterNumber, chunkIndex]
+  );
+  return serializeReadingPosition(result.rows[0]);
 }
 
 export async function completeProject200BibleChapter(userId, bookKey, chapterNumber, expectedBlocks) {

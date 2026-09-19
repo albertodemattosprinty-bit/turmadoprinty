@@ -90,7 +90,7 @@ import { addProject200Tutor, appendProject200TutorMessage, claimProject200TutorP
 import { completeProject200Onboarding, ensureProject200OnboardingSchema, getProject200Onboarding, initializeProject200Onboarding, markProject200OnboardingAvatarComplete, restartProject200Onboarding, saveProject200OnboardingProgress } from "./src/project200-onboarding.js";
 import { getQualityAssessment, saveQualityAssessment } from "./src/project200-quality.js";
 import { createProject200BooksRuntime } from "./src/project200-books-runtime.js";
-import { completeProject200BibleChapter, getProject200Reading, recordProject200ReadingBlocks, saveProject200BiblePlan } from "./src/project200-reading.js";
+import { completeProject200BibleChapter, getProject200Reading, recordProject200ReadingBlocks, saveProject200BiblePlan, saveProject200ReadingPosition } from "./src/project200-reading.js";
 import { getProject200BibleVersion, rewriteProject200BibleChapter } from "./src/project200-bible-versions.js";
 import { getProject201AppUpdateConfig, saveProject201AppUpdateConfig } from "./src/project201-app-update.js";
 import { decryptUserBuffer, encryptUserBuffer } from "./src/privacy-crypto.js";
@@ -15023,6 +15023,9 @@ const server = http.createServer(async (request, response) => {
       } else if (request.method === "POST" && pathname === "/api/200/reading/bible-chapter") {
         const body = await readJsonBody(request);
         sendJson(response, 200, { ok: true, reading: await completeProject200BibleChapter(user.id, body?.bookKey, body?.chapterNumber, body?.expectedBlocks) });
+      } else if (request.method === "PUT" && pathname === "/api/200/reading/position") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, { ok: true, position: await saveProject200ReadingPosition(user.id, body) });
       } else if (request.method === "PUT" && pathname === "/api/200/reading/bible-plan") {
         const body = await readJsonBody(request);
         const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
