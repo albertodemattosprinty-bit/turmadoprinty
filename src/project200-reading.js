@@ -1,5 +1,6 @@
 import { db, query } from "./db.js";
 import { ensureExtraGoalsSchema } from "./extra-goals.js";
+import { getCanonicalProject200BibleChapter } from "./project200-bible-versions.js";
 import { ensureProject200PointsSchema } from "./project200-friends.js";
 
 let schemaPromise = null;
@@ -41,6 +42,17 @@ async function listProject200ReadingPositions(userId, client = { query }) {
     [userId]
   );
   return result.rows.map(serializeReadingPosition);
+}
+
+async function listProject200CompletedBibleChapters(userId, client = { query }) {
+  const result = await client.query(
+    `select book_key, chapter_number
+       from project200_bible_chapter_progress
+      where user_id=$1
+      order by completed_at, book_key, chapter_number`,
+    [userId]
+  );
+  return result.rows.map((row) => `${row.book_key}:${Number(row.chapter_number)}`);
 }
 
 function normalizeBibleSchedule(value, repeatDays) {
@@ -95,11 +107,27 @@ export async function ensureProject200ReadingSchema() {
       updated_at timestamptz not null default now(),
       primary key(user_id, reading_type, book_key, chapter_number)
     )`);
+    await query(`create table if not exists project200_bible_chapter_progress (
+      user_id uuid not null references users(id) on delete cascade,
+      book_key text not null,
+      chapter_number integer not null check(chapter_number between 1 and 200),
+      completed_at timestamptz not null default now(),
+      primary key(user_id, book_key, chapter_number)
+    )`);
     await query("alter table project200_reading_progress add column if not exists bible_characters bigint not null default 0");
     await query("alter table project200_reading_events add column if not exists reading_type text not null default 'book'");
     await query("create index if not exists idx_project200_reading_events_user_created on project200_reading_events(user_id, created_at desc)");
     await query("create index if not exists idx_project200_reading_events_bible_chapter on project200_reading_events(user_id, reading_type, book_key, chapter_number)");
     await query("create index if not exists idx_project200_reading_positions_user_updated on project200_reading_positions(user_id, updated_at desc)");
+    await query("create index if not exists idx_project200_bible_chapter_progress_user_completed on project200_bible_chapter_progress(user_id, completed_at desc)");
+    await query(`insert into project200_bible_chapter_progress(user_id,book_key,chapter_number)
+      select progress.user_id,
+             split_part(chapter.value #>> '{}', ':', 1),
+             split_part(chapter.value #>> '{}', ':', 2)::integer
+        from project200_reading_progress progress
+        cross join lateral jsonb_array_elements(progress.completed_bible_chapters) chapter(value)
+       where (chapter.value #>> '{}') ~ '^[A-Z0-9]+:[0-9]{1,3}$'
+      on conflict do nothing`);
   })().catch((error) => { schemaPromise = null; throw error; });
   return schemaPromise;
 }
@@ -107,11 +135,12 @@ export async function ensureProject200ReadingSchema() {
 export async function getProject200Reading(userId) {
   await ensureProject200ReadingSchema();
   await query(`insert into project200_reading_progress(user_id) values($1) on conflict do nothing`, [userId]);
-  const [result, positions] = await Promise.all([
+  const [result, positions, completedBibleChapters] = await Promise.all([
     query(`select total_characters, bible_characters, exact_points, completed_bible_chapters, bible_plan, updated_at from project200_reading_progress where user_id=$1`, [userId]),
-    listProject200ReadingPositions(userId)
+    listProject200ReadingPositions(userId),
+    listProject200CompletedBibleChapters(userId)
   ]);
-  return { ...serializeReadingRow(result.rows[0]), positions };
+  return { ...serializeReadingRow(result.rows[0]), completedBibleChapters, positions };
 }
 
 export async function recordProject200ReadingBlocks(userId, blocks = []) {
@@ -135,7 +164,8 @@ export async function recordProject200ReadingBlocks(userId, blocks = []) {
     if (earnedVisiblePoints > 0) await client.query(`insert into project200_point_events(user_id,source_type,source_key,points,scope_date,metadata) values($1,'reading',$2,$3,$4::date,$5::jsonb) on conflict(user_id,source_type,source_key) do update set points=project200_point_events.points+excluded.points,metadata=excluded.metadata,updated_at=now()`, [userId, `reading-${today}`, earnedVisiblePoints, today, JSON.stringify({ exactPoints: progress.exactPoints, totalCharacters: progress.totalCharacters })]);
     await client.query("commit");
     const positions = await listProject200ReadingPositions(userId, client);
-    return { ...progress, positions, addedCharacters: added, addedPoints: Number((added / 50).toFixed(2)) };
+    const completedBibleChapters = await listProject200CompletedBibleChapters(userId, client);
+    return { ...progress, completedBibleChapters, positions, addedCharacters: added, addedPoints: Number((added / 50).toFixed(2)) };
   } catch (error) {
     await client.query("rollback").catch(() => {});
     throw error;
@@ -158,13 +188,27 @@ export async function saveProject200ReadingPosition(userId, position = {}) {
   return serializeReadingPosition(result.rows[0]);
 }
 
-export async function completeProject200BibleChapter(userId, bookKey, chapterNumber, expectedBlocks) {
+export async function completeProject200BibleChapter(userId, bookKey, chapterNumber) {
   await ensureProject200ReadingSchema();
-  const safeBookKey = String(bookKey || "").slice(0, 100); const safeChapter = boundedInteger(chapterNumber, 1, 1, 200); const requiredBlocks = boundedInteger(expectedBlocks, 1, 1, 500);
-  const blockResult = await query(`select count(*)::integer as total from project200_reading_events where user_id=$1 and reading_type='bible' and book_key=$2 and chapter_number=$3`, [userId, safeBookKey, safeChapter]);
-  if (Number(blockResult.rows[0]?.total || 0) < requiredBlocks) throw new Error("Leia todos os trechos deste capítulo antes de concluí-lo.");
-  const chapterKey = `${safeBookKey}:${safeChapter}`;
-  await query(`insert into project200_reading_progress(user_id,completed_bible_chapters) values($1,$2::jsonb) on conflict(user_id) do update set completed_bible_chapters=(select jsonb_agg(distinct item) from jsonb_array_elements(project200_reading_progress.completed_bible_chapters || excluded.completed_bible_chapters) item),updated_at=now()`, [userId, JSON.stringify([chapterKey])]);
+  const canonical = await getCanonicalProject200BibleChapter(bookKey, chapterNumber);
+  const chapterKey = `${canonical.bookKey}:${canonical.chapterNumber}`;
+  const client = await db.connect();
+  try {
+    await client.query("begin");
+    await client.query(
+      `insert into project200_bible_chapter_progress(user_id,book_key,chapter_number)
+       values($1,$2,$3)
+       on conflict(user_id,book_key,chapter_number) do nothing`,
+      [userId, canonical.bookKey, canonical.chapterNumber]
+    );
+    await client.query(`insert into project200_reading_progress(user_id,completed_bible_chapters) values($1,$2::jsonb) on conflict(user_id) do update set completed_bible_chapters=(select jsonb_agg(distinct item) from jsonb_array_elements(project200_reading_progress.completed_bible_chapters || excluded.completed_bible_chapters) item),updated_at=now()`, [userId, JSON.stringify([chapterKey])]);
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
   return getProject200Reading(userId);
 }
 

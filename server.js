@@ -15022,7 +15022,7 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 200, { ok: true, reading: await recordProject200ReadingBlocks(user.id, body?.blocks) });
       } else if (request.method === "POST" && pathname === "/api/200/reading/bible-chapter") {
         const body = await readJsonBody(request);
-        sendJson(response, 200, { ok: true, reading: await completeProject200BibleChapter(user.id, body?.bookKey, body?.chapterNumber, body?.expectedBlocks) });
+        sendJson(response, 200, { ok: true, reading: await completeProject200BibleChapter(user.id, body?.bookKey, body?.chapterNumber) });
       } else if (request.method === "PUT" && pathname === "/api/200/reading/position") {
         const body = await readJsonBody(request);
         sendJson(response, 200, { ok: true, position: await saveProject200ReadingPosition(user.id, body) });

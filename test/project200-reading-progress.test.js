@@ -22,10 +22,19 @@ test("índices inválidos são limitados antes de chegar ao Postgres", () => {
 
 test("o leitor usa capítulos concluídos para a porcentagem e SVG nos menus de livro e capítulo", async () => {
   const source = await readFile(new URL("../public/200/books.js", import.meta.url), "utf8");
-  assert.match(source, /completedChapterCount \* 100 \/ allChapterKeys\.length/u);
+  const styles = await readFile(new URL("../public/200/books.css", import.meta.url), "utf8");
+  const backend = await readFile(new URL("../src/project200-reading.js", import.meta.url), "utf8");
+  assert.match(source, /completedChapterCount \* 100 \/ \(allChapterKeys\.length \|\| BIBLE_TOTAL_CHAPTERS\)/u);
   assert.match(source, /class="bible-approved-icon"/u);
   assert.match(source, /data-bible-book-option/u);
   assert.match(source, /data-bible-chapter-option/u);
   assert.match(source, /queueBookReadingPosition\(context\.bookKey, index \+ 1\)/u);
   assert.match(source, /getBookResumePosition\(book\.id, state\.currentChunks\.length\)/u);
+  assert.match(source, /bible-welcome-progress/u);
+  assert.match(source, /completeCurrentBibleChapter\(context\)/u);
+  assert.match(source, /advanceToNextBibleChapter/u);
+  assert.doesNotMatch(source, /expectedBlocks: state\.currentChunks\.length/u);
+  assert.match(styles, /\.books-shell\.is-reading \.book-download-button\{visibility:hidden\}/u);
+  assert.match(backend, /create table if not exists project200_bible_chapter_progress/u);
+  assert.match(backend, /getCanonicalProject200BibleChapter\(bookKey, chapterNumber\)/u);
 });

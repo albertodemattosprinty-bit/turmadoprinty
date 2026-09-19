@@ -1,8 +1,9 @@
 (function initProject200Books() {
   const TOKEN_KEY = "turma_do_printy_token";
   const byId = (id) => document.getElementById(id);
-  const state = { books: [], loading: false, pollTimer: 0, literaryStyle: "Romance", isAdmin: false, coverEditorBook: null, bible: null, bibleLoading: null, bibleBook: 0, bibleChapter: 0, bibleVerse: 0, bibleVersions: new Map(), bibleVersionLoading: new Map(), bibleGeneratingKey: "", activeChunk: 0, reading: null, pendingBlocks: [], savingBlocks: [], readingSavePromise: null, pendingReadingPosition: null, readingPositionTimer: 0, readingPositionPromise: null, readingBlocksSinceFeedback: 0, queuedBlockKeys: new Set(), currentChunks: [], currentContext: null, chunkStartedAt: 0, readerTouch: null, offlineCoverUrls: new Map(), planStep: 0, planStartedAt: 0, planLetters: 0, plan: { lettersPerSecond: 14.7, durationMonths: 12, durationDays: 0, repeatDays: [0,1,2,3,4,5,6], scheduleConfig: null, scheduleLabel: "Todos os dias" } };
+  const state = { books: [], loading: false, pollTimer: 0, literaryStyle: "Romance", isAdmin: false, coverEditorBook: null, bible: null, bibleLoading: null, bibleBook: 0, bibleChapter: 0, bibleVerse: 0, bibleVersions: new Map(), bibleVersionLoading: new Map(), bibleGeneratingKey: "", bibleCompletingKey: "", activeChunk: 0, reading: null, pendingBlocks: [], savingBlocks: [], readingSavePromise: null, pendingReadingPosition: null, readingPositionTimer: 0, readingPositionPromise: null, readingFeedbackTimer: 0, readingBlocksSinceFeedback: 0, queuedBlockKeys: new Set(), currentChunks: [], currentContext: null, chunkStartedAt: 0, readerTouch: null, offlineCoverUrls: new Map(), planStep: 0, planStartedAt: 0, planLetters: 0, plan: { lettersPerSecond: 14.7, durationMonths: 12, durationDays: 0, repeatDays: [0,1,2,3,4,5,6], scheduleConfig: null, scheduleLabel: "Todos os dias" } };
   const BIBLE_TOTAL_CHARACTERS = 3809122;
+  const BIBLE_TOTAL_CHAPTERS = 1189;
   const OFFLINE_CACHE_NAME = "project200-books-v1";
   const OFFLINE_INDEX_KEY = "project_200_offline_books_v1";
   const LOCAL_READING_POSITIONS_KEY = "project_200_reading_positions_v1";
@@ -275,7 +276,7 @@
 
   async function flushReadingBlocks({ force = false } = {}) {
     if (state.readingSavePromise) return state.readingSavePromise;
-    if (!getToken() || !state.pendingBlocks.length || (!force && state.pendingBlocks.length < 5)) return null;
+    if (!getToken() || !state.pendingBlocks.length) return null;
     const blocks = state.pendingBlocks.splice(0, 5);
     state.savingBlocks = blocks;
     let persisted = false;
@@ -291,7 +292,7 @@
       state.savingBlocks = [];
       state.readingSavePromise = null;
       renderReadingPointsSummary();
-      if (persisted && state.pendingBlocks.length >= 5) void flushReadingBlocks();
+      if (persisted && state.pendingBlocks.length) void flushReadingBlocks();
     }
     })();
     state.readingSavePromise = save;
@@ -310,7 +311,20 @@
     const modal = ensureBooksOverlay("readingPointsOverlay");
     renderReadingPointsSummary();
     modal.innerHTML = `<div class="reading-feedback-card"><span>PONTOS DE LEITURA</span><strong>${Math.floor(Number(reading?.exactPoints || 0))}</strong><p>${Number(reading?.totalCharacters || 0).toLocaleString("pt-BR")} letras lidas</p></div>`;
-    modal.hidden = false; window.setTimeout(() => { modal.hidden = true; }, 1000);
+    modal.hidden = false;
+    window.clearTimeout(state.readingFeedbackTimer);
+    state.readingFeedbackTimer = window.setTimeout(() => { modal.hidden = true; }, 1000);
+  }
+
+  function showBibleChapterCompletion(reading, chapterLabel) {
+    const modal = ensureBooksOverlay("readingPointsOverlay");
+    renderReadingPointsSummary();
+    modal.innerHTML = `<div class="reading-feedback-card bible-chapter-complete"><span>CAPÍTULO CONCLUÍDO</span>${approvedSvgMarkup()}<h2>${escapeHtml(chapterLabel)}</h2><strong>${Math.floor(Number(reading?.exactPoints || 0))}</strong><p>pontos de leitura totais em todos os livros</p></div>`;
+    modal.hidden = false;
+    window.clearTimeout(state.readingFeedbackTimer);
+    return new Promise((resolve) => {
+      state.readingFeedbackTimer = window.setTimeout(() => { modal.hidden = true; resolve(); }, 1200);
+    });
   }
 
   function ensureBooksOverlay(id) {
@@ -344,13 +358,50 @@
     if (scroll) anchorActiveChunk({ smooth: true });
   }
 
+  async function advanceToNextBibleChapter() {
+    const book = state.bible?.[state.bibleBook];
+    if (!book) return false;
+    if (state.bibleChapter < book.chapters.length - 1) state.bibleChapter += 1;
+    else if (state.bibleBook < state.bible.length - 1) { state.bibleBook += 1; state.bibleChapter = 0; }
+    else return false;
+    state.bibleVerse = 0;
+    await showBibleChapter();
+    return true;
+  }
+
+  async function completeCurrentBibleChapter(context) {
+    const completionKey = `${context.bookKey}:${context.chapterNumber}`;
+    if (state.bibleCompletingKey) return false;
+    state.bibleCompletingKey = completionKey;
+    try {
+      const saved = await flushAllReadingBlocks();
+      if (!saved) throw new Error("Não foi possível salvar sua leitura. Confira a conexão e tente avançar novamente.");
+      const payload = await apiFetch("/api/200/reading/bible-chapter", { method: "POST", body: JSON.stringify({ bookKey: context.bookKey, chapterNumber: context.chapterNumber }) });
+      state.reading = payload?.reading || state.reading;
+      window.dispatchEvent(new CustomEvent("project200:reading-updated"));
+      const book = state.bible?.[state.bibleBook];
+      const chapter = book?.chapters?.[state.bibleChapter];
+      await showBibleChapterCompletion(state.reading, `${book?.name || context.bookKey} ${chapter?.number || context.chapterNumber}`);
+      if (!await advanceToNextBibleChapter()) renderBibleReader();
+      return true;
+    } finally {
+      if (state.bibleCompletingKey === completionKey) state.bibleCompletingKey = "";
+    }
+  }
+
   async function finishCurrentChunkAndAdvance(chunk) {
     const index = Number(chunk.dataset.readingChunk || 0);
     if (index !== state.activeChunk) { selectReadingChunk(index); return; }
     const context = state.currentContext || {};
     const key = getReadingBlockKey(index);
+    const isLastBibleChunk = context.type === "bible" && index === state.currentChunks.length - 1;
     if (state.queuedBlockKeys.has(key)) {
       if (context.type === "book") queueBookReadingPosition(context.bookKey, index + 1);
+      if (isLastBibleChunk) {
+        try { await completeCurrentBibleChapter(context); }
+        catch (error) { const status = byId("booksStatus"); if (status) status.textContent = error.message; }
+        return;
+      }
       selectReadingChunk(index + 1);
       return;
     }
@@ -361,23 +412,20 @@
       state.pendingBlocks.push({ key, characters, readingType: context.type || "book", bookKey: context.bookKey, chapterNumber: context.chapterNumber });
     }
     if (context.type === "book") queueBookReadingPosition(context.bookKey, index + 1);
+    if (!isLastBibleChunk) void flushReadingBlocks();
     state.readingBlocksSinceFeedback += 1;
-    if (state.readingBlocksSinceFeedback >= 5) {
+    if (state.readingBlocksSinceFeedback >= 5 && !isLastBibleChunk) {
       state.readingBlocksSinceFeedback = 0;
       showPointsUpdate();
-      void flushReadingBlocks();
     }
-    if (context.type === "bible" && index === state.currentChunks.length - 1) {
-      const saved = await flushAllReadingBlocks();
-      if (!saved) return;
+    if (isLastBibleChunk) {
       try {
-        const payload = await apiFetch("/api/200/reading/bible-chapter", { method: "POST", body: JSON.stringify({ bookKey: context.bookKey, chapterNumber: context.chapterNumber, expectedBlocks: state.currentChunks.length }) });
-        state.reading = payload?.reading || state.reading;
-        renderBibleReader();
+        state.readingBlocksSinceFeedback = 0;
+        await completeCurrentBibleChapter(context);
       } catch (error) {
         const status = byId("booksStatus"); if (status) status.textContent = error.message;
-        return;
       }
+      return;
     }
     selectReadingChunk(index + 1);
   }
@@ -512,9 +560,9 @@
     const allChapterKeys = books.flatMap((item) => item.chapters.map((part) => `${item.key}:${part.number}`));
     const completedChapterCount = allChapterKeys.reduce((total, key) => total + (completed.has(key) ? 1 : 0), 0);
     return {
-      totalChapters: allChapterKeys.length,
+      totalChapters: allChapterKeys.length || BIBLE_TOTAL_CHAPTERS,
       completedChapterCount,
-      percent: allChapterKeys.length ? completedChapterCount * 100 / allChapterKeys.length : 0
+      percent: completedChapterCount * 100 / (allChapterKeys.length || BIBLE_TOTAL_CHAPTERS)
     };
   }
 
@@ -610,11 +658,18 @@
     else if (booksModal) { booksModal.classList.add("active"); booksModal.setAttribute("aria-hidden", "false"); document.body.classList.add("modal-open"); void loadLibrary({ quiet: true }); void loadReadingProgress(); }
   }
 
+  function renderBibleWelcome() {
+    const modal = ensureBooksOverlay("bibleWelcomeOverlay");
+    const completed = new Set(state.reading?.completedBibleChapters || []);
+    const stats = bibleCompletionStats(completed);
+    modal.innerHTML = `<div class="bible-welcome-card"><span>BÍBLIA SAGRADA</span><div class="bible-welcome-progress" aria-label="${stats.percent.toFixed(2)}% da Bíblia lida"><strong>${stats.percent.toFixed(2)}%</strong><small>${stats.completedChapterCount} de ${stats.totalChapters} capítulos concluídos</small></div><h2>Continue sua leitura</h2><p>Leia no seu ritmo, acompanhe capítulos e transforme letras em progresso.</p><button type="button" data-bible-read>Iniciar leitura</button><button type="button" class="is-secondary" data-bible-plan>Plano de leitura</button><button type="button" class="is-ghost" data-bible-close>Agora não</button></div>`;
+    modal.hidden = false;
+  }
+
   function openBible() {
     ensureBooksWorkspaceOpen();
-    const modal = ensureBooksOverlay("bibleWelcomeOverlay");
-    modal.innerHTML = `<div class="bible-welcome-card"><span>BÍBLIA SAGRADA</span><h2>Continue sua leitura</h2><p>Leia no seu ritmo, acompanhe capítulos e transforme letras em progresso.</p><button type="button" data-bible-read>Iniciar leitura</button><button type="button" class="is-secondary" data-bible-plan>Plano de leitura</button><button type="button" class="is-ghost" data-bible-close>Agora não</button></div>`;
-    modal.hidden = false;
+    renderBibleWelcome();
+    void Promise.all([loadBible(), loadReadingProgress()]).then(renderBibleWelcome).catch(() => {});
   }
 
   const planSample = "No princípio criou Deus os céus e a terra. A terra era sem forma e vazia; havia trevas sobre a face do abismo, mas o Espírito de Deus pairava sobre as águas. Então Deus disse: haja luz. E houve luz. Deus viu que a luz era boa e separou a luz das trevas.";
@@ -728,6 +783,7 @@
     if (!layer) return;
     layer.hidden = !open;
     layer.setAttribute("aria-hidden", open ? "false" : "true");
+    layer.closest(".books-shell")?.classList.toggle("is-reading", open);
     if (!open) setBibleReaderControls(false);
   }
 
