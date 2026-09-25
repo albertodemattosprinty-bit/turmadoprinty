@@ -6618,6 +6618,7 @@ const ilifeFinancePrefsKey = "project_200_finance_prefs_v1";
 const ilifeFinanceDefaultAccounts = ["Conta principal", "Carteira", "Reserva"];
 const ilifeFinanceDefaultCategories = ["Trabalho", "Casa", "Alimenta\u00e7\u00e3o", "Transporte", "Sa\u00fade", "Lazer", "Outros"];
 const ilifeFinanceCreateOptionValue = "__CREATE_NEW__";
+const ilifeFinanceGoalCategoryPrefix = "__FINANCIAL_GOAL__:";
 
 function normalizeIlifeFinanceName(value, fallback = "") {
   return String(value || fallback).trim().replace(/\s+/g, " ").slice(0, 80);
@@ -6659,6 +6660,51 @@ function renderIlifeFinanceSelect(selectId, values, selectedValue, createLabel) 
   select.value = safeSelected;
 }
 
+function getIlifeFinanceGoalCategoryValue(goalId) {
+  return `${ilifeFinanceGoalCategoryPrefix}${String(goalId || "").trim()}`;
+}
+
+function getIlifeFinanceGoalIdFromCategory(value) {
+  const normalized = String(value || "");
+  return normalized.startsWith(ilifeFinanceGoalCategoryPrefix)
+    ? normalized.slice(ilifeFinanceGoalCategoryPrefix.length).trim()
+    : "";
+}
+
+function getActiveIlifeFinanceGoals() {
+  return (Array.isArray(state.ilifeFinance.goals) ? state.ilifeFinance.goals : [])
+    .filter((goal) => goal?.status === "ACTIVE");
+}
+
+function getSelectedIlifeFinanceGoalId() {
+  if (state.ilifeFinance.depositGoalId) return String(state.ilifeFinance.depositGoalId);
+  return getIlifeFinanceGoalIdFromCategory(getIlifeFinanceEl("ilifeFinanceCategorySelect")?.value);
+}
+
+function renderIlifeFinanceCategorySelect() {
+  const select = getIlifeFinanceEl("ilifeFinanceCategorySelect");
+  if (!select) return;
+  const categories = state.ilifeFinance.categories?.length ? state.ilifeFinance.categories : ilifeFinanceDefaultCategories;
+  const income = state.ilifeFinance.wizard?.kind !== "EXPENSE";
+  const goals = income ? getActiveIlifeFinanceGoals() : [];
+  const currentValue = select.value;
+  const selectedGoalId = state.ilifeFinance.depositGoalId
+    || getIlifeFinanceGoalIdFromCategory(currentValue)
+    || state.ilifeFinance.editingEntry?.financialGoalId
+    || "";
+  const selectedGoalValue = selectedGoalId ? getIlifeFinanceGoalCategoryValue(selectedGoalId) : "";
+  const normalSelected = categories.includes(currentValue)
+    ? currentValue
+    : (categories.includes(state.ilifeFinance.activeCategoryInput) ? state.ilifeFinance.activeCategoryInput : categories[0]);
+  select.innerHTML = categories.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("")
+    + (goals.length ? `<optgroup label="Metas financeiras">${goals.map((goal) => `<option value="${escapeHtml(getIlifeFinanceGoalCategoryValue(goal.id))}">${escapeHtml(goal.name)}</option>`).join("")}</optgroup>` : "")
+    + `<option value="${ilifeFinanceCreateOptionValue}">+ Criar novo</option>`;
+  select.value = [...select.options].some((option) => option.value === selectedGoalValue) ? selectedGoalValue : normalSelected;
+  select.disabled = Boolean(state.ilifeFinance.depositGoalId);
+  const createButton = getIlifeFinanceEl("ilifeFinanceCreateCategoryButton");
+  if (createButton) createButton.hidden = Boolean(state.ilifeFinance.depositGoalId);
+}
+
 function canDeleteIlifeFinanceAccount(name) {
   const accounts = state.ilifeFinance.accounts || [];
   return accounts.length > 1 && accounts.includes(name);
@@ -6676,9 +6722,7 @@ function renderIlifeFinanceChips(containerId, values, type) {
 
 function renderIlifeFinanceCustomFields() {
   const accounts = state.ilifeFinance.accounts?.length ? state.ilifeFinance.accounts : ilifeFinanceDefaultAccounts;
-  const categories = state.ilifeFinance.categories?.length ? state.ilifeFinance.categories : ilifeFinanceDefaultCategories;
   renderIlifeFinanceSelect("ilifeFinanceAccountSelect", accounts, state.ilifeFinance.activeAccountInput || state.ilifeFinance.selectedAccount || accounts[0], "Criar novo");
-  renderIlifeFinanceSelect("ilifeFinanceCategorySelect", categories, state.ilifeFinance.activeCategoryInput || categories[0], "Criar novo");
   renderIlifeFinanceListModal();
   renderIlifeFinanceGoals();
 }
@@ -6933,22 +6977,21 @@ function closeIlifeFinanceGoalModal() {
 function renderIlifeFinanceGoals() {
   const goals = Array.isArray(state.ilifeFinance.goals) ? state.ilifeFinance.goals : [];
   const overview = getIlifeFinanceEl("ilifeFinanceGoalOverview");
-  if (overview) overview.innerHTML = goals.length ? goals.map((goal) => `<article><div><span>PROJETO FINANCEIRO</span><strong>${escapeHtml(goal.name)}</strong><small>${escapeHtml(formatMoney(goal.progressCents))} de ${escapeHtml(formatMoney(goal.targetAmountCents))}</small></div><b>${goal.progressPercent}%</b><i><em style="width:${goal.progressPercent}%"></em></i></article>`).join("") : '<button type="button" data-create-finance-goal>Crie sua primeira meta financeira</button>';
-  const select = getIlifeFinanceEl("ilifeFinanceGoalSelect");
-  if (select) {
-    const selected = state.ilifeFinance.depositGoalId || select.value || state.ilifeFinance.editingEntry?.financialGoalId || "";
-    select.innerHTML = '<option value="">Sem meta financeira</option>' + goals.filter((goal) => goal.status === "ACTIVE").map((goal) => `<option value="${escapeHtml(goal.id)}">${escapeHtml(goal.name)}</option>`).join("");
-    if ([...select.options].some((option) => option.value === selected)) select.value = selected;
-    select.disabled = Boolean(state.ilifeFinance.depositGoalId);
-  }
+  if (overview) overview.innerHTML = goals.length ? goals.map((goal) => {
+    const depositAttributes = goal.status === "ACTIVE"
+      ? ` role="button" tabindex="0" data-ilife-finance-goal-deposit="${escapeHtml(goal.id)}" aria-label="Adicionar entrada em ${escapeHtml(goal.name)}"`
+      : "";
+    return `<article${depositAttributes}><div><span>PROJETO FINANCEIRO</span><strong>${escapeHtml(goal.name)}</strong><small>${escapeHtml(formatMoney(goal.progressCents))} de ${escapeHtml(formatMoney(goal.targetAmountCents))}</small></div><b>${goal.progressPercent}%</b><i><em style="width:${goal.progressPercent}%"></em></i></article>`;
+  }).join("") : '<button type="button" data-create-finance-goal>Crie sua primeira meta financeira</button>';
+  renderIlifeFinanceCategorySelect();
   renderIlifeFinanceDepositProgress();
 }
 
 function renderIlifeFinanceDepositProgress() {
   const panel = getIlifeFinanceEl("ilifeFinanceDepositProgress");
   if (!panel) return;
-  const goalId = state.ilifeFinance.depositGoalId || getIlifeFinanceEl("ilifeFinanceGoalSelect")?.value;
-  const goal = state.ilifeFinance.goals?.find((item) => item.id === goalId);
+  const goalId = getSelectedIlifeFinanceGoalId();
+  const goal = state.ilifeFinance.goals?.find((item) => String(item.id) === goalId);
   panel.hidden = !goal || state.ilifeFinance.wizard?.kind !== "INCOME";
   panel.innerHTML = goal ? `<article><div><span>PROGRESSO DA META</span><strong>${escapeHtml(goal.name)}</strong><small>${escapeHtml(formatMoney(goal.progressCents))} de ${escapeHtml(formatMoney(goal.targetAmountCents))}</small></div><b>${goal.progressPercent}%</b><i role="progressbar" aria-label="Progresso financeiro" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${goal.progressPercent}"><em style="width:${goal.progressPercent}%"></em></i></article>` : "";
 }
@@ -7172,6 +7215,8 @@ function openIlifeFinanceWizard(kind, { goalId = null } = {}) {
   state.ilifeFinance.customDates = [];
   renderIlifeFinanceCustomDates();
   state.ilifeFinance.editingEntry = null;
+  const categorySelect = getIlifeFinanceEl("ilifeFinanceCategorySelect");
+  if (categorySelect && !goalId) categorySelect.value = state.ilifeFinance.activeCategoryInput || ilifeFinanceDefaultCategories[0];
   if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "";
   renderIlifeFinanceCustomFields();
   renderIlifeFinanceWizard();
@@ -7188,8 +7233,10 @@ function closeIlifeFinanceWizard() {
   const wasDeposit = Boolean(state.ilifeFinance.depositGoalId);
   state.ilifeFinance.depositGoalId = null;
   document.getElementById("ilifeFinanceModal")?.classList.remove("is-goal-deposit");
-  const goalSelect = getIlifeFinanceEl("ilifeFinanceGoalSelect");
-  if (goalSelect) goalSelect.disabled = false;
+  const categorySelect = getIlifeFinanceEl("ilifeFinanceCategorySelect");
+  if (categorySelect) categorySelect.disabled = false;
+  const createCategoryButton = getIlifeFinanceEl("ilifeFinanceCreateCategoryButton");
+  if (createCategoryButton) createCategoryButton.hidden = false;
   if (ilifeFinanceEntryWizard) {
     ilifeFinanceEntryWizard.classList.remove("is-open");
     ilifeFinanceEntryWizard.hidden = true;
@@ -7199,15 +7246,18 @@ function closeIlifeFinanceWizard() {
   if (wasDeposit) closeModal("ilifeFinanceModal");
 }
 
-function openIlifeFinanceMissionDeposit(goal) {
-  const financialGoal = goal.financialGoal;
-  if (!financialGoal) return;
-  if (!state.ilifeFinance.goals?.some((item) => item.id === financialGoal.id)) state.ilifeFinance.goals = [...(state.ilifeFinance.goals || []), financialGoal];
+function openIlifeFinanceGoalDeposit(financialGoal) {
+  if (!financialGoal || financialGoal.status !== "ACTIVE") return;
+  if (!state.ilifeFinance.goals?.some((item) => String(item.id) === String(financialGoal.id))) state.ilifeFinance.goals = [...(state.ilifeFinance.goals || []), financialGoal];
   openModal("ilifeFinanceModal");
   openIlifeFinanceWizard("INCOME", { goalId: financialGoal.id });
   getIlifeFinanceEl("ilifeFinanceTitleInput").value = `Depósito: ${financialGoal.name}`.slice(0, 90);
   getIlifeFinanceEl("ilifeFinanceSettlementSelect").value = "CASH";
   renderIlifeFinanceWizard();
+}
+
+function openIlifeFinanceMissionDeposit(goal) {
+  openIlifeFinanceGoalDeposit(goal?.financialGoal);
 }
 
 function getOwnIlifeLaxKey() {
@@ -7290,8 +7340,6 @@ function renderIlifeFinanceWizard() {
   document.querySelectorAll("[data-ilife-finance-kind-switch]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.ilifeFinanceKindSwitch === wizard.kind);
   });
-  const goalWrap = getIlifeFinanceEl("ilifeFinanceGoalSelectWrap");
-  if (goalWrap) goalWrap.hidden = !income;
   const typeSwitch = getIlifeFinanceEl("ilifeFinanceForm")?.querySelector(".finance-nano-type-switch");
   if (typeSwitch) typeSwitch.hidden = deposit;
   const advanced = getIlifeFinanceEl("ilifeFinanceForm")?.querySelector(".finance-nano-advanced");
@@ -7302,6 +7350,7 @@ function renderIlifeFinanceWizard() {
   if (settlement) settlement.disabled = deposit;
   const date = getIlifeFinanceEl("ilifeFinanceOnceDate");
   if (date) date.disabled = deposit;
+  renderIlifeFinanceCategorySelect();
   renderIlifeFinanceDepositProgress();
 }
 
@@ -7317,12 +7366,14 @@ function buildIlifeFinancePayload() {
   const startsOn = deposit ? getProjectTodayDateKey() : multiDate && selectedDates.length ? selectedDates[0] : (getIlifeFinanceEl("ilifeFinanceOnceDate")?.value || getProjectTodayDateKey());
   const recurring = !deposit && Boolean(getIlifeFinanceEl("ilifeFinanceRecurring")?.checked) && !multiDate;
   const endsOn = getIlifeFinanceEl("ilifeFinanceEndDate")?.value || null;
+  const financialGoalId = wizard.kind === "INCOME" ? getSelectedIlifeFinanceGoalId() : null;
+  const financialGoal = financialGoalId ? state.ilifeFinance.goals?.find((goal) => String(goal.id) === financialGoalId) : null;
   return {
     title: String(getIlifeFinanceEl("ilifeFinanceTitleInput")?.value || "").trim(),
     amountCents: parseIlifeFinanceAmount(getIlifeFinanceEl("ilifeFinanceAmountInput")?.value),
     accountName: normalizeIlifeFinanceName(getIlifeFinanceEl("ilifeFinanceAccountSelect")?.value, "Conta principal"),
-    category: normalizeIlifeFinanceName(getIlifeFinanceEl("ilifeFinanceCategorySelect")?.value, "Outros"),
-    financialGoalId: wizard.kind === "INCOME" ? (state.ilifeFinance.depositGoalId || getIlifeFinanceEl("ilifeFinanceGoalSelect")?.value || null) : null,
+    category: financialGoal ? normalizeIlifeFinanceName(financialGoal.name, "Outros") : normalizeIlifeFinanceName(getIlifeFinanceEl("ilifeFinanceCategorySelect")?.value, "Outros"),
+    financialGoalId,
     kind: deposit ? "INCOME" : wizard.kind,
     settlementType,
     valueMode,
@@ -7353,8 +7404,6 @@ function openIlifeFinanceEdit(itemId) {
   if (dateInput) dateInput.value = entry.dueOn || getProjectTodayDateKey();
   const settlementSelect = getIlifeFinanceEl("ilifeFinanceSettlementSelect");
   if (settlementSelect) settlementSelect.value = entry.settlementType === "CASH" ? "CASH" : "FUTURE";
-  const goalSelect = getIlifeFinanceEl("ilifeFinanceGoalSelect");
-  if (goalSelect) goalSelect.value = entry.financialGoalId || "";
   setIlifeFinanceExclusiveChoice("[data-ilife-finance-value-mode]", entry.valueMode || entry.scheduleConfig?.valueMode || "FIXED");
   if (recurring) recurring.checked = false;
   state.ilifeFinance.customDates = Array.isArray(entry.scheduleConfig?.dates) ? entry.scheduleConfig.dates : [];
@@ -18995,6 +19044,7 @@ document.querySelectorAll("[data-ilife-finance-kind-switch]").forEach((button) =
   button.addEventListener("click", () => {
     if (!state.ilifeFinance.wizard) state.ilifeFinance.wizard = buildIlifeFinanceWizard(button.dataset.ilifeFinanceKindSwitch);
     state.ilifeFinance.wizard.kind = button.dataset.ilifeFinanceKindSwitch === "EXPENSE" ? "EXPENSE" : "INCOME";
+    renderIlifeFinanceCustomFields();
     renderIlifeFinanceWizard();
   });
 });
@@ -19035,8 +19085,15 @@ getIlifeFinanceEl("ilifeFinanceAccountSelect")?.addEventListener("change", (even
 });
 getIlifeFinanceEl("ilifeFinanceCategorySelect")?.addEventListener("change", (event) => {
   if (event.currentTarget.value === ilifeFinanceCreateOptionValue) { openIlifeFinanceListModal("category"); renderIlifeFinanceCustomFields(); return; }
-  state.ilifeFinance.activeCategoryInput = event.currentTarget.value;
-  saveIlifeFinancePrefs();
+  const goalId = getIlifeFinanceGoalIdFromCategory(event.currentTarget.value);
+  if (!goalId) {
+    state.ilifeFinance.activeCategoryInput = event.currentTarget.value;
+    saveIlifeFinancePrefs();
+  } else if (!String(ilifeFinanceTitleInput?.value || "").trim()) {
+    const goal = state.ilifeFinance.goals?.find((item) => String(item.id) === goalId);
+    if (goal && ilifeFinanceTitleInput) ilifeFinanceTitleInput.value = `Depósito: ${goal.name}`.slice(0, 90);
+  }
+  renderIlifeFinanceDepositProgress();
 });
 getIlifeFinanceEl("ilifeFinanceCreateAccountButton")?.addEventListener("click", () => openIlifeFinanceListModal("account"));
 getIlifeFinanceEl("ilifeFinanceCreateCategoryButton")?.addEventListener("click", () => openIlifeFinanceListModal("category"));
@@ -19107,13 +19164,25 @@ ilifeFinanceTransferClose?.addEventListener("click", closeIlifeFinanceTransferMo
 ilifeFinanceTransferModal?.addEventListener("click", (event) => { if (event.target === ilifeFinanceTransferModal) closeIlifeFinanceTransferModal(); });
 ilifeFinanceTransferForm?.addEventListener("submit", (event) => { event.preventDefault(); void submitIlifeFinanceTransfer(); });
 getIlifeFinanceEl("ilifeFinanceGoalAction")?.addEventListener("click", openIlifeFinanceGoalModal);
-getIlifeFinanceEl("ilifeFinanceGoalOverview")?.addEventListener("click", (event) => { if (event.target.closest("[data-create-finance-goal]")) openIlifeFinanceGoalModal(); });
+getIlifeFinanceEl("ilifeFinanceGoalOverview")?.addEventListener("click", (event) => {
+  if (event.target.closest("[data-create-finance-goal]")) { openIlifeFinanceGoalModal(); return; }
+  const depositCard = event.target.closest("[data-ilife-finance-goal-deposit]");
+  const goal = state.ilifeFinance.goals?.find((item) => String(item.id) === String(depositCard?.dataset.ilifeFinanceGoalDeposit || ""));
+  if (goal?.status === "ACTIVE") openIlifeFinanceGoalDeposit(goal);
+});
+getIlifeFinanceEl("ilifeFinanceGoalOverview")?.addEventListener("keydown", (event) => {
+  if (!['Enter', ' '].includes(event.key)) return;
+  const depositCard = event.target.closest("[data-ilife-finance-goal-deposit]");
+  const goal = state.ilifeFinance.goals?.find((item) => String(item.id) === String(depositCard?.dataset.ilifeFinanceGoalDeposit || ""));
+  if (goal?.status !== "ACTIVE") return;
+  event.preventDefault();
+  openIlifeFinanceGoalDeposit(goal);
+});
 ilifeFinanceGoalClose?.addEventListener("click", closeIlifeFinanceGoalModal);
 ilifeFinanceGoalModal?.addEventListener("click", (event) => { if (event.target === ilifeFinanceGoalModal) closeIlifeFinanceGoalModal(); });
 ilifeFinanceGoalAmount?.addEventListener("input", renderIlifeFinanceGoalWizard);
 ilifeFinanceGoalGradual?.addEventListener("change", renderIlifeFinanceGoalWizard);
 getIlifeFinanceEl("ilifeFinanceGoalInitialDeposit")?.addEventListener("input", renderIlifeFinanceGoalWizard);
-getIlifeFinanceEl("ilifeFinanceGoalSelect")?.addEventListener("change", renderIlifeFinanceDepositProgress);
 [[ilifeFinanceGoalDurationMinus, -1], [ilifeFinanceGoalDurationPlus, 1]].forEach(([button, direction]) => {
   button?.addEventListener("pointerdown", () => startIlifeFinanceGoalHold(direction));
   button?.addEventListener("pointerup", () => { stopIlifeFinanceGoalHold(); if (!state.ilifeFinance.goalHoldTriggered) changeIlifeFinanceGoalDuration(direction); });

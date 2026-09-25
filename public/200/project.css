@@ -15106,6 +15106,8 @@ body[data-background-theme="white"] .marin-message-audio-card.is-viewed {
 .finance-goal-overview:empty { display:none; }
 .finance-goal-overview > button { width:100%; min-height:54px; border:1px dashed var(--finance-nano-brand); border-radius:16px; color:var(--finance-nano-brand-dark); background:var(--finance-nano-brand-soft); font:inherit; font-weight:850; cursor:pointer; }
 .finance-goal-overview article { position:relative; display:grid; grid-template-columns:1fr auto; gap:5px 12px; padding:15px; margin-bottom:10px; overflow:hidden; border:1px solid var(--finance-nano-line); border-radius:17px; background:#fff; }
+.finance-goal-overview article[role="button"] { cursor:pointer; }
+.finance-goal-overview article[role="button"]:focus-visible { outline:2px solid var(--finance-nano-brand); outline-offset:2px; }
 .finance-goal-overview article div { display:grid; gap:3px; }
 .finance-goal-overview article span { color:var(--finance-nano-muted); font-size:9px; font-weight:900; letter-spacing:.1em; }
 .finance-goal-overview article strong { font-size:14px; }
