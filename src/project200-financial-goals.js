@@ -16,6 +16,16 @@ function normalizeDateOnly(value, label) {
   return raw;
 }
 
+function normalizeStoredDateOnly(value, label) {
+  if (!(value instanceof Date)) return normalizeDateOnly(value, label);
+  if (Number.isNaN(value.getTime())) throw new Error(`${label} invalida.`);
+  return normalizeDateOnly([
+    String(value.getFullYear()).padStart(4, "0"),
+    String(value.getMonth() + 1).padStart(2, "0"),
+    String(value.getDate()).padStart(2, "0")
+  ].join("-"), label);
+}
+
 function dateToKey(date) {
   return date.toISOString().slice(0, 10);
 }
@@ -108,8 +118,8 @@ export async function ensureProject200FinancialGoalsSchema() {
 function normalizeGoalRow(row) {
   const targetAmountCents = Number(row.target_amount_cents || 0);
   const progressCents = Math.max(0, Number(row.progress_cents || 0));
-  const startOn = String(row.start_on || "").slice(0, 10);
-  const targetOn = String(row.target_on || "").slice(0, 10);
+  const startOn = normalizeStoredDateOnly(row.start_on, "Data inicial");
+  const targetOn = normalizeStoredDateOnly(row.target_on, "Prazo");
   const durationDays = Math.max(1, daysBetween(startOn, targetOn));
   return {
     id: String(row.id),
