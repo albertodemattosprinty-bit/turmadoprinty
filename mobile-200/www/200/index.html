@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
   <link rel="stylesheet" href="/200/quality.css?v=20260906-1" />
   <link rel="stylesheet" href="/200/books.css?v=20260919-reading-rhythm-v2" />
-  <link rel="stylesheet" href="/200/wellness.css?v=20260911-exercise-background-v1" />
+  <link rel="stylesheet" href="/200/wellness.css?v=20260929-today-load-v1" />
   <link rel="stylesheet" href="/200/wellness-pack.css?v=20260915-gps-speed-v2" />
   <link rel="stylesheet" href="/200/performance.css?v=20260906-scroll-v1" />
 </head>
@@ -2119,7 +2119,7 @@
           <section class="wellness-active-workout" id="wellnessActiveWorkout" role="button" tabindex="0" aria-label="Abrir treino em andamento" hidden>
             <div class="wellness-active-workout-main"><span class="wellness-active-workout-media" data-fixed-exercise-video-shell><img id="wellnessActiveWorkoutImage" src="/200/apps/exercicios.png" alt="" /><video id="wellnessActiveWorkoutVideo" muted loop playsinline preload="metadata" hidden></video><i class="wellness-exercise-video-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z"/></svg></i></span><div><span>Treino em andamento</span><h2 id="wellnessWorkoutName">Caminhar</h2><div class="wellness-workout-counter" id="wellnessWorkoutCounter">00:00</div><small id="wellnessWorkoutDetail">Progresso salvo no seu perfil</small></div></div>
           </section>
-          <div class="wellness-exercise-category-switcher" role="group" aria-label="Categoria de exercícios"><button type="button" id="wellnessExerciseCategoryPrevious" aria-label="Categoria anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><strong id="wellnessExerciseCategoryName" aria-live="polite">Musculação</strong><button type="button" id="wellnessExerciseCategoryNext" aria-label="Próxima categoria"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div>
+          <section class="wellness-today-exercises-heading" aria-labelledby="wellnessTodayExercisesTitle"><span>SEU PLANO</span><h2 id="wellnessTodayExercisesTitle">Exercícios para hoje</h2><p>Somente os exercícios programados para hoje.</p></section>
           <div class="wellness-exercise-grid" id="wellnessExerciseGrid"></div>
           <button class="wellness-catalog-open" type="button" id="wellnessOpenCatalog" aria-label="Abrir acervo de exercícios" title="Abrir acervo de exercícios"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
           <h2 class="wellness-exercise-section-title">Exercícios Recentes</h2>
@@ -2268,6 +2268,7 @@
             <div class="wellness-goal-counter"><span>Séries</span><div class="wellness-goal-stepper"><button type="button" data-goal-adjust="series" data-direction="-1" aria-label="Diminuir séries"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><input type="number" id="wellnessTargetSeries" min="1" max="100" inputmode="none" value="3" aria-label="Séries" readonly /><button type="button" data-goal-adjust="series" data-direction="1" aria-label="Aumentar séries"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div></div>
             <div class="wellness-goal-counter"><span>Movimentos por série</span><div class="wellness-goal-stepper"><button type="button" data-goal-adjust="reps" data-direction="-1" aria-label="Diminuir movimentos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><input type="number" id="wellnessTargetReps" min="1" max="10000" inputmode="none" value="12" aria-label="Movimentos por série" readonly /><button type="button" data-goal-adjust="reps" data-direction="1" aria-label="Aumentar movimentos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div></div>
           </div>
+          <button class="wellness-exercise-load-open" type="button" id="wellnessExerciseLoadOpen" hidden aria-describedby="wellnessExerciseLoadHint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6M7 7v10M17 7v10M20 9v6M7 12h10"/><path d="M3 8h4v8H3zM17 8h4v8h-4z"/></svg><span><b>Definir carga</b><small id="wellnessExerciseLoadHint">Toque e segure para ver o histórico</small></span><strong id="wellnessExerciseLoadValue">10 kg</strong></button>
           <div class="wellness-goal-fields" id="wellnessMinutesGoalFields" hidden>
             <div class="wellness-goal-counter"><span>Minutos</span><div class="wellness-goal-stepper"><button type="button" data-goal-adjust="minutes" data-direction="-1" aria-label="Diminuir minutos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><input type="number" id="wellnessTargetMinutes" min="1" max="1440" inputmode="none" value="30" aria-label="Minutos" readonly /><button type="button" data-goal-adjust="minutes" data-direction="1" aria-label="Aumentar minutos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div></div>
           </div>
@@ -2278,6 +2279,29 @@
           <p id="wellnessGoalHelp">Você pode fazer em várias etapas ao longo do dia ou encerrar antes. Tudo realizado será somado na sua tabela.</p>
           <button class="wellness-phase-primary" type="submit" id="wellnessGoalStart">Iniciar treino</button>
         </form>
+      </div>
+
+      <div class="wellness-phase-layer" id="wellnessExerciseLoadLayer" hidden>
+        <article class="wellness-phase-screen wellness-exercise-load-screen">
+          <button class="wellness-phase-close" type="button" id="wellnessExerciseLoadBack" aria-label="Voltar à preparação"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+          <svg class="wellness-exercise-load-icon" viewBox="0 0 64 64" aria-hidden="true"><path d="M7 24v16M14 18v28M50 18v28M57 24v16M14 32h36"/><rect x="4" y="21" width="10" height="22" rx="2"/><rect x="50" y="21" width="10" height="22" rx="2"/></svg>
+          <span class="wellness-phase-kicker">CARGA</span>
+          <h2>Definir carga</h2>
+          <p>Escolha a carga utilizada neste exercício.</p>
+          <div class="wellness-exercise-load-stepper"><button type="button" id="wellnessExerciseLoadDecrease" aria-label="Diminuir carga em 5 quilogramas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><output id="wellnessExerciseLoadInput" aria-live="polite">10 kg</output><button type="button" id="wellnessExerciseLoadIncrease" aria-label="Aumentar carga em 5 quilogramas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div>
+          <small class="wellness-exercise-load-tip">Toque e segure as setas para continuar de 5 em 5 kg.</small>
+          <button class="wellness-phase-primary" type="button" id="wellnessExerciseLoadSave">Salvar carga</button>
+        </article>
+      </div>
+
+      <div class="wellness-phase-layer" id="wellnessExerciseLoadHistoryLayer" hidden>
+        <article class="wellness-phase-screen wellness-exercise-load-history-screen">
+          <button class="wellness-phase-close" type="button" id="wellnessExerciseLoadHistoryBack" aria-label="Voltar à carga"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+          <span class="wellness-phase-kicker">CARGA</span>
+          <h2>Histórico de mudanças</h2>
+          <p>Data e nova carga registrada para este exercício.</p>
+          <div class="wellness-exercise-load-history" id="wellnessExerciseLoadHistory" aria-live="polite"></div>
+        </article>
       </div>
 
       <div class="wellness-phase-layer" id="wellnessWorkoutLayer" hidden>
@@ -2373,7 +2397,7 @@
   <script src="/200/offline-data.js?v=20260915-delete-sync-v1"></script>
   <script type="module" src="/200/project.js?v=20260925-finance-goal-categories-v1"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
-  <script type="module" src="/200/wellness.js?v=20260915-gps-speed-v2"></script>
+  <script type="module" src="/200/wellness.js?v=20260929-today-load-v1"></script>
   <script src="/200/books.js?v=20260919-reading-rhythm-v2"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260908-readonly-v1"></script>

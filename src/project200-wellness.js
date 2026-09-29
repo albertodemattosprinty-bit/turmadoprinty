@@ -17,6 +17,8 @@ import {
 const PROJECT200_TIME_ZONE = process.env.PROJECT200_TIME_ZONE || "America/Sao_Paulo";
 const TRACKING_TYPES = new Set(["steps", "minutes", "series", "gps"]);
 const EXERCISE_CATEGORIES = new Set(["strength", "aerobic", "calisthenics"]);
+const PROJECT200_DEFAULT_STRENGTH_LOAD_KG = 10;
+const PROJECT200_MAX_STRENGTH_LOAD_KG = 5000;
 export const PROJECT200_MEAL_SLOTS = [
   ["pre_morning_snack", "Lanche pré-matinal"],
   ["breakfast", "Café da manhã"],
@@ -46,6 +48,12 @@ function normalizeProfileName(value) {
 
 function clampInteger(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, Math.trunc(Number(value || 0) || 0)));
+}
+
+function normalizeProject200StrengthLoadKg(value, fallback = PROJECT200_DEFAULT_STRENGTH_LOAD_KG) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.round(Math.max(0, Math.min(PROJECT200_MAX_STRENGTH_LOAD_KG, parsed)) * 100) / 100;
 }
 
 function normalizeExerciseNameKey(value) {
@@ -103,6 +111,7 @@ function normalizeWorkoutRow(row) {
     targetReps: Math.max(0, Math.trunc(Number(row.target_reps || 0) || 0)),
     targetMinutes: Math.max(0, Number(row.target_minutes || 0)),
     targetDistanceMeters: Math.max(0, Math.trunc(Number(row.target_distance_meters || 0))),
+    loadKg: String(row.category || "") === "strength" ? normalizeProject200StrengthLoadKg(row.load_kg) : null,
     energyPoints: Math.max(0, Number(row.energy_points || 0)),
     strengthPoints: Math.max(0, Number(row.strength_points || 0)),
     resistancePoints: Math.max(0, Number(row.resistance_points || 0)),
@@ -125,6 +134,7 @@ function normalizeExerciseLibraryRow(row) {
     targetReps: Math.max(0, Math.trunc(Number(row?.target_reps || 0))),
     targetMinutes: Math.max(0, Number(row?.target_minutes || 0)),
     targetDistanceMeters: Math.max(0, Math.trunc(Number(row?.target_distance_meters || 0))),
+    loadKg: String(row?.category || "") === "strength" ? normalizeProject200StrengthLoadKg(row?.load_kg) : null,
     sortOrder: Math.max(0, Math.trunc(Number(row?.sort_order || 0))),
     scheduleConfig: normalizeExerciseSchedule(row?.schedule_config),
     todaySeriesCount: Math.max(0, Math.trunc(Number(row?.today_series_count || 0))),
@@ -255,6 +265,7 @@ async function prepareProject200WellnessSchema() {
   await query(`alter table project200_exercise_sessions add column if not exists energy_points numeric(14,2) not null default 0`);
   await query(`alter table project200_exercise_sessions add column if not exists strength_points numeric(14,2) not null default 0`);
   await query(`alter table project200_exercise_sessions add column if not exists resistance_points numeric(14,2) not null default 0`);
+  await query(`alter table project200_exercise_sessions add column if not exists load_kg numeric(10,2) not null default 10`);
   await query(`create index if not exists idx_project200_exercise_user_profile_date on project200_exercise_sessions(user_id, assigned_profile, started_at desc)`);
   await query(`create unique index if not exists idx_project200_exercise_active on project200_exercise_sessions(user_id, assigned_profile) where status = 'active'`);
   await query(`create table if not exists project200_exercise_series (
@@ -277,6 +288,14 @@ async function prepareProject200WellnessSchema() {
   await query(`create index if not exists idx_project200_exercise_library_user_profile on project200_exercise_library(user_id, assigned_profile, created_at)`);
   await query(`alter table project200_exercise_library add column if not exists schedule_config jsonb`);
   await query(`alter table project200_exercise_library add column if not exists sort_order integer not null default 0`);
+  await query(`alter table project200_exercise_library add column if not exists load_kg numeric(10,2) not null default 10`);
+  await query(`create table if not exists project200_exercise_load_history (
+    id uuid primary key default gen_random_uuid(), user_id uuid not null references users(id) on delete cascade,
+    assigned_profile text not null default 'Usuario', exercise_id text not null, load_kg numeric(10,2) not null,
+    changed_at timestamptz not null default now()
+  )`);
+  await query(`create index if not exists idx_project200_exercise_load_history_user_exercise_date
+    on project200_exercise_load_history(user_id, assigned_profile, exercise_id, changed_at desc)`);
   await query(`create table if not exists project200_exercise_assets (
     exercise_id text primary key, exercise_name text not null, muscles jsonb not null default '[]'::jsonb,
     start_image_url text not null, finish_image_url text not null, muscle_image_url text not null default '', thumbnail_url text not null default '', generated_model text not null default 'gpt-image-1',
@@ -753,6 +772,58 @@ export async function addProject200ExerciseToLibrary(userId, payload = {}) {
   return normalizeExerciseLibraryRow(result.rows[0]);
 }
 
+export async function setProject200ExerciseLoad(userId, payload = {}) {
+  await ensureProject200WellnessSchema();
+  const profile = normalizeProfileName(payload.profileName);
+  const exerciseId = String(payload.exerciseId || "").trim().slice(0, 80);
+  if (!exerciseId) throw new Error("Escolha um exercício válido.");
+  const loadKg = normalizeProject200StrengthLoadKg(payload.loadKg);
+  const result = await query(
+    `with current as (
+       select load_kg from project200_exercise_library
+        where user_id = $1 and assigned_profile = $2 and exercise_id = $3 and category = 'strength'
+        for update
+     ), updated as (
+       update project200_exercise_library library
+          set load_kg = $4, updated_at = now()
+         from current
+        where library.user_id = $1 and library.assigned_profile = $2 and library.exercise_id = $3
+          and library.category = 'strength'
+       returning library.*, current.load_kg as previous_load_kg
+     ), recorded as (
+       insert into project200_exercise_load_history (user_id, assigned_profile, exercise_id, load_kg)
+       select $1, $2, $3, $4 from updated where updated.previous_load_kg is distinct from $4
+       returning id
+     )
+     select updated.*, (select count(*)::integer from recorded) as history_inserted from updated`,
+    [userId, profile, exerciseId, loadKg]
+  );
+  if (!result.rows[0]) throw new Error("A carga pode ser definida somente em exercícios de musculação do seu plano.");
+  return normalizeExerciseLibraryRow(result.rows[0]);
+}
+
+export async function listProject200ExerciseLoadHistory(userId, payload = {}) {
+  await ensureProject200WellnessSchema();
+  const profile = normalizeProfileName(payload.profileName);
+  const exerciseId = String(payload.exerciseId || "").trim().slice(0, 80);
+  if (!exerciseId) throw new Error("Escolha um exercício válido.");
+  const result = await query(
+    `select history.load_kg, history.changed_at
+       from project200_exercise_load_history history
+       join project200_exercise_library library
+         on library.user_id = history.user_id and library.assigned_profile = history.assigned_profile
+        and library.exercise_id = history.exercise_id and library.category = 'strength'
+      where history.user_id = $1 and history.assigned_profile = $2 and history.exercise_id = $3
+      order by history.changed_at desc, history.id desc
+      limit 60`,
+    [userId, profile, exerciseId]
+  );
+  return result.rows.map((row) => ({
+    loadKg: normalizeProject200StrengthLoadKg(row.load_kg),
+    changedAt: new Date(row.changed_at).toISOString()
+  }));
+}
+
 export async function removeProject200ExerciseFromLibrary(userId, payload = {}) {
   await ensureProject200WellnessSchema();
   const profile = normalizeProfileName(payload.profileName);
@@ -825,13 +896,19 @@ export async function startProject200ExerciseSession(userId, payload = {}) {
   const dailyGoal = trackingType === "series" ? targetSeries * targetReps : trackingType === "gps" ? targetDistanceMeters : targetMinutes;
   if (!exerciseId || exerciseName.length < 2) throw new Error("Escolha um exercicio valido.");
   const equipment = String(payload.equipment || "").trim().slice(0, 120);
+  const storedLoad = category === "strength"
+    ? await query(`select load_kg from project200_exercise_library where user_id = $1 and assigned_profile = $2 and exercise_id = $3 and category = 'strength' limit 1`, [userId, profile, exerciseId])
+    : null;
+  const loadKg = category === "strength"
+    ? normalizeProject200StrengthLoadKg(payload.loadKg ?? storedLoad?.rows?.[0]?.load_kg)
+    : 0;
   const result = await query(
     `insert into project200_exercise_sessions (
        user_id, assigned_profile, exercise_id, exercise_name, category, tracking_type, equipment,
-       target_series, target_reps, target_minutes, target_distance_meters
-     ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning *, 0::integer as series_count`,
+       target_series, target_reps, target_minutes, target_distance_meters, load_kg
+     ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) returning *, 0::integer as series_count`,
     [userId, profile, exerciseId, exerciseName, category, trackingType, equipment,
-      targetSeries, targetReps, targetMinutes, targetDistanceMeters]
+      targetSeries, targetReps, targetMinutes, targetDistanceMeters, loadKg]
   );
   await query(
     `insert into project200_exercise_library (
