@@ -288,9 +288,8 @@ body[data-background-theme="white"] .wellness-modal{--wellness-phase-bg:radial-g
 /* Os blocos estruturais deixam o fundo contínuo; apenas ações e mídia mantêm cor própria. */
 .wellness-workout-heading,.wellness-workout-image-zone,.wellness-workout-progress-zone,.wellness-workout-series-status,.wellness-workout-finish-zone,.wellness-workout-finish-panel,.wellness-workout-next-preview,.wellness-workout-player-slot,.wellness-workout-player-slot .running-player,.wellness-workout-complete-map,.wellness-workout-complete-map .wellness-muscle-map-slide,.wellness-workout-complete-gains,.wellness-workout-complete-gain{background:transparent!important}.wellness-workout-finish-panel,.wellness-workout-player-slot .running-player,.wellness-workout-complete-gain{border-color:transparent!important;box-shadow:none!important}.wellness-workout-close{background:transparent;border-color:transparent;box-shadow:none}
 
-/* A arte preta e laranja é o fundo único de todos os ambientes fullscreen de exercícios. */
-.wellness-modal[data-wellness-tab="exercises"],.wellness-modal[data-wellness-tab="exercises"]>.wellness-shell,.wellness-modal[data-wellness-tab="exercises"] .wellness-phase-layer{background-color:#080808!important;background-image:url("/200/images/exercise-fullscreen-bg.png?v=20260911")!important;background-position:center!important;background-size:cover!important;background-repeat:no-repeat!important}
-.wellness-modal[data-wellness-tab="exercises"] .wellness-phase-screen{background:transparent!important}
+/* Exercícios permanece sempre opaco: sem imagem de fundo e sem qualquer fase vazada. */
+.wellness-modal[data-wellness-tab="exercises"],.wellness-modal[data-wellness-tab="exercises"]>.wellness-shell,.wellness-modal[data-wellness-tab="exercises"] .wellness-phase-layer,.wellness-modal[data-wellness-tab="exercises"] .wellness-phase-screen{background-color:#000!important;background-image:none!important}
 
 /* A ação final e a indicação do próximo exercício ficam empilhadas. */
 .wellness-workout-finish-panel{flex-direction:column;gap:2px;padding-block:6px}
