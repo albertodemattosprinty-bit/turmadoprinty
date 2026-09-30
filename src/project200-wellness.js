@@ -495,7 +495,7 @@ export async function syncProject200ExerciseMission(userId, profileName = PROJEC
 export async function getProject200WellnessDashboard(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME) {
   await ensureProject200WellnessSchema();
   const profile = normalizeProfileName(profileName);
-  const [mealResult, summaryResult, workoutResult, recentWorkoutResult, preferencesResult, libraryResult, weightResult, assetResult, definitionResult, muscleProgressResult, muscleLifetimeResult] = await Promise.all([
+  const [mealResult, summaryResult, dailyExerciseMetricResult, workoutResult, recentWorkoutResult, preferencesResult, libraryResult, weightResult, assetResult, definitionResult, muscleProgressResult, muscleLifetimeResult] = await Promise.all([
     query(
       `select * from project200_nutrition_entries
        where user_id = $1 and assigned_profile = $2
@@ -510,6 +510,15 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
        from project200_nutrition_entries
        where user_id = $1 and assigned_profile = $2
          and (consumed_at at time zone $3)::date = (now() at time zone $3)::date`,
+      [userId, profile, PROJECT200_TIME_ZONE]
+    ),
+    query(
+      `select coalesce(sum(energy_points), 0)::numeric as energy,
+         coalesce(sum(strength_points), 0)::numeric as strength,
+         coalesce(sum(resistance_points), 0)::numeric as resistance
+       from project200_exercise_sessions
+       where user_id = $1 and assigned_profile = $2 and status = 'completed'
+         and (completed_at at time zone $3)::date = (now() at time zone $3)::date`,
       [userId, profile, PROJECT200_TIME_ZONE]
     ),
     getActiveWorkoutRow(userId, profile),
@@ -562,7 +571,7 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
       [userId, profile]
     )
   ]);
-  const summary = summaryResult.rows[0] || {};
+  const summary = summaryResult.rows[0] || {}, dailyExerciseMetrics = dailyExerciseMetricResult.rows[0] || {};
   const preference = preferencesResult.rows[0] || {};
   const storedMealSlots = Array.isArray(preference.meal_slots) ? preference.meal_slots.filter((key) => MEAL_SLOT_KEYS.has(key)) : [];
   const enabledMealSlotKeys = storedMealSlots.length ? storedMealSlots : DEFAULT_MEAL_SLOT_KEYS;
@@ -586,7 +595,12 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
       completedMealSlots,
       enabledMealSlots: enabledMealSlotKeys.length,
       mealCompletionPercent: Math.round((completedMealSlots / Math.max(1, enabledMealSlotKeys.length)) * 100),
-      exerciseCompletionPercent
+      exerciseCompletionPercent,
+      exerciseMetrics: {
+        energy: Math.max(0, Number(dailyExerciseMetrics.energy || 0)),
+        strength: Math.max(0, Number(dailyExerciseMetrics.strength || 0)),
+        resistance: Math.max(0, Number(dailyExerciseMetrics.resistance || 0))
+      }
     },
     meals: normalizedMeals,
     mealSlots: PROJECT200_MEAL_SLOTS.map((slot) => ({ ...slot, enabled: enabledMealSlotKeys.includes(slot.key), meal: latestMealBySlot.get(slot.key) || null })),
