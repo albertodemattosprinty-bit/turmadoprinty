@@ -4790,6 +4790,48 @@ async function handleProject200ExerciseDefinitionsRequest(request, response) {
   }
 }
 
+function project200ExerciseNameKey(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+async function handleProject200CatalogExerciseCreate(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const body = await readJsonBody(request);
+    const exerciseName = String(body?.exerciseName || "").trim().replace(/\s+/g, " ").slice(0, 160);
+    const nameKey = project200ExerciseNameKey(exerciseName);
+    if (nameKey.length < 2) throw new Error("Digite o nome do exercício para criar.");
+    await ensureProject200WellnessSchema();
+    const existingResult = await query(`select * from project200_exercise_definitions order by exercise_name asc`);
+    const similar = existingResult.rows.map(normalizeProject200ExerciseDefinition).find((definition) => {
+      const names = [definition.exerciseName, ...(Array.isArray(definition.alternativeNames) ? definition.alternativeNames : [])]
+        .map(project200ExerciseNameKey).filter(Boolean);
+      return names.some((candidate) => candidate === nameKey || candidate.includes(nameKey) || nameKey.includes(candidate));
+    });
+    if (similar) {
+      sendJson(response, 200, { ok: true, definition: similar, existing: true });
+      return;
+    }
+    const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+    if (!apiKey) throw new Error("A Luna não está disponível para criar exercícios agora.");
+    const generated = await createProject200ExerciseDefinitionsWithAi(apiKey, [{ exerciseName }], "create", user.id);
+    const raw = generated[0];
+    if (!raw) throw new Error("A Luna não conseguiu criar esse exercício agora.");
+    const definition = normalizeProject200ExerciseDefinition({
+      ...raw, exerciseId: project200AiExerciseId(exerciseName), exerciseName,
+      source: "luna"
+    });
+    if (!definition.muscles.length) throw new Error("A Luna não conseguiu definir os músculos desse exercício.");
+    const saved = await saveProject200ExerciseDefinitions(user.id, [definition]);
+    if (!saved[0]) throw new Error("Não foi possível salvar esse exercício.");
+    sendJson(response, 201, { ok: true, definition: saved[0], defaultImage: "/200/apps/exercicios.png" });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível criar esse exercício." });
+  }
+}
+
 async function handleProject200ExerciseImagesRequest(request, response, exerciseId) {
   const admin = await requireAdmin(request, response);
   if (!admin) return;
@@ -16712,6 +16754,11 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/admin/200/exercises/definitions/generate") {
     await handleProject200ExerciseDefinitionsRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/exercises/catalog/create") {
+    await handleProject200CatalogExerciseCreate(request, response);
     return;
   }
 
