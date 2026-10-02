@@ -50,11 +50,11 @@ import { createEscreverParagraph, deleteEscreverParagraph, ensureEscreverSchema,
 import { buildMiniSystemPrompt, MINI_MINISTRY_CONTEXT } from "./src/mini-prompts.js";
 import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getAlbumRehearsalCodeForOwner, getPlanSubscriptionById, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, listPlanSubscriptions, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent, redeemAlbumRehearsalCode } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
-import { createScheduleEntry, deleteScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
+import { createScheduleEntry, deleteScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, linkScheduleEntryToTermUser, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { claimAllTerm, createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getLatestTermByUserId, getTermByEventPageSlug, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { updateLatestTermCouponByUserId } from "./src/all-terms.js";
-import { archiveAdminEventFlow, createEventCoupon, deleteEventCoupon, ensureEventFlowSchema, getEventPresentations, listAdminEventFlow, listEventCoupons, markContractorPanelReached, normalizeEventPageSlug, recordProposalActivity, recordProposalVisit, resolveEventPage, resolveEventPricing, updateEventCoupon } from "./src/event-flow.js";
+import { archiveAdminEventFlow, createEventCoupon, deleteEventCoupon, ensureEventFlowSchema, getEventPresentations, listAdminEventFlow, listEventCoupons, markContractorPanelReached, markEventTermSubmitted, normalizeEventPageSlug, recordProposalActivity, recordProposalVisit, resolveEventPage, resolveEventPricing, updateEventCoupon } from "./src/event-flow.js";
 import { confirmEventLodging, confirmEventPayment, createEventExpenseNote, ensureEventContractingSchema, getEventContractWorkflow, getEventExpenseNoteFile, getEventPromoVideoFile, listUnreadEventUserIds, markEventUpdatesViewed, reportEventPayment, saveEventLodging, saveEventPromoVideo } from "./src/event-contracting.js";
 import { buildEventPromoNarration, composeEventPromoVideo, synthesizeEventPromoNarration } from "./src/event-promo-video.js";
 import { compileProject200ExerciseVideo } from "./src/project200-exercise-video.js";
@@ -10985,6 +10985,7 @@ async function handleCreateTerm(request, response) {
     const body = await readJsonBody(request);
     const claimToken = authUser ? "" : crypto.randomBytes(32).toString("hex");
     const term = await createAllTermEntry(body?.answers || {}, authUser?.id || null, body?.acceptedTerms || [], claimToken);
+    if (authUser?.id) await markEventTermSubmitted(authUser.id);
     const answers = term?.answers || {};
     const months = [
       "Janeiro", "Fevereiro", "Marco", "Abril", "Maio", "Junho",
@@ -11019,7 +11020,9 @@ async function handleCreateTerm(request, response) {
       dateLabel,
       place: String(answers.igreja || "-"),
       city: String(answers.cidade || "-"),
-      time: timeLabel || "-"
+      time: timeLabel || "-",
+      contractorUserId: authUser?.id || null,
+      termId: term.id
     });
 
     sendJson(response, 201, { ok: true, termId: term.id, pdfUrl: `/api/terms/${term.id}/pdf`, requiresAccount: !authUser, claimToken: claimToken || undefined });
@@ -11047,6 +11050,7 @@ async function handleClaimTermAccount(request, response, termId) {
     if (await findUserByUsername(username)) { sendJson(response, 409, { error: "Esse nome de acesso ja esta em uso." }); return; }
     user = await createUser({ name: displayName || username, username, password });
     const term = await claimAllTerm(termId, claimToken, user.id);
+    await linkScheduleEntryToTermUser(term.id, user.id);
     if (activeSeconds > 0) {
       const visit = await query(`insert into event_proposal_visits (user_id, opened_at, last_seen_at) values ($1, now() - ($2 * interval '1 second'), now()) returning id`, [user.id, activeSeconds]);
       await query(`insert into event_proposal_activity_sessions (visit_id, user_id, started_at, last_seen_at, ended_at) values ($1, $2, now() - ($3 * interval '1 second'), now(), now())`, [visit.rows[0].id, user.id, activeSeconds]);

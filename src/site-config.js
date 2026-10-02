@@ -181,9 +181,11 @@ export async function ensureSiteConfigSchema() {
 
       await query("create index if not exists idx_agenda_events_sort_order on agenda_events(sort_order);");
       await query("alter table agenda_events add column if not exists contractor_user_id uuid references users(id) on delete set null;");
+      await query("alter table agenda_events add column if not exists term_id uuid;");
       await query("alter table agenda_events add column if not exists deleted_at timestamptz;");
       await query("create index if not exists idx_agenda_events_deleted_at on agenda_events(deleted_at);");
       await query("create index if not exists idx_agenda_events_contractor_user_id on agenda_events(contractor_user_id);");
+      await query("create unique index if not exists idx_agenda_events_term_id on agenda_events(term_id) where term_id is not null;");
 
       await query(
         `
@@ -377,8 +379,8 @@ export async function getScheduleEntries() {
   await ensureSiteConfigSchema();
   const result = await query(
     `
-      select id, month_label, date_label, place, city, time_label, sort_order
-      , contractor_user_id
+      select id, month_label, date_label, place, city, time_label, sort_order,
+             contractor_user_id, term_id
       from agenda_events
       where deleted_at is null
       order by sort_order asc, created_at asc
@@ -393,20 +395,21 @@ export async function getScheduleEntries() {
     city: row.city,
     time: row.time_label,
     sortOrder: row.sort_order,
-    contractorUserId: row.contractor_user_id || null
+    contractorUserId: row.contractor_user_id || null,
+    termId: row.term_id || null
   }));
 }
 
-export async function createScheduleEntry({ monthLabel, dateLabel, place, city, time }) {
+export async function createScheduleEntry({ monthLabel, dateLabel, place, city, time, contractorUserId = null, termId = null }) {
   await ensureSiteConfigSchema();
   const nextOrderResult = await query("select coalesce(max(sort_order), 0) + 1 as next_order from agenda_events");
   const nextOrder = Number(nextOrderResult.rows[0]?.next_order) || 1;
 
   const result = await query(
     `
-      insert into agenda_events (month_label, date_label, place, city, time_label, sort_order)
-      values ($1, $2, $3, $4, $5, $6)
-      returning id, month_label, date_label, place, city, time_label, sort_order
+      insert into agenda_events (month_label, date_label, place, city, time_label, sort_order, contractor_user_id, term_id)
+      values ($1, $2, $3, $4, $5, $6, $7, $8)
+      returning id, month_label, date_label, place, city, time_label, sort_order, contractor_user_id, term_id
     `,
     [
       normalizeMonthLabel(monthLabel),
@@ -414,7 +417,9 @@ export async function createScheduleEntry({ monthLabel, dateLabel, place, city, 
       normalizePlace(place),
       normalizeCity(city),
       normalizeTime(time),
-      nextOrder
+      nextOrder,
+      contractorUserId || null,
+      termId || null
     ]
   );
 
@@ -427,8 +432,24 @@ export async function createScheduleEntry({ monthLabel, dateLabel, place, city, 
     city: row.city,
     time: row.time_label,
     sortOrder: row.sort_order,
-    contractorUserId: null
+    contractorUserId: row.contractor_user_id || null,
+    termId: row.term_id || null
   };
+}
+
+export async function linkScheduleEntryToTermUser(termId, userId) {
+  const safeTermId = String(termId || "").trim();
+  const safeUserId = String(userId || "").trim();
+  if (!safeTermId || !safeUserId) return null;
+  await ensureSiteConfigSchema();
+  const result = await query(
+    `update agenda_events
+        set contractor_user_id = $2
+      where term_id = $1 and deleted_at is null
+      returning id, contractor_user_id, term_id`,
+    [safeTermId, safeUserId]
+  );
+  return result.rows[0] || null;
 }
 
 export async function updateScheduleEntry({ eventId, dateLabel, place, city, time }) {

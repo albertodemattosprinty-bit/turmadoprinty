@@ -374,6 +374,21 @@ export async function archiveAdminEventFlow(userId) {
   };
 }
 
+export async function markEventTermSubmitted(userId) {
+  const safeUserId = String(userId || "").trim();
+  if (!safeUserId) return null;
+  await ensureEventFlowSchema();
+  const result = await query(
+    `insert into event_flow_state (user_id, first_term_at, last_term_at, deleted_at, updated_at)
+     values ($1, now(), now(), null, now())
+     on conflict (user_id) do update
+       set last_term_at = now(), deleted_at = null, updated_at = now()
+     returning user_id, first_term_at, last_term_at, deleted_at`,
+    [safeUserId]
+  );
+  return result.rows[0] || null;
+}
+
 export async function resolveEventPricing(input = {}) {
   await ensureEventFlowSchema();
   const presentation = resolvePresentation(input.presentationKey || "congresso-infantil");
@@ -439,7 +454,7 @@ export async function listAdminEventFlow() {
              floor(sum(greatest(0, extract(epoch from (coalesce(ended_at, last_seen_at) - started_at)))))::bigint as active_seconds
         from event_proposal_activity_sessions
        group by user_id
-    )
+    ), event_rows as (
     select u.id as user_id, u.name, u.username,
            coalesce(vs.access_count, 0)::int as access_count,
            coalesce(ast.active_seconds, 0)::bigint as active_seconds,
@@ -461,14 +476,34 @@ export async function listAdminEventFlow() {
          limit 1
       ) latest_term on true
      where efs.deleted_at is null
-     order by coalesce(vs.last_access_at, latest_term.created_at) desc nulls last, lower(coalesce(u.name, u.username, '')) asc
+    union all
+    select null::uuid as user_id,
+           coalesce(nullif(t.answers->>'contratante', ''), nullif(t.answers->>'igreja', ''), 'Contratante sem conta') as name,
+           ''::text as username,
+           0::int as access_count,
+           0::bigint as active_seconds,
+           null::timestamptz as first_access_at,
+           null::timestamptz as last_access_at,
+           null::timestamptz as contractor_panel_at,
+           t.id as term_id,
+           t.created_at as term_created_at,
+           t.answers
+      from "all-terms" t
+     where t.user_id is null
+       and t.claim_token_hash is not null
+    )
+    select * from event_rows
+    order by coalesce(last_access_at, term_created_at) desc nulls last,
+             lower(coalesce(answers->>'igreja', name, username, '')) asc
   `);
 
   return result.rows.map((row) => ({
-    userId: row.user_id,
+    eventKey: row.user_id || `term:${row.term_id}`,
+    userId: row.user_id || null,
+    accountLinked: Boolean(row.user_id),
     name: row.answers?.igreja || row.name || "-",
     accountName: row.name || "-",
-    username: row.username || "-",
+    username: row.username || "",
     accessCount: Number(row.access_count || 0),
     activeSeconds: Number(row.active_seconds || 0),
     firstAccessAt: row.first_access_at || null,

@@ -72,11 +72,12 @@ function syncBodyLock() {
 }
 
 function getUser(userId) {
-  return (state.users || []).find((user) => String(user.userId) === String(userId)) || null;
+  return (state.users || []).find((user) => String(user.eventKey || user.userId) === String(userId)) || null;
 }
 
 function eventStage(user) {
   if (user.status === "scheduled") return "Evento confirmado";
+  if (user.termId && !user.accountLinked) return "Termo aguardando conta";
   if (user.termId) return "Termo conclu√≠do";
   return "Avaliando proposta";
 }
@@ -105,28 +106,34 @@ function filteredUsers() {
 function renderEvents() {
   const users = filteredUsers();
   $("usersBody").innerHTML = users.map((user) => {
+    const eventKey = user.eventKey || user.userId;
     const status = user.status === "scheduled"
       ? '<span class="status-pill status-pill--scheduled">Confirmado</span>'
       : '<span class="status-pill status-pill--open">Em negocia√ß√£o</span>';
-    const noteButton = user.termId
+    const noteButton = user.termId && user.userId
       ? `<button class="button button--success" type="button" data-add-expense="${esc(user.userId)}">Adicionar nota</button>`
       : '<button class="button button--secondary" type="button" disabled title="O termo precisa estar conclu√≠do">Adicionar nota</button>';
-    const roomButton = user.termId
+    const roomButton = user.termId && user.userId
       ? `<button class="button button--secondary" type="button" data-open-room="${esc(user.userId)}">Abrir sala</button>`
-      : '<button class="button button--secondary" type="button" disabled>Aguardando termo</button>';
+      : user.termId
+        ? `<a class="button button--secondary" href="/api/terms/${encodeURIComponent(user.termId)}/pdf" target="_blank" rel="noopener">Abrir termo</a>`
+        : '<button class="button button--secondary" type="button" disabled>Aguardando termo</button>';
+    const deleteButton = user.userId
+      ? `<button class="button button--danger" type="button" data-delete-event="${esc(user.userId)}">Excluir</button>`
+      : "";
     return `
-      <tr ${user.termId ? `data-open-user="${esc(user.userId)}"` : ""}>
+      <tr ${user.termId && user.userId ? `data-open-user="${esc(eventKey)}"` : ""}>
         <td>
           <span class="event-primary">
             <strong>${esc(user.name || "Evento sem nome")}${user.hasUnreadUpdate ? '<span class="attention-dot" title="Nova movimenta√ß√£o"></span>' : ""}</strong>
-            <small>@${esc(user.username || "sem usu√°rio")}</small>
+            <small>${user.accountLinked ? `@${esc(user.username || "sem usu√°rio")}` : "Sem conta vinculada"}</small>
           </span>
         </td>
         <td><strong>${esc(eventStage(user))}</strong><span class="cell-detail">${user.eventCount ? `${user.eventCount} evento${user.eventCount === 1 ? "" : "s"}` : "Termo ainda n√£o conclu√≠do"}</span></td>
         <td><strong>${user.finalPriceCents ? money(user.finalPriceCents) : "A definir"}</strong><span class="cell-detail">${esc(user.presentationName || "Apresenta√ß√£o n√£o escolhida")}</span></td>
         <td><strong>${dateTime(user.lastAccessAt || user.termCreatedAt)}</strong><span class="cell-detail">${duration(user.activeSeconds)} de interesse ¬∑ ${Number(user.accessCount || 0)} acessos</span></td>
         <td>${status}</td>
-        <td><div class="action-cluster">${noteButton}${roomButton}<button class="button button--danger" type="button" data-delete-event="${esc(user.userId)}">Excluir</button></div></td>
+        <td><div class="action-cluster">${noteButton}${roomButton}${deleteButton}</div></td>
       </tr>
     `;
   }).join("");
@@ -212,17 +219,12 @@ async function renderAdminChurchArtworkPreview(artwork) {
     image.src = adminChurchArtworkObjectUrl;
     wrap.classList.remove("hidden");
   } catch {
-    $("adminChurchArtworkFeedback").textContent = "A fachada existe, mas a prÇvia n∆o pìde ser aberta agora.";
     $("adminChurchArtworkFeedback").textContent = "A fachada existe, mas a pr\u00e9via n\u00e3o p\u00f4de ser aberta agora.";
   }
 }
 
 function renderAdminChurchArtwork(workflow) {
   const artwork = workflow.churchArtwork;
-  $("generateAdminChurchArtwork").textContent = artwork ? "Criar uma nova vers∆o" : "Criar fachada com IA";
-  $("adminChurchArtworkFeedback").textContent = artwork
-    ? "Fachada pronta. O pr¢ximo v°deo usar† esta arte durante a locuá∆o."
-    : "Nenhuma fachada cinematogr†fica criada.";
   void renderAdminChurchArtworkPreview(artwork);
   $("generateAdminChurchArtwork").textContent = artwork ? "Criar uma nova vers\u00e3o" : "Criar fachada com IA";
   $("adminChurchArtworkFeedback").textContent = artwork
@@ -624,7 +626,6 @@ $("generateAdminChurchArtwork").addEventListener("click", async () => {
     return;
   }
   if (file.size > 15 * 1024 * 1024) {
-    feedback.textContent = "A foto precisa ter no m†ximo 15 MB.";
     feedback.textContent = "A foto precisa ter no m\u00e1ximo 15 MB.";
     return;
   }
@@ -633,7 +634,6 @@ $("generateAdminChurchArtwork").addEventListener("click", async () => {
   /*
     feedback.textContent = "A foto precisa ter no m\u00e1ximo 15 MB.";
   */
-  feedback.textContent = "Gerando a arte 16:9 conforme o hor†rio do evento. Isso pode levar atÇ dois minutos.";
   feedback.textContent = "Gerando a arte 16:9 conforme o hor\u00e1rio do evento. Isso pode levar at\u00e9 dois minutos.";
   try {
     const response = await fetch(getApiUrl(`/api/admin/eventos/users/${encodeURIComponent(activeUserId)}/church-artwork/generate`), {
@@ -649,9 +649,7 @@ $("generateAdminChurchArtwork").addEventListener("click", async () => {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || "N\u00e3o foi poss\u00edvel criar a fachada.");
-    if (!response.ok) throw new Error(data.error || "N∆o foi poss°vel criar a fachada.");
     await openEventRoom(activeUserId);
-    feedback.textContent = "Fachada criada! O pr¢ximo v°deo mostrar† a arte durante a locuá∆o da ElevenLabs.";
     feedback.textContent = "Fachada criada! O pr\u00f3ximo v\u00eddeo mostrar\u00e1 a arte durante a locu\u00e7\u00e3o da ElevenLabs.";
   } catch (error) {
     /*
@@ -669,7 +667,6 @@ $("generateAdminChurchArtwork").addEventListener("click", async () => {
     feedback.textContent = "Fachada criada! O pr\u00f3ximo v\u00eddeo mostrar\u00e1 a arte durante a locu\u00e7\u00e3o da ElevenLabs.";
     */
     button.textContent = activeDetail?.workflow?.churchArtwork ? "Criar uma nova vers\u00e3o" : "Criar fachada com IA";
-    button.textContent = activeDetail?.workflow?.churchArtwork ? "Criar uma nova vers∆o" : "Criar fachada com IA";
     button.textContent = activeDetail?.workflow?.churchArtwork ? "Criar uma nova vers\u00e3o" : "Criar fachada com IA";
   }
 });
