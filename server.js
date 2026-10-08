@@ -5933,7 +5933,7 @@ async function handleExtraGoalProgressRequest(request, response, goalId) {
   try {
     const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
     const currentGoal = await getExtraGoalById(user.id, selectedProfile, goalId);
-    if (["bible_reading", "exercise_plan", "financial_goal", "nutrition_control", "meal_slot"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("O progresso desta missão é atualizado somente pelo aplicativo nativo correspondente.");
+    if (["bible_reading", "exercise_plan", "financial_goal", "nutrition_control", "metrics", "meal_slot"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("O progresso desta missão é atualizado somente pelo aplicativo nativo correspondente.");
     const isLimit = String(currentGoal?.goalKind || "goal").trim().toLowerCase() === "limit";
     const shouldTrackPointsUpdate = !isLimit && Math.trunc(Number(body?.delta || 0) || 0) !== 0;
     const pointsSnapshotPrepared = body?.pointsSnapshotPrepared === true;
@@ -6025,7 +6025,7 @@ async function handleExtraGoalProgressBatchRequest(request, response) {
       if (!delta) continue;
       const currentGoal = await getExtraGoalById(user.id, selectedProfile, goalId);
       if (!currentGoal) throw new Error("Missão não encontrada durante a sincronização.");
-      if (["bible_reading", "exercise_plan", "financial_goal", "nutrition_control", "meal_slot"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("O progresso desta missão é atualizado somente pelo aplicativo nativo correspondente.");
+      if (["bible_reading", "exercise_plan", "financial_goal", "nutrition_control", "metrics", "meal_slot"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("O progresso desta missão é atualizado somente pelo aplicativo nativo correspondente.");
       const isLimit = String(currentGoal?.goalKind || "goal").trim().toLowerCase() === "limit";
       if (!isLimit) {
         shouldTrackPointsUpdate = true;

@@ -506,14 +506,14 @@ async function syncProject200NutritionControlMissions(userId, profileName, meals
   }
   const controls = await query(
     `select id, target_value, schedule_config from extra_goals
-     where user_id=$1 and assigned_profile=$2 and schedule_config->>'nativeType' in ('nutrition_control','meal_slot')`,
+     where user_id=$1 and assigned_profile=$2 and schedule_config->>'nativeType' in ('metrics','nutrition_control','meal_slot')`,
     [userId, profile]
   );
   await Promise.all(controls.rows.map(async (control) => {
     const nativeType = String(control.schedule_config?.nativeType || "");
     const nutrientKey = String(control.schedule_config?.nutrientKey || "").trim();
     const mealSlot = String(control.schedule_config?.mealSlot || "").trim();
-    if (nativeType === "nutrition_control" && !nutrientKey) return;
+    if ((nativeType === "metrics" || nativeType === "nutrition_control") && !nutrientKey) return;
     if (nativeType === "meal_slot" && !MEAL_SLOT_KEYS.has(mealSlot)) return;
     const progressValue = nativeType === "meal_slot"
       ? (meals.some((meal) => meal.mealSlot === mealSlot) ? 1 : 0)

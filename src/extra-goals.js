@@ -240,6 +240,18 @@ function normalizeScheduleConfig(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
 
+function normalizeNativeMetricScheduleConfig(value) {
+  const schedule = normalizeScheduleConfig(value);
+  if (!schedule) return null;
+  return ["nutrition_control", "metrics"].includes(String(schedule.nativeType || "").trim().toLowerCase())
+    ? { ...schedule, nativeType: "metrics" }
+    : schedule;
+}
+
+function isNonScoringMetricSchedule(value) {
+  return ["nutrition_control", "metrics"].includes(String(value?.nativeType || "").trim().toLowerCase());
+}
+
 function normalizeExtraGoalVariantRow(row) {
   const unitDurationSeconds = Math.max(0, Math.trunc(Number(row.unit_duration_seconds || 0) || 0));
   return {
@@ -597,6 +609,11 @@ export async function ensureExtraGoalsSchema() {
   await query("update extra_goals set limit_interval_value = 1 where limit_interval_value is null or limit_interval_value < 1;");
   await query("update extra_goals set limit_interval_unit = 'day' where limit_interval_unit is null or limit_interval_unit not in ('day', 'week', 'month', 'year');");
   await query("update extra_goals set unit_duration_seconds = unit_duration_minutes * 60 where unit_duration_seconds <= 0 and unit_duration_minutes > 0;");
+  await query(`update extra_goals
+    set schedule_config=jsonb_set(schedule_config,'{nativeType}','"metrics"'::jsonb),
+        unit_duration_minutes=0,unit_duration_seconds=0,updated_at=now()
+    where schedule_config->>'nativeType' in ('nutrition_control','metrics')
+      and (schedule_config->>'nativeType'<>'metrics' or unit_duration_minutes<>0 or unit_duration_seconds<>0);`);
   await query("alter table extra_goals add column if not exists svg_icon_url text not null default '';");
   await query("alter table extra_goals add column if not exists svg_icon_label text not null default '';");
   await query("update extra_goals set assigned_profile = 'Usuario' where assigned_profile is null or btrim(assigned_profile) = '';");
@@ -1251,8 +1268,8 @@ export async function createExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   ) || 0)));
   const isFolder = goalKind !== "limit" && payload?.isFolder === true;
   const repeatDays = normalizeExtraGoalRepeatDays(payload?.repeatDays);
-  const scheduleConfig = normalizeScheduleConfig(payload?.scheduleConfig || payload?.repeatConfig);
-  const unitDurationSeconds = goalKind === "limit" || isFolder ? 0 : requestedDurationSeconds;
+  const scheduleConfig = normalizeNativeMetricScheduleConfig(payload?.scheduleConfig || payload?.repeatConfig);
+  const unitDurationSeconds = goalKind === "limit" || isFolder || isNonScoringMetricSchedule(scheduleConfig) ? 0 : requestedDurationSeconds;
   const unitDurationMinutes = Math.max(0, Math.trunc(unitDurationSeconds / 60));
   await query(
     `
@@ -1579,8 +1596,8 @@ export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   const nextCategoryId = normalizeExtraGoalCategoryId(payload?.categoryId ?? currentGoal?.categoryId);
   const nextIsFolder = nextGoalKind !== "limit" && (payload?.isFolder === undefined ? currentGoal?.isFolder === true : payload.isFolder === true);
   const nextRepeatDays = normalizeExtraGoalRepeatDays(payload?.repeatDays, currentGoal?.repeatDays);
-  const nextScheduleConfig = normalizeScheduleConfig(payload?.scheduleConfig || payload?.repeatConfig || currentGoal?.scheduleConfig || currentGoal?.repeatConfig);
-  const safeNextUnitDurationSeconds = nextGoalKind === "limit" || nextIsFolder ? 0 : nextUnitDurationSeconds;
+  const nextScheduleConfig = normalizeNativeMetricScheduleConfig(payload?.scheduleConfig || payload?.repeatConfig || currentGoal?.scheduleConfig || currentGoal?.repeatConfig);
+  const safeNextUnitDurationSeconds = nextGoalKind === "limit" || nextIsFolder || isNonScoringMetricSchedule(nextScheduleConfig) ? 0 : nextUnitDurationSeconds;
   const nextUnitDurationMinutes = Math.max(0, Math.trunc(safeNextUnitDurationSeconds / 60));
   const nextLimitIntervalValue = Math.max(1, Math.min(999, Math.trunc(Number(payload?.limitIntervalValue ?? currentGoal?.limitIntervalValue ?? 1) || 1)));
   const nextLimitIntervalUnit = normalizeLimitIntervalUnit(payload?.limitIntervalUnit ?? currentGoal?.limitIntervalUnit);

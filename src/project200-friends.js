@@ -326,6 +326,7 @@ async function getPointsByUserIds(userIds = [], scopeKey = "today") {
           where user_id = any($1::uuid[])
             and assigned_profile = $3
             and coalesce(goal_kind, 'goal') <> 'limit'
+            and coalesce(schedule_config->>'nativeType','') not in ('metrics','nutrition_control')
           group by user_id
         ),
         event_points as (
@@ -365,6 +366,7 @@ async function getPointsByUserIds(userIds = [], scopeKey = "today") {
         where h.user_id = any($1::uuid[])
           and h.assigned_profile = $2
           and coalesce(g.goal_kind, 'goal') <> 'limit'
+          and coalesce(g.schedule_config->>'nativeType','') not in ('metrics','nutrition_control')
           and h.scope_date >= $3::date
           and h.scope_date <= $4::date
         group by h.user_id
@@ -671,6 +673,7 @@ export async function getProject200UserPointTotals(userId) {
            and g.user_id = h.user_id
           where h.user_id = $1
             and coalesce(g.goal_kind, 'goal') <> 'limit'
+            and coalesce(g.schedule_config->>'nativeType','') not in ('metrics','nutrition_control')
         ),
         event_points as (
           select coalesce(sum(points), 0)::bigint as points
