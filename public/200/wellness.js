@@ -438,6 +438,25 @@ function rebuildProvisionalMuscleProgress(workout){ state.provisionalMuscleProgr
 function formatMusclePoints(points){ return Number(points||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function formatMusclePercent(percent){ return Number(percent||0).toLocaleString("pt-BR",{minimumFractionDigits:Number.isInteger(Number(percent||0))?0:1,maximumFractionDigits:1}); }
 function muscleOverloadGradientMarkup(id){ return `<linearGradient id="${escapeHtml(id)}" x1="-1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ef4444"></stop><stop offset=".5" stop-color="#f97316"></stop><stop offset="1" stop-color="#ef4444"></stop><animate attributeName="x1" values="-1;1;-1" dur="4.2s" repeatCount="indefinite"></animate><animate attributeName="x2" values="0;2;0" dur="4.2s" repeatCount="indefinite"></animate></linearGradient>`; }
+function lifetimeMusclePoints(){ return new Map((Array.isArray(state.dashboard?.muscleLifetime)?state.dashboard.muscleLifetime:[]).map((item)=>[String(item?.muscleId||""),Math.max(0,Number(item?.points||0))])); }
+function renderMuscleLifetimeLabels(){
+  const lifetime=lifetimeMusclePoints(),namespace="http://www.w3.org/2000/svg";
+  elements.muscleProgressMapTrack?.querySelectorAll("svg").forEach((svg)=>{
+    svg.querySelectorAll("[data-muscle-lifetime-label]").forEach((label)=>label.remove());
+    const viewBox=String(svg.getAttribute("viewBox")||"").trim().split(/\s+/).map(Number),viewWidth=Number(viewBox[2]||0),viewHeight=Number(viewBox[3]||0);
+    svg.querySelectorAll("[data-current-muscle-id]").forEach((region)=>{
+      const points=Number(lifetime.get(String(region.dataset.currentMuscleId||""))||0),displayPoints=completionDisplayPoints(points);
+      if(displayPoints<=0)return;
+      let box;try{box=region.getBBox();}catch{return;}
+      const textValue=`${displayPoints.toLocaleString("pt-BR")} PTS`,centerX=box.x+(box.width/2),centerY=box.y+(box.height/2),label=svg.ownerDocument.createElementNS(namespace,"g"),rect=svg.ownerDocument.createElementNS(namespace,"rect"),text=svg.ownerDocument.createElementNS(namespace,"text");
+      label.classList.add("wellness-muscle-lifetime-label");label.dataset.muscleLifetimeLabel="true";label.setAttribute("aria-hidden","true");
+      text.textContent=textValue;text.setAttribute("x",String(centerX));text.setAttribute("y",String(centerY));text.setAttribute("text-anchor","middle");text.setAttribute("dominant-baseline","middle");
+      label.append(rect,text);svg.append(label);
+      const labelWidth=Math.max(28,(typeof text.getComputedTextLength==="function"?text.getComputedTextLength():textValue.length*7)+14),labelHeight=22,halfWidth=labelWidth/2,x=Math.max(2,Math.min(Math.max(2,viewWidth-labelWidth-2),centerX-halfWidth)),y=Math.max(2,Math.min(Math.max(2,viewHeight-labelHeight-2),centerY-(labelHeight/2)));
+      rect.setAttribute("x",String(x));rect.setAttribute("y",String(y));rect.setAttribute("width",String(labelWidth));rect.setAttribute("height",String(labelHeight));rect.setAttribute("rx","7");text.setAttribute("x",String(x+halfWidth));text.setAttribute("y",String(y+(labelHeight/2)+.5));
+    });
+  });
+}
 function refreshMuscleProgressMap(){
   if(!elements.muscleProgressMapTrack)return;
   const progress=currentMuscleProgress(),byMuscle=new Map(progress.map((item)=>[item.muscleId,item]));
@@ -445,6 +464,7 @@ function refreshMuscleProgressMap(){
     const muscleId=region.dataset.currentMuscleId,item=byMuscle.get(muscleId),muscle=PROJECT200_MUSCLE_BY_ID[muscleId],points=Number(item?.points||0),percent=Number(item?.percent||0),opacity=points?Math.min(1,.42+(Math.min(percent,110)/110)*.58):.42,gradientId=region.closest("svg")?.dataset.overloadGradient||"";
     region.classList.toggle("is-trained",points>0); region.classList.toggle("is-overload",points>0&&percent>=110); region.style.setProperty("--muscle-color",item?.color||"rgb(148 163 184)"); if(percent>=110&&gradientId)region.style.setProperty("--muscle-fill",`url(#${gradientId})`);else region.style.removeProperty("--muscle-fill"); region.style.setProperty("--muscle-opacity",String(opacity)); region.setAttribute("aria-label",`${muscle?.name||muscleId} · ${formatMusclePoints(points)} pontos · ${formatMusclePercent(percent)}% · ${item?.stage||"Irrelevante"}`);
   });
+  renderMuscleLifetimeLabels();
   const strongest=progress[0],muscle=PROJECT200_MUSCLE_BY_ID[strongest?.muscleId];
   if(elements.muscleProgressSummary)elements.muscleProgressSummary.textContent=strongest&&strongest.points>0?`${muscle?.name||"Maior carga"} · ${formatMusclePoints(strongest.points)} pts · ${formatMusclePercent(strongest.percent)}% · ${strongest.stage}`:"Todos os músculos · 0%";
 }
