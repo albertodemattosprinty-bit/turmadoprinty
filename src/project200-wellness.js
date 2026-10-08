@@ -492,6 +492,46 @@ export async function syncProject200ExerciseMission(userId, profileName = PROJEC
   return { goalId: goalId ? String(goalId) : "", percent };
 }
 
+async function syncProject200NutritionControlMissions(userId, profileName, meals = []) {
+  await ensureExtraGoalsSchema();
+  const profile = normalizeProfileName(profileName);
+  const dateKey = project200DateKey();
+  const totals = new Map();
+  for (const meal of meals) {
+    for (const nutrient of Array.isArray(meal?.nutrients) ? meal.nutrients : []) {
+      const key = String(nutrient?.key || "").trim();
+      if (!key) continue;
+      totals.set(key, (totals.get(key) || 0) + Math.max(0, Number(nutrient?.value || 0) || 0));
+    }
+  }
+  const controls = await query(
+    `select id, target_value, schedule_config from extra_goals
+     where user_id=$1 and assigned_profile=$2 and schedule_config->>'nativeType' in ('nutrition_control','meal_slot')`,
+    [userId, profile]
+  );
+  await Promise.all(controls.rows.map(async (control) => {
+    const nativeType = String(control.schedule_config?.nativeType || "");
+    const nutrientKey = String(control.schedule_config?.nutrientKey || "").trim();
+    const mealSlot = String(control.schedule_config?.mealSlot || "").trim();
+    if (nativeType === "nutrition_control" && !nutrientKey) return;
+    if (nativeType === "meal_slot" && !MEAL_SLOT_KEYS.has(mealSlot)) return;
+    const progressValue = nativeType === "meal_slot"
+      ? (meals.some((meal) => meal.mealSlot === mealSlot) ? 1 : 0)
+      : Math.round((totals.get(nutrientKey) || 0) * 100) / 100;
+    await query(
+      `update extra_goals set progress_value=$4, progress_date=$3::date, last_progress_at=now(), updated_at=now()
+       where id=$1 and user_id=$2`,
+      [control.id, userId, dateKey, progressValue]
+    );
+    await query(
+      `insert into extra_goal_progress_history (user_id,goal_id,assigned_profile,scope_date,progress_value,target_value,updated_at)
+       values ($1,$2,$3,$4::date,$5,$6,now())
+       on conflict (user_id,goal_id,scope_date) do update set progress_value=excluded.progress_value,target_value=excluded.target_value,updated_at=now()`,
+      [userId, control.id, profile, dateKey, progressValue, Math.max(1, Number(control.target_value || 1))]
+    );
+  }));
+}
+
 export async function getProject200WellnessDashboard(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME) {
   await ensureProject200WellnessSchema();
   const profile = normalizeProfileName(profileName);
@@ -576,6 +616,7 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
   const storedMealSlots = Array.isArray(preference.meal_slots) ? preference.meal_slots.filter((key) => MEAL_SLOT_KEYS.has(key)) : [];
   const enabledMealSlotKeys = storedMealSlots.length ? storedMealSlots : DEFAULT_MEAL_SLOT_KEYS;
   const normalizedMeals = mealResult.rows.map(normalizeMealRow);
+  await syncProject200NutritionControlMissions(userId, profile, normalizedMeals);
   const latestMealBySlot = new Map();
   normalizedMeals.forEach((meal) => { if (meal.mealSlot && !latestMealBySlot.has(meal.mealSlot)) latestMealBySlot.set(meal.mealSlot, meal); });
   const mealMissionQuality = Math.round(enabledMealSlotKeys.reduce((sum, key) => sum + Number(latestMealBySlot.get(key)?.qualityScore || 0), 0) / Math.max(1, enabledMealSlotKeys.length));
@@ -602,6 +643,7 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
         resistance: Math.max(0, Number(dailyExerciseMetrics.resistance || 0))
       }
     },
+    nutritionPlanConfigured: Array.isArray(preference.meal_slots) && preference.meal_slots.some((key) => MEAL_SLOT_KEYS.has(key)),
     meals: normalizedMeals,
     mealSlots: PROJECT200_MEAL_SLOTS.map((slot) => ({ ...slot, enabled: enabledMealSlotKeys.includes(slot.key), meal: latestMealBySlot.get(slot.key) || null })),
     activeWorkout: normalizeWorkoutRow(workoutResult),

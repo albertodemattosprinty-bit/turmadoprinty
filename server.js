@@ -4450,7 +4450,7 @@ async function requestProject200MarinReply({ apiKey, user, profileName, personaK
     "- Acoes usam apenas estes IDs de aspecto: alimentacao, hidratacao, aprendizado, trabalho, casa, exercicios, social, higiene, lazer, aspecto. Sono e planejamento/Financas nunca sao atribuidos a uma acao manual.",
     "- Quando criar missao, tarefa ou limite com repeticao, preencha scheduleConfig no modelo universal: frequency none/daily/weekly/monthly_custom/yearly/periodic; interval; intervalUnit day/week/month/year; weekDays 0=Dom a 6=Sab; monthlyMode day ou weekday; monthDay; monthlyOrdinalIndex 0=primeira, 1=segunda, 2=terceira, 3=quarta, 4=ultima; monthlyWeekdayIndex 0=Dom a 6=Sab; startsOn YYYY-MM-DD; endMode never/date/count; endsOn; count; notification com mode at_time/5m/10m/30m/1h/1d/custom, customAmount e customUnit minutes/hours/days.",
     "- Exemplos: diariamente use frequency daily, interval 1 e intervalUnit day. Toda segunda use weekly com weekDays [1]. Primeira segunda do mes use monthly_custom, intervalUnit month, monthlyMode weekday, monthlyOrdinalIndex 0, monthlyWeekdayIndex 1. Dia 15 do mes use monthlyMode day e monthDay 15.",
-    "- Ambiente mapeia para casa. Proposito deixou de ser um aspecto; nao use planejamento para tarefas ou missoes manuais. Familia usa aspecto e nunca social.",
+    "- Ambiente mapeia para casa. Proposito deixou de ser um aspecto; nao use planejamento para tarefas ou missoes manuais. Habitos emocionais usam aspecto e nunca social.",
     "- Preserve sono, alimentacao, saude, seguranca, autonomia e limites fisicos. Disciplina nunca significa privacao perigosa.",
     "- Nao substitua orientacao medica, juridica ou financeira profissional.",
     "- Ao receber uma imagem, descreva e interprete somente o que estiver visivel. Diga quando algo nao puder ser confirmado.",
@@ -5933,7 +5933,7 @@ async function handleExtraGoalProgressRequest(request, response, goalId) {
   try {
     const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
     const currentGoal = await getExtraGoalById(user.id, selectedProfile, goalId);
-    if (["bible_reading", "exercise_plan", "financial_goal"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("O progresso desta missão é atualizado somente pelo aplicativo nativo correspondente.");
+    if (["bible_reading", "exercise_plan", "financial_goal", "nutrition_control", "meal_slot"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("O progresso desta missão é atualizado somente pelo aplicativo nativo correspondente.");
     const isLimit = String(currentGoal?.goalKind || "goal").trim().toLowerCase() === "limit";
     const shouldTrackPointsUpdate = !isLimit && Math.trunc(Number(body?.delta || 0) || 0) !== 0;
     const pointsSnapshotPrepared = body?.pointsSnapshotPrepared === true;
@@ -6025,7 +6025,7 @@ async function handleExtraGoalProgressBatchRequest(request, response) {
       if (!delta) continue;
       const currentGoal = await getExtraGoalById(user.id, selectedProfile, goalId);
       if (!currentGoal) throw new Error("Missão não encontrada durante a sincronização.");
-      if (["bible_reading", "exercise_plan", "financial_goal"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("O progresso desta missão é atualizado somente pelo aplicativo nativo correspondente.");
+      if (["bible_reading", "exercise_plan", "financial_goal", "nutrition_control", "meal_slot"].includes(currentGoal?.scheduleConfig?.nativeType)) throw new Error("O progresso desta missão é atualizado somente pelo aplicativo nativo correspondente.");
       const isLimit = String(currentGoal?.goalKind || "goal").trim().toLowerCase() === "limit";
       if (!isLimit) {
         shouldTrackPointsUpdate = true;
@@ -6345,7 +6345,7 @@ const PROJECT200_TASK_CATEGORIES = [
   { aspectId: "20000000-0000-4000-8000-000000000009", id: "planejamento", name: "Finanças" },
   { aspectId: "20000000-0000-4000-8000-000000000010", id: "higiene", name: "Higiene" },
   { aspectId: "20000000-0000-4000-8000-000000000011", id: "lazer", name: "Lazer" },
-  { aspectId: "20000000-0000-4000-8000-000000000012", id: "aspecto", name: "Família" }
+  { aspectId: "20000000-0000-4000-8000-000000000012", id: "aspecto", name: "Emocional" }
 ];
 const PROJECT200_TASK_ASSIGNABLE_CATEGORIES = PROJECT200_TASK_CATEGORIES.filter((item) => item.id !== "sono" && item.id !== "planejamento");
 
@@ -6360,7 +6360,7 @@ function inferProject200CategoryLocally(title) {
   if (/\b(cafe|almoco|jantar|comida|comer|refeicao|lanche|cozinhar|aliment)\b/.test(normalized)) return pick("alimentacao");
   if (/\b(estudar|estudo|ler|leitura|curso|aula|escola|revisao|aprender|habilidade|treinar idioma|praticar idioma)\b/.test(normalized)) return pick("aprendizado");
   if (/\b(reuniao|projeto|cliente|entrega|trabalho|emprego|profissao|expediente|task)\b/.test(normalized)) return pick("trabalho");
-  if (/\b(familia|familiar|filho|filha|pai|mae|esposa|marido|irmao|irma|avo|avó)\b/.test(normalized)) return pick("aspecto");
+  if (/\b(meditar|meditacao|respirar|emocional|diario|reflexao|pessoal|familia|familiar|filho|filha|pai|mae|esposa|marido|irmao|irma|avo|avó)\b/.test(normalized)) return pick("aspecto");
   if (/\b(escovar|banho|higiene|barba|cabelo|dente|unha|lavar rosto|lavar roupa|ir ao banheiro|sanitario)\b/.test(normalized)) return pick("higiene");
   if (/\b(arrumar|faxina|limpar|manutencao|consertar|organizar casa|cozinha|quarto|banheiro|casa|ambiente|lixo)\b/.test(normalized)) return pick("casa");
   if (/\b(treino|academia|corrida|caminhada|alongamento|exercicio|flexao|agachamento|esporte)\b/.test(normalized)) return pick("exercicios");
@@ -6462,7 +6462,7 @@ async function handleProject200ActionCategorize(request, response) {
       messages: [
         {
           role: "system",
-          content: `Classifique o título em exatamente UM aspecto permitido e responda somente JSON: {"categoryId":"...","categoryName":"..."}. Sono e Finanças são nativos e proibidos para tarefas manuais. Regras: alimentação cobre qualquer ação de comer; hidratação cobre beber água; aprendizado cobre escola, cursos e habilidades; trabalho cobre atividades profissionais e organização sem categoria própria; casa cobre ambiente, arrumação e manutenção; exercícios cobre atividade física; social cobre amigos, mensagens e encontros, nunca família; higiene cobre banheiro, banho, rosto, dentes, unhas, barba e roupas; lazer cobre diversão; família cobre somente relações familiares. Aspectos permitidos: ${PROJECT200_TASK_ASSIGNABLE_CATEGORIES.map((c) => `${c.id}=${c.name}`).join("; ")}.`
+          content: `Classifique o título em exatamente UM aspecto permitido e responda somente JSON: {"categoryId":"...","categoryName":"..."}. Sono e Finanças são nativos e proibidos para tarefas manuais. Regras: alimentação cobre qualquer ação de comer; hidratação cobre beber água; aprendizado cobre escola, cursos e habilidades; trabalho cobre atividades profissionais e organização sem categoria própria; casa cobre ambiente, arrumação e manutenção; exercícios cobre atividade física; social cobre amigos, mensagens e encontros; higiene cobre banheiro, banho, rosto, dentes, unhas, barba e roupas; lazer cobre diversão; aspecto cobre práticas emocionais, autocuidado e reflexão pessoal. Aspectos permitidos: ${PROJECT200_TASK_ASSIGNABLE_CATEGORIES.map((c) => `${c.id}=${c.name}`).join("; ")}.`
         },
         { role: "user", content: title.slice(0, 180) }
       ]

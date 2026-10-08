@@ -294,7 +294,7 @@ const statsPointCategories = [
   { aspectId: "20000000-0000-4000-8000-000000000009", id: "planejamento", name: "Finanças", targetPoints: 30, icon: "/200/icons/financas.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000010", id: "higiene", name: "Higiene", targetPoints: 15, icon: "/200/aspect-icons/higiene.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000011", id: "lazer", name: "Lazer", targetPoints: 90, icon: "/200/aspect-icons/lazer.svg" },
-  { aspectId: "20000000-0000-4000-8000-000000000012", id: "aspecto", name: "Família", targetPoints: 30, icon: "/200/aspect-icons/familia.svg" }
+  { aspectId: "20000000-0000-4000-8000-000000000012", id: "aspecto", name: "Emocional", targetPoints: 30, icon: "/200/aspect-icons/aspecto.svg" }
 ];
 const sleepDelayOptions = [0, 5, 15, 30, 60];
 const avatarPresetToPath = {
@@ -23199,7 +23199,8 @@ window.project200ProjectsContext = {
   formatActionTitleForDisplay, formatMinutesHuman, getServerNowMs, isLimitGoal,
   normalizeActionStatus, openModal, closeModal, openTaskComposer,
   openMissionCreateModal: (...args) => openMissionCreateModal(...args),
-  getToken, redirectToProject200Login, renderActions, loadActions, loadMissions
+  getToken, redirectToProject200Login, renderActions, loadActions, loadMissions,
+  refreshMissions: async (options = {}) => { await loadMissions(options); renderMissions(); await loadActionMissions(options); }
 };
 
 // PROJECT200_UNIVERSAL_SCHEDULE_EXTENSION
@@ -23589,7 +23590,7 @@ window.project200ProjectsContext = {
     if (target === "mission-create") return normalizeSchedule(state.missionCreate?.scheduleConfig || state.missionCreate?.repeatConfig, state.missionCreate?.repeatDays);
     if (target === "mission-adjust") return normalizeSchedule(state.missionAdjust?.scheduleConfig || state.missionAdjust?.repeatConfig, state.missionAdjust?.repeatDays);
     if (target === "microtask") return normalizeSchedule(state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig, state.missionVariants?.repeatDays);
-    if (target === "bible-plan" || target === "exercise-goal") return normalizeSchedule(bridgeExternalSchedule, ALL_MISSION_REPEAT_DAYS);
+    if (target === "bible-plan" || target === "exercise-goal" || target === "habit-store") return normalizeSchedule(bridgeExternalSchedule, ALL_MISSION_REPEAT_DAYS);
     return normalizeSchedule();
   }
   function derivedRepeatDays(schedule) {
@@ -23620,7 +23621,7 @@ window.project200ProjectsContext = {
       state.missionVariants.avoidDays = cfg.frequency === "periodic" ? normalizeAvoidDays(cfg.avoidDays, [0, 6]) : [];
       const start = projectDateKeyToDate(cfg.startsOn, 12);
       state.missionVariants.nextDueOffsetDays = Math.max(0, Math.round((start.getTime() - todayStart().getTime()) / 86400000));
-    } else if (target === "bible-plan" || target === "exercise-goal") {
+    } else if (target === "bible-plan" || target === "exercise-goal" || target === "habit-store") {
       bridgeExternalSchedule = cfg;
     }
     renderBridgeButtons();
@@ -23695,7 +23696,7 @@ window.project200ProjectsContext = {
   function openDailyRepetitionModal(target, callback = null, initialSchedule = null) {
     bridgeTarget = target;
     bridgeApplyCallback = callback;
-    if (target === "bible-plan" || target === "exercise-goal") bridgeExternalSchedule = normalizeSchedule(initialSchedule, ALL_MISSION_REPEAT_DAYS);
+    if (target === "bible-plan" || target === "exercise-goal" || target === "habit-store") bridgeExternalSchedule = normalizeSchedule(initialSchedule, ALL_MISSION_REPEAT_DAYS);
     const modal = ensureModal();
     renderBridgeModal();
     modal.classList.add("active");

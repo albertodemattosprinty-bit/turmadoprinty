@@ -21,7 +21,7 @@ const ASPECTS = [
   { name: "Finanças", icon: "/200/icons/financas.svg" },
   { name: "Higiene", icon: "/200/aspect-icons/higiene.svg" },
   { name: "Lazer", icon: "/200/aspect-icons/lazer.svg" },
-  { name: "Família", icon: "/200/aspect-icons/familia.svg" }
+  { name: "Emocional", icon: "/200/aspect-icons/aspecto.svg" }
 ];
 
 const EDUCATION = [
