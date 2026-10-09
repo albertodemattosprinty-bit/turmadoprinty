@@ -1171,6 +1171,8 @@ const profileRenameMessage = document.getElementById("profileRenameMessage");
 const profileRenameConfirmButton = document.getElementById("profileRenameConfirmButton");
 const toggleTaskBeepOptionButton = document.getElementById("toggleTaskBeepOption");
 const toggleTaskBeepHint = document.getElementById("toggleTaskBeepHint");
+const toggleContinuousTasksOptionButton = document.getElementById("toggleContinuousTasksOption");
+const toggleContinuousTasksHint = document.getElementById("toggleContinuousTasksHint");
 const toggleMinuteNotificationsOptionButton = document.getElementById("toggleMinuteNotificationsOption");
 const toggleMinuteNotificationsHint = document.getElementById("toggleMinuteNotificationsHint");
 const toggleFinalMinuteNotificationsOptionButton = document.getElementById("toggleFinalMinuteNotificationsOption");
@@ -1272,6 +1274,9 @@ let actionLastSpeechAt = 0;
 let actionPendingAiPayload = null;
 let actionStatusTargetId = "";
 let runningTaskTicker = null;
+let continuousTaskTransitionTimer = 0;
+let taskSpeechPlaybackQueue = Promise.resolve();
+const taskSpeechBlobCache = new Map();
 let pendingActionsAnchorId = "";
 let actionCompletionAnimationId = "";
 let suppressActionsAutoAnchorOnce = false;
@@ -1686,6 +1691,7 @@ const state = {
     homeViewMode: "apps",
     missionActionsMode: "separate",
     completionBeepCycles: 0,
+    continuousTasksEnabled: false,
     minuteNotificationInterval: 1,
     finalMinuteNotificationsEnabled: true,
     backgroundTheme: "edge",
@@ -3051,7 +3057,11 @@ function getRunningActionProgressState(action) {
   if (!action) {
     return { percent: 0, remainingMinutes: 0 };
   }
-  const durationMinutes = getActionDurationMinutes(action);
+  const isFreeTimeAction = String(action?.categoryId || "").trim().toLowerCase() === "free_time";
+  const scheduledDurationMs = new Date(action?.endAt || "").getTime() - new Date(action?.startAt || "").getTime();
+  const durationMinutes = isFreeTimeAction && Number.isFinite(scheduledDurationMs) && scheduledDurationMs > 0
+    ? scheduledDurationMs / 60000
+    : getActionDurationMinutes(action);
   if (!durationMinutes) {
     return { percent: 0, remainingMinutes: 0 };
   }
@@ -4581,7 +4591,8 @@ function renderHomeRunningTask() {
   }
   if (remainingSeconds <= 0) {
     void playRunningEndBellCue(runningActionId);
-    if (isQuickTaskAction(action) && !state.quickTaskAutoFinalizing) {
+    if ((isQuickTaskAction(action) || (state.options.continuousTasksEnabled && !action._continuousAutoFinalized)) && !state.quickTaskAutoFinalizing) {
+      if (state.options.continuousTasksEnabled) action._continuousAutoFinalized = true;
       state.quickTaskAutoFinalizing = true;
       void performRunningFinalize(action);
     }
@@ -8788,6 +8799,7 @@ async function completeActionImmediately(action, { returnToActions = true, actio
       suppressActionsAutoAnchorOnce = true;
       renderActions();
       renderHomeRunningTask();
+      scheduleContinuousTaskTransition(result.payload.action);
       void loadStatsSummary();
       return true;
     } catch (error) {
@@ -8833,6 +8845,7 @@ async function completeActionImmediately(action, { returnToActions = true, actio
     if (!payload?.action) throw new Error("Nao foi possivel concluir a tarefa.");
     updateActionInState(payload.action);
     registerSystemEventFromActionTransition(previousAction, payload.action);
+    scheduleContinuousTaskTransition(payload.action);
     enqueueActionPointsUpdateFeedback(payload?.pointsUpdate, 120);
     renderActions();
     renderHomeRunningTask();
@@ -8848,6 +8861,145 @@ async function completeActionImmediately(action, { returnToActions = true, actio
   } finally {
     setActionOptimisticSync(actionId, false);
   }
+}
+
+function getTaskSpeechCacheKey(payload) {
+  return [payload?.kind || "", payload?.id || "", payload?.variantId || "", payload?.minutes || "", payload?.title || ""].join(":");
+}
+
+async function requestTaskSpeechBlob(payload) {
+  const cacheKey = getTaskSpeechCacheKey(payload);
+  if (taskSpeechBlobCache.has(cacheKey)) return taskSpeechBlobCache.get(cacheKey);
+  const token = getToken();
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const response = await fetch(getApiUrl("/api/200/task-speech"), {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) {
+    const errorPayload = await response.json().catch(() => ({}));
+    throw new Error(errorPayload?.error || "Não foi possível carregar o áudio da tarefa.");
+  }
+  const blob = await response.blob();
+  taskSpeechBlobCache.set(cacheKey, blob);
+  return blob;
+}
+
+function playTaskSpeechBlob(blob) {
+  if (!blob || typeof Audio === "undefined") return Promise.resolve();
+  const audio = new Audio(URL.createObjectURL(blob));
+  audio.preload = "auto";
+  return new Promise((resolve) => {
+    const finish = () => {
+      URL.revokeObjectURL(audio.src);
+      resolve();
+    };
+    audio.addEventListener("ended", finish, { once: true });
+    audio.addEventListener("error", finish, { once: true });
+    void audio.play().catch(finish);
+  });
+}
+
+function queueTaskSpeechSequence(requests) {
+  if (!Array.isArray(requests) || !requests.length) return;
+  const playSequence = async () => {
+    const playback = getRunningPlaybackState();
+    const resumeMusic = Boolean(runningAudio && !runningAudio.paused);
+    const resumeTime = Number(runningAudio?.currentTime || 0);
+    if (resumeMusic) runningAudio.pause();
+    try {
+      const blobs = await Promise.all(requests.map((request) => requestTaskSpeechBlob(request)));
+      for (const blob of blobs) await playTaskSpeechBlob(blob);
+    } catch {
+      // Áudio de voz não deve interromper o início ou a contagem da atividade.
+    } finally {
+      if (resumeMusic && runningAudio) {
+        try {
+          runningAudio.currentTime = resumeTime;
+          await runningAudio.play();
+        } catch {}
+      }
+      if (playback?.track) renderRunningMusicPlayer();
+    }
+  };
+  taskSpeechPlaybackQueue = taskSpeechPlaybackQueue.then(playSequence, playSequence);
+}
+
+function queueActionStartSpeech(action) {
+  if (!action?.id) return;
+  const duration = Math.max(0, Math.round(getActionDurationMinutes(action)));
+  if (String(action.categoryId || "").trim().toLowerCase() === "free_time") {
+    queueTaskSpeechSequence([
+      { kind: "system", id: "tempo_livre" },
+      ...(duration ? [{ kind: "duration", minutes: duration }] : [])
+    ]);
+    return;
+  }
+  queueTaskSpeechSequence([
+    { kind: "system", id: "nova_tarefa" },
+    { kind: "action", id: String(action.id), title: String(action.title || "") },
+    ...(duration ? [{ kind: "duration", minutes: duration }] : [])
+  ]);
+}
+
+function queueMissionStartSpeech(goal, selectedVariant = null, durationSeconds = 0) {
+  const goalId = String(goal?.id || "").trim();
+  if (!goalId) return;
+  const duration = Math.max(0, Math.round(Number(durationSeconds || 0) / 60));
+  queueTaskSpeechSequence([
+    { kind: "system", id: "nova_tarefa" },
+    { kind: "mission", id: goalId, variantId: String(selectedVariant?.id || ""), profile: state.selectedProfile || getDefaultProfileName(), title: String(selectedVariant?.title || goal?.title || "") },
+    ...(duration ? [{ kind: "duration", minutes: duration }] : [])
+  ]);
+}
+
+function scheduleContinuousTaskTransition(completedAction) {
+  if (!state.options.continuousTasksEnabled || !completedAction?.id) return;
+  window.clearTimeout(continuousTaskTransitionTimer);
+  continuousTaskTransitionTimer = window.setTimeout(async () => {
+    continuousTaskTransitionTimer = 0;
+    if (!state.options.continuousTasksEnabled) return;
+    const nextAction = getNextTimelineEntryForRunning(completedAction);
+    const now = getServerNowMs();
+    const activeWindowEnd = Number(getActiveTimeWindow(now)?.endMs || 0);
+    const nextStart = new Date(nextAction?.startAt || "").getTime();
+    const hasNextAction = Boolean(nextAction?.id && Number.isFinite(nextStart));
+    if (hasNextAction && nextStart <= now + 15000) {
+      resetRunningCompletionState();
+      await toggleActionStatus(nextAction.id, { skipDecision: true, ignoreRunningConflict: true });
+      return;
+    }
+    if (!Number.isFinite(activeWindowEnd) || activeWindowEnd <= now || (hasNextAction && nextStart > activeWindowEnd)) return;
+    const freeTimeEnd = Math.min(hasNextAction ? nextStart : activeWindowEnd, activeWindowEnd, now + (24 * 60 * 60 * 1000));
+    try {
+      const payload = await apiRequest("/api/actions/free-time", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profile: state.selectedProfile || getDefaultProfileName(),
+          startAt: new Date(now).toISOString(),
+          endAt: new Date(freeTimeEnd).toISOString()
+        }),
+        skipGlobalLoading: true,
+        offlineInvalidates: ["/api/actions"]
+      });
+      const freeTimeAction = payload?.action;
+      if (!freeTimeAction?.id) throw new Error("Não foi possível iniciar o tempo livre.");
+      state.actions = [...state.actions.filter((item) => String(item?.id || "") !== String(freeTimeAction.id)), freeTimeAction];
+      state.runningLocalStarts[String(freeTimeAction.id)] = new Date(freeTimeAction.startedAt || now).getTime() || now;
+      resetRunningCompletionState();
+      startRunningTaskTicker();
+      renderActions();
+      renderHomeRunningTask();
+      openPrimaryRunningSurface({ overview: false });
+      void autoPlayRunningTaskDefaultPreference(freeTimeAction);
+      queueActionStartSpeech(freeTimeAction);
+    } catch (error) {
+      showFloatingNotice(error instanceof Error ? error.message : "Não foi possível iniciar o tempo livre.");
+    }
+  }, RUNNING_COMPLETION_ANIMATION_MS + RUNNING_COMPLETION_HOLD_MS + 100);
 }
 
 async function toggleActionStatus(actionId, options = {}) {
@@ -8918,6 +9070,8 @@ async function toggleActionStatus(actionId, options = {}) {
     startingOptimistically ? actionStatuses.inProgress : actionStatuses.completed
   );
   if (startingOptimistically) {
+    window.clearTimeout(continuousTaskTransitionTimer);
+    continuousTaskTransitionTimer = 0;
     setActionOptimisticSync(targetId, true);
     updateActionInState(optimisticStatusAction);
     resetRunningCompletionState();
@@ -8945,6 +9099,9 @@ async function toggleActionStatus(actionId, options = {}) {
     }
 
     state.actions = state.actions.map((item) => (item.id === targetId ? updated : item));
+    if ([actionStatuses.pending, actionStatuses.paused].includes(currentStatus) && normalizeActionStatus(updated?.status) === actionStatuses.inProgress) {
+      queueActionStartSpeech(updated);
+    }
     cacheCurrentActionsState();
     registerSystemEventFromActionTransition(targetAction, updated);
     const nextStatus = normalizeActionStatus(updated?.status);
@@ -8959,6 +9116,7 @@ async function toggleActionStatus(actionId, options = {}) {
         payload?.pointsUpdate,
         RUNNING_COMPLETION_ANIMATION_MS + RUNNING_COMPLETION_HOLD_MS + 120
       );
+      scheduleContinuousTaskTransition(updated);
     }
     setActionOptimisticSync(targetId, false);
     startRunningTaskTicker();
@@ -15972,6 +16130,7 @@ async function submitQuickTaskStart(conflictMode = "") {
     closeModal("quickTaskModal");
     await loadActions();
     if (payload?.action?.id) {
+      queueActionStartSpeech(payload.action);
       openModal("runningTaskModal");
     }
   } catch (error) {
@@ -17529,6 +17688,7 @@ function beginMissionRun(goal, selectedVariant = null, options = {}) {
   missionRunTicker = window.setInterval(renderMissionRunState, 1000);
   openModal("missionRunModal");
   if (!options?.resume) {
+    queueMissionStartSpeech(goal, selectedVariant, getMissionRunDurationSeconds(goal, selectedVariant));
     void persistMissionCurrentTaskState({ resetStartedAt: true }).catch(() => {});
   }
 }
@@ -19317,6 +19477,7 @@ async function loadOptionsConfig() {
       state.options.completionBeepCycles = taskBeepOptionCycles.includes(Number(parsed.completionBeepCycles))
         ? Number(parsed.completionBeepCycles)
         : 0;
+      state.options.continuousTasksEnabled = parsed.continuousTasksEnabled === true;
       state.options.minuteNotificationInterval = normalizeMinuteCueInterval(parsed.minuteNotificationInterval);
       state.options.finalMinuteNotificationsEnabled = parsed.finalMinuteNotificationsEnabled !== false;
       state.options.backgroundTheme = normalizeBackgroundTheme(parsed.backgroundTheme);
@@ -19330,6 +19491,7 @@ async function loadOptionsConfig() {
       state.options.homeViewMode = "apps";
       state.options.missionActionsMode = "separate";
       state.options.completionBeepCycles = 0;
+      state.options.continuousTasksEnabled = false;
       state.options.minuteNotificationInterval = 1;
       state.options.finalMinuteNotificationsEnabled = true;
       state.options.backgroundTheme = "edge";
@@ -19352,6 +19514,7 @@ function saveOptionsConfig() {
     homeViewMode: normalizeHomeViewMode(state.options.homeViewMode),
     missionActionsMode: normalizeMissionActionsMode(state.options.missionActionsMode),
     completionBeepCycles: Number(state.options.completionBeepCycles || 0),
+    continuousTasksEnabled: Boolean(state.options.continuousTasksEnabled),
     minuteNotificationInterval: normalizeMinuteCueInterval(state.options.minuteNotificationInterval),
     finalMinuteNotificationsEnabled: Boolean(state.options.finalMinuteNotificationsEnabled),
     backgroundTheme: normalizeBackgroundTheme(state.options.backgroundTheme),
@@ -19550,6 +19713,11 @@ toggleMissionActionsOptionButton?.classList.toggle("is-off", missionActionsMode 
   if (toggleTaskBeepHint) {
     toggleTaskBeepHint.textContent = taskBeepOptionLabels.get(Number(state.options.completionBeepCycles || 0)) || "Nenhum";
   }
+  if (toggleContinuousTasksHint) {
+    toggleContinuousTasksHint.textContent = state.options.continuousTasksEnabled ? "Ativado" : "Desativado";
+  }
+  toggleContinuousTasksOptionButton?.classList.toggle("is-off", !state.options.continuousTasksEnabled);
+  toggleContinuousTasksOptionButton?.setAttribute("aria-pressed", state.options.continuousTasksEnabled ? "true" : "false");
   if (toggleMinuteNotificationsHint) {
     toggleMinuteNotificationsHint.textContent = getMinuteCueIntervalLabel(state.options.minuteNotificationInterval);
   }
@@ -21582,7 +21750,7 @@ async function performRunningFinalize(runningAction) {
   if (state.options.stopMusicOnFinish && runningAudio) {
     stopRunningMusicAfterFinishedActivity();
   }
-  await completeActionImmediately(runningAction, { returnToActions: true });
+  await completeActionImmediately(runningAction, { returnToActions: !state.options.continuousTasksEnabled });
   state.quickTaskAutoFinalizing = false;
 
 }
@@ -21806,6 +21974,15 @@ toggleTaskBeepOptionButton?.addEventListener("click", () => {
   const currentIndex = Math.max(0, taskBeepOptionCycles.indexOf(Number(state.options.completionBeepCycles || 0)));
   const nextIndex = (currentIndex + 1) % taskBeepOptionCycles.length;
   state.options.completionBeepCycles = taskBeepOptionCycles[nextIndex];
+  saveOptionsConfig();
+  renderOptionsModal();
+});
+toggleContinuousTasksOptionButton?.addEventListener("click", () => {
+  state.options.continuousTasksEnabled = !state.options.continuousTasksEnabled;
+  if (!state.options.continuousTasksEnabled) {
+    window.clearTimeout(continuousTaskTransitionTimer);
+    continuousTaskTransitionTimer = 0;
+  }
   saveOptionsConfig();
   renderOptionsModal();
 });
@@ -23198,6 +23375,7 @@ window.project200ProjectsContext = {
   state, actionsList, actionsModal, actionStatuses, apiRequest, escapeHtml,
   formatActionTitleForDisplay, formatMinutesHuman, getServerNowMs, isLimitGoal,
   normalizeActionStatus, openModal, closeModal, openTaskComposer,
+  openStartDecisionModal, toggleActionStatus, completeActionImmediately, closeActionsModalWithFade, queueActionStartSpeech,
   openMissionCreateModal: (...args) => openMissionCreateModal(...args),
   getToken, redirectToProject200Login, renderActions, loadActions, loadMissions,
   refreshMissions: async (options = {}) => { await loadMissions(options); renderMissions(); await loadActionMissions(options); }

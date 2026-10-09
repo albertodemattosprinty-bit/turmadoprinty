@@ -174,6 +174,7 @@ const albumManifestStore = createAlbumManifestStore({ rootDir: __dirname });
 let cachedContextPrompt = "";
 let r2Client = null;
 let r2PrivateClient = null;
+const project200TaskSpeechRequests = new Map();
 let miniMediaDatabaseBootstrapped = false;
 const midiaUploadActivityByIp = new Map();
 const midiaPlaybackClients = new Set();
@@ -4350,6 +4351,139 @@ function normalizeProject200MarinImage({ imageBase64, mimeType }) {
   if (!supported.has(safeMimeType)) throw new Error("Envie uma imagem JPG, PNG, WEBP ou GIF.");
   const imageBuffer = decodeProject200MarinMedia(imageBase64, 12 * 1024 * 1024, "Imagem vazia.");
   return { mimeType: safeMimeType, base64: imageBuffer.toString("base64") };
+}
+
+async function resolveProject200TaskSpeechAsset(user, body = {}) {
+  await ensureActionsSchema();
+  const kind = String(body?.kind || "").trim().toLowerCase();
+  const id = String(body?.id || "").trim();
+  if (kind === "system" && id === "nova_tarefa") {
+    return { assetKey: "nova_tarefa", fileName: "nova_tarefa.mp3", text: "Nova tarefa iniciada" };
+  }
+  if (kind === "system" && id === "tempo_livre") {
+    return { assetKey: "tempo_livre", fileName: "tempo_livre.mp3", text: "O tempo livre começou" };
+  }
+  if (kind === "duration") {
+    const minutes = Math.trunc(Number(body?.minutes));
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > (24 * 60)) throw new Error("Duração inválida para o áudio.");
+    return {
+      assetKey: `duracao_${minutes}_minutos`,
+      fileName: `duracao_${minutes}_minutos.mp3`,
+      text: minutes === 1 ? "1 minuto" : `${minutes} minutos`
+    };
+  }
+  if (kind === "action") {
+    const action = await getUserActionById(user.id, id);
+    if (!action) throw new Error("Tarefa não encontrada para gerar o áudio.");
+    const title = String(action.title || "").trim();
+    const idHash = crypto.createHash("sha256").update(String(action.id)).digest("hex").slice(0, 20);
+    const textHash = crypto.createHash("sha256").update(title).digest("hex").slice(0, 12);
+    return { assetKey: `tarefa_${idHash}_${textHash}`, fileName: `tarefa_${idHash}_${textHash}.mp3`, text: title };
+  }
+  if (kind === "mission") {
+    const goalId = id;
+    const profile = await resolveProject200ProfileName(user.id, String(body?.profile || ""), { fallbackToDefault: true });
+    const goal = await getExtraGoalById(user.id, profile, goalId);
+    if (!goal) throw new Error("Missão não encontrada para gerar o áudio.");
+    let title = String(goal.title || "").trim();
+    const variantId = String(body?.variantId || "").trim();
+    if (variantId) {
+      const variants = await listExtraGoalVariants(user.id, profile, goalId);
+      const variant = (Array.isArray(variants) ? variants : []).find((item) => String(item?.id || "") === variantId);
+      if (!variant) throw new Error("Etapa da missão não encontrada para gerar o áudio.");
+      title = String(variant.title || title).trim();
+    }
+    if (!title) throw new Error("A missão não tem um nome para narrar.");
+    const identity = `${goalId}:${variantId}:${title}`;
+    const assetHash = crypto.createHash("sha256").update(identity).digest("hex").slice(0, 32);
+    return { assetKey: `missao_${assetHash}`, fileName: `missao_${assetHash}.mp3`, text: title };
+  }
+  throw new Error("Tipo de áudio de tarefa inválido.");
+}
+
+async function generateProject200TaskSpeech(text, userId) {
+  const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+  if (!apiKey) {
+    const error = new Error("OPENAI_API_KEY não configurada para gerar o áudio da tarefa.");
+    error.statusCode = 503;
+    throw error;
+  }
+  const speechResponse = await fetch("https://api.openai.com/v1/audio/speech", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o-mini-tts",
+      voice: "cedar",
+      response_format: "mp3",
+      input: String(text || "").slice(0, 240),
+      instructions: "Fale em português do Brasil. Use voz masculina adulta, natural, acolhedora e clara, com timbre médio-grave e ritmo tranquilo. Pronuncie somente o texto fornecido."
+    })
+  });
+  if (!speechResponse.ok) {
+    const parsed = await readApiResponse(speechResponse);
+    const error = new Error("Falha ao gerar o áudio da tarefa.");
+    error.statusCode = speechResponse.status;
+    error.details = parsed.data || parsed.text || "Resposta vazia da OpenAI.";
+    throw error;
+  }
+  const audioBuffer = Buffer.from(await speechResponse.arrayBuffer());
+  if (!audioBuffer.length) throw new Error("O áudio gerado veio vazio.");
+  void recordNarrationUsage(userId, estimateNarrationDurationSeconds(text)).catch(() => {});
+  return audioBuffer;
+}
+
+async function handleProject200TaskSpeechRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const body = await readJsonBody(request);
+    const asset = await resolveProject200TaskSpeechAsset(user, body);
+    const userHash = crypto.createHash("sha256").update(String(user.id)).digest("hex").slice(0, 24);
+    const objectKey = `project200/task-speech/${userHash}/${asset.fileName}`;
+    const encryptionContext = `project200-task-speech:${asset.assetKey}`;
+    let audioBuffer;
+    try {
+      const encrypted = await readProject200PrivateR2ObjectBuffer(objectKey);
+      audioBuffer = await decryptUserBuffer(user.id, encrypted, encryptionContext);
+      if (!audioBuffer.length) throw new Error("Áudio salvo vazio.");
+    } catch (error) {
+      const missing = ["NoSuchKey", "NotFound", "NoSuchObject"].includes(String(error?.name || error?.Code || ""))
+        || Number(error?.$metadata?.httpStatusCode || 0) === 404;
+      if (!missing) throw error;
+      const requestKey = `${user.id}:${asset.assetKey}`;
+      let generation = project200TaskSpeechRequests.get(requestKey);
+      if (!generation) {
+        generation = (async () => {
+          const generated = await generateProject200TaskSpeech(asset.text, user.id);
+          const encrypted = await encryptUserBuffer(user.id, generated, encryptionContext);
+          if (!encrypted) throw new Error("Configure PROJECT200_DATA_KEK para proteger os áudios das tarefas.");
+          await getProject200PrivateR2Client().send(new PutObjectCommand({
+            Bucket: R2_PRIVATE_BUCKET,
+            Key: objectKey,
+            Body: encrypted,
+            ContentType: "application/vnd.project200.encrypted+json",
+            CacheControl: "private, no-store",
+            Metadata: { originalContentType: "audio/mpeg", source: "project200-task-speech" }
+          }));
+          return generated;
+        })().finally(() => project200TaskSpeechRequests.delete(requestKey));
+        project200TaskSpeechRequests.set(requestKey, generation);
+      }
+      audioBuffer = await generation;
+    }
+    response.writeHead(200, {
+      "Content-Type": "audio/mpeg",
+      "Content-Length": audioBuffer.length,
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff"
+    });
+    response.end(audioBuffer);
+  } catch (error) {
+    sendJson(response, Number(error?.statusCode) || 400, {
+      error: error instanceof Error ? error.message : "Não foi possível preparar o áudio da tarefa.",
+      details: error?.details
+    });
+  }
 }
 
 async function generateProject200MarinSpeech(apiKey, text, personaKey) {
@@ -17313,6 +17447,38 @@ const server = http.createServer(async (request, response) => {
         error: error instanceof Error ? error.message : "Nao foi possivel salvar a acao.",
         code: isOverlap ? "ACTION_OVERLAP" : undefined,
         overlaps: isOverlap && Array.isArray(error?.overlaps) ? error.overlaps : undefined
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/task-speech") {
+    await handleProject200TaskSpeechRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/actions/free-time") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const profile = await resolveProject200ProfileName(user.id, String(body?.profile || ""), { fallbackToDefault: true });
+      const created = await createUserAction(user.id, {
+        title: "Tempo livre",
+        assignee: profile,
+        categoryId: "free_time",
+        repeatRule: "none",
+        repeatDays: [],
+        startAt: body?.startAt,
+        endAt: body?.endAt
+      });
+      const action = created[0];
+      if (!action?.id) throw new Error("Não foi possível registrar o intervalo livre.");
+      const startedAction = await updateUserActionStatus(user.id, action.id);
+      sendJson(response, 201, { ok: true, action: startedAction });
+    } catch (error) {
+      sendJson(response, Number(error?.statusCode) || 400, {
+        error: error instanceof Error ? error.message : "Não foi possível iniciar o tempo livre."
       });
     }
     return;

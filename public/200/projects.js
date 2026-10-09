@@ -139,7 +139,10 @@ if (ctx) {
     const labels = { step: "Etapa", action: "Agenda", mission: "Missão", limit: "Limite" };
     byId("projectItemsList").innerHTML = (draft?.items || []).map((item, index) => {
       const warning = item.itemType === "limit" && itemStatus(item).broken ? "Limite quebrado" : labels[item.itemType];
-      return `<div class="project-item-row" data-project-item-open="${index}" role="button" tabindex="0"><span><strong>${ctx.escapeHtml(item.title || labels[item.itemType])}</strong><small>${warning}</small></span><button class="project-item-remove" type="button" data-project-item-remove="${index}" aria-label="Remover ${ctx.escapeHtml(item.title || labels[item.itemType])}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>`;
+      const controls = item.itemType === "step" && itemStatus(item).percent < 100
+        ? `<span class="project-item-controls"><button class="project-item-play" type="button" data-project-item-start="${index}" aria-label="Iniciar etapa ${ctx.escapeHtml(item.title || "")}" title="Iniciar etapa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 12 7-12 7V5Z"/></svg></button><button class="project-item-remove" type="button" data-project-item-remove="${index}" aria-label="Remover ${ctx.escapeHtml(item.title || labels[item.itemType])}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></span>`
+        : `<button class="project-item-remove" type="button" data-project-item-remove="${index}" aria-label="Remover ${ctx.escapeHtml(item.title || labels[item.itemType])}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>`;
+      return `<div class="project-item-row" data-project-item-open="${index}" role="button" tabindex="0"><span><strong>${ctx.escapeHtml(item.title || labels[item.itemType])}</strong><small>${warning}</small></span>${controls}</div>`;
     }).join("");
   }
 
@@ -302,10 +305,37 @@ if (ctx) {
     });
     await ctx.loadActions({ silent: true });
     if (payload?.action?.id) {
+      ctx.queueActionStartSpeech(payload.action);
       item.itemId = String(payload.action.id);
       await persistProjectItems(project, project.items);
       ctx.closeActionsModalWithFade();
       ctx.openModal("runningTaskModal");
+    }
+  }
+
+  async function startProjectStep(project, item) {
+    if (!project || !item || item.itemType !== "step" || itemStatus(item).percent >= 100) return;
+    const linkedAction = item.itemId ? ctx.state.actions.find((entry) => String(entry.id) === String(item.itemId)) : null;
+    ctx.closeModal("projectWizardModal");
+    if (linkedAction) {
+      await ctx.toggleActionStatus(linkedAction.id, { skipDecision: true });
+      return;
+    }
+    try {
+      const payload = await ctx.apiRequest("/api/actions/quick-start", {
+        method: "POST",
+        body: JSON.stringify({ title: item.title, plannedMinutes: item.durationMinutes, assignee: ctx.state.selectedProfile })
+      });
+      await ctx.loadActions({ silent: true });
+      if (!payload?.action?.id) throw new Error("Não foi possível iniciar a etapa.");
+      ctx.queueActionStartSpeech(payload.action);
+      item.itemId = String(payload.action.id);
+      await persistProjectItems(project, project.items);
+      ctx.closeActionsModalWithFade();
+      ctx.openModal("runningTaskModal");
+    } catch (error) {
+      byId("projectWizardStatus").textContent = error instanceof Error ? error.message : "Não foi possível iniciar a etapa.";
+      ctx.openModal("projectWizardModal");
     }
   }
 
@@ -437,6 +467,15 @@ if (ctx) {
     if (draft.id) try { await persistDraftItems(); } catch (error) { byId("projectWizardStatus").textContent = error instanceof Error ? error.message : "Não foi possível atualizar o projeto."; }
   });
   byId("projectItemsList")?.addEventListener("click", async (event) => {
+    const startButton = event.target.closest("[data-project-item-start]");
+    if (startButton) {
+      event.stopPropagation();
+      const index = Number(startButton.dataset.projectItemStart);
+      const project = records.find((entry) => String(entry.id) === String(draft?.id));
+      const item = project?.items?.[index];
+      if (item) await startProjectStep(project, item);
+      return;
+    }
     const removeButton = event.target.closest("[data-project-item-remove]");
     if (removeButton) {
       event.stopPropagation();
