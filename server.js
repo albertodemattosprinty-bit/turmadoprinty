@@ -4358,19 +4358,10 @@ async function resolveProject200TaskSpeechAsset(user, body = {}) {
   const kind = String(body?.kind || "").trim().toLowerCase();
   const id = String(body?.id || "").trim();
   if (kind === "system" && id === "nova_tarefa") {
-    return { assetKey: "nova_tarefa", fileName: "nova_tarefa.mp3", text: "Nova tarefa iniciada" };
+    return { assetKey: "nova_tarefa_harry_v1", fileName: "harry_v1_nova_tarefa.mp3", text: "Nova tarefa iniciada" };
   }
   if (kind === "system" && id === "tempo_livre") {
-    return { assetKey: "tempo_livre", fileName: "tempo_livre.mp3", text: "O tempo livre começou" };
-  }
-  if (kind === "duration") {
-    const minutes = Math.trunc(Number(body?.minutes));
-    if (!Number.isInteger(minutes) || minutes < 1 || minutes > (24 * 60)) throw new Error("Duração inválida para o áudio.");
-    return {
-      assetKey: `duracao_${minutes}_minutos`,
-      fileName: `duracao_${minutes}_minutos.mp3`,
-      text: minutes === 1 ? "1 minuto" : `${minutes} minutos`
-    };
+    return { assetKey: "tempo_livre_harry_v1", fileName: "harry_v1_tempo_livre.mp3", text: "O tempo livre começou" };
   }
   if (kind === "action") {
     const action = await getUserActionById(user.id, id);
@@ -4378,7 +4369,7 @@ async function resolveProject200TaskSpeechAsset(user, body = {}) {
     const title = String(action.title || "").trim();
     const idHash = crypto.createHash("sha256").update(String(action.id)).digest("hex").slice(0, 20);
     const textHash = crypto.createHash("sha256").update(title).digest("hex").slice(0, 12);
-    return { assetKey: `tarefa_${idHash}_${textHash}`, fileName: `tarefa_${idHash}_${textHash}.mp3`, text: title };
+    return { assetKey: `tarefa_harry_v1_${idHash}_${textHash}`, fileName: `harry_v1_tarefa_${idHash}_${textHash}.mp3`, text: title };
   }
   if (kind === "mission") {
     const goalId = id;
@@ -4396,34 +4387,34 @@ async function resolveProject200TaskSpeechAsset(user, body = {}) {
     if (!title) throw new Error("A missão não tem um nome para narrar.");
     const identity = `${goalId}:${variantId}:${title}`;
     const assetHash = crypto.createHash("sha256").update(identity).digest("hex").slice(0, 32);
-    return { assetKey: `missao_${assetHash}`, fileName: `missao_${assetHash}.mp3`, text: title };
+    return { assetKey: `missao_harry_v1_${assetHash}`, fileName: `harry_v1_missao_${assetHash}.mp3`, text: title };
   }
   throw new Error("Tipo de áudio de tarefa inválido.");
 }
 
 async function generateProject200TaskSpeech(text, userId) {
-  const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+  const apiKey = String(process.env.ELEVENLABS_API_KEY || "").trim();
+  const voiceId = String(process.env.ELEVENLABS_VOICE_ID_HARRY || "SOYHLrjzK2X1ezoPC6cr").trim();
   if (!apiKey) {
-    const error = new Error("OPENAI_API_KEY não configurada para gerar o áudio da tarefa.");
+    const error = new Error("ELEVENLABS_API_KEY não configurada para gerar o áudio da tarefa.");
     error.statusCode = 503;
     throw error;
   }
-  const speechResponse = await fetch("https://api.openai.com/v1/audio/speech", {
+  const speechResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    headers: { "xi-api-key": apiKey, Accept: "audio/mpeg", "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gpt-4o-mini-tts",
-      voice: "cedar",
-      response_format: "mp3",
-      input: String(text || "").slice(0, 240),
-      instructions: "Fale em português do Brasil. Use voz masculina adulta, natural, acolhedora e clara, com timbre médio-grave e ritmo tranquilo. Pronuncie somente o texto fornecido."
-    })
+      text: String(text || "").slice(0, 240),
+      model_id: ELEVENLABS_MODEL_ID,
+      language_code: "pt"
+    }),
+    signal: AbortSignal.timeout(90000)
   });
   if (!speechResponse.ok) {
-    const parsed = await readApiResponse(speechResponse);
-    const error = new Error("Falha ao gerar o áudio da tarefa.");
+    const details = await speechResponse.text().catch(() => "");
+    const error = new Error("Falha ao gerar o áudio da tarefa no ElevenLabs.");
     error.statusCode = speechResponse.status;
-    error.details = parsed.data || parsed.text || "Resposta vazia da OpenAI.";
+    error.details = details.slice(0, 500) || "Resposta vazia do ElevenLabs.";
     throw error;
   }
   const audioBuffer = Buffer.from(await speechResponse.arrayBuffer());

@@ -1274,6 +1274,7 @@ let actionLastSpeechAt = 0;
 let actionPendingAiPayload = null;
 let actionStatusTargetId = "";
 let runningTaskTicker = null;
+let runningTaskTickerGeneration = 0;
 let continuousTaskTransitionTimer = 0;
 let taskSpeechPlaybackQueue = Promise.resolve();
 const taskSpeechBlobCache = new Map();
@@ -6135,18 +6136,27 @@ function startHomeDateTimeTicker() {
 }
 
 function startRunningTaskTicker() {
-  renderHomeRunningTask();
-  if (runningTaskTicker) {
-    window.clearTimeout(runningTaskTicker);
-  }
-  runningTaskTicker = window.setTimeout(function tickRunningTask() {
-    const runningSurfaceVisible = runningTaskModal?.classList.contains("active")
-      || !document.querySelector(".workspace-modal.active");
-    if (!document.hidden && runningSurfaceVisible) {
+  if (runningTaskTicker) window.clearTimeout(runningTaskTicker);
+  const generation = ++runningTaskTickerGeneration;
+  const renderSafely = () => {
+    try {
       renderHomeRunningTask();
+    } catch (error) {
+      console.error("Falha ao atualizar o contador da atividade em andamento:", error);
     }
-    runningTaskTicker = window.setTimeout(tickRunningTask, 1000);
-  }, 1000);
+  };
+  renderSafely();
+  const tickRunningTask = () => {
+    if (generation !== runningTaskTickerGeneration) return;
+    try {
+      if (!document.hidden) renderSafely();
+    } finally {
+      if (generation === runningTaskTickerGeneration) {
+        runningTaskTicker = window.setTimeout(tickRunningTask, 1000);
+      }
+    }
+  };
+  runningTaskTicker = window.setTimeout(tickRunningTask, 1000);
 }
 
 function formatMoney(cents) {
@@ -8929,29 +8939,22 @@ function queueTaskSpeechSequence(requests) {
 
 function queueActionStartSpeech(action) {
   if (!action?.id) return;
-  const duration = Math.max(0, Math.round(getActionDurationMinutes(action)));
   if (String(action.categoryId || "").trim().toLowerCase() === "free_time") {
-    queueTaskSpeechSequence([
-      { kind: "system", id: "tempo_livre" },
-      ...(duration ? [{ kind: "duration", minutes: duration }] : [])
-    ]);
+    queueTaskSpeechSequence([{ kind: "system", id: "tempo_livre" }]);
     return;
   }
   queueTaskSpeechSequence([
     { kind: "system", id: "nova_tarefa" },
-    { kind: "action", id: String(action.id), title: String(action.title || "") },
-    ...(duration ? [{ kind: "duration", minutes: duration }] : [])
+    { kind: "action", id: String(action.id), title: String(action.title || "") }
   ]);
 }
 
-function queueMissionStartSpeech(goal, selectedVariant = null, durationSeconds = 0) {
+function queueMissionStartSpeech(goal, selectedVariant = null) {
   const goalId = String(goal?.id || "").trim();
   if (!goalId) return;
-  const duration = Math.max(0, Math.round(Number(durationSeconds || 0) / 60));
   queueTaskSpeechSequence([
     { kind: "system", id: "nova_tarefa" },
-    { kind: "mission", id: goalId, variantId: String(selectedVariant?.id || ""), profile: state.selectedProfile || getDefaultProfileName(), title: String(selectedVariant?.title || goal?.title || "") },
-    ...(duration ? [{ kind: "duration", minutes: duration }] : [])
+    { kind: "mission", id: goalId, variantId: String(selectedVariant?.id || ""), profile: state.selectedProfile || getDefaultProfileName(), title: String(selectedVariant?.title || goal?.title || "") }
   ]);
 }
 
@@ -17688,7 +17691,7 @@ function beginMissionRun(goal, selectedVariant = null, options = {}) {
   missionRunTicker = window.setInterval(renderMissionRunState, 1000);
   openModal("missionRunModal");
   if (!options?.resume) {
-    queueMissionStartSpeech(goal, selectedVariant, getMissionRunDurationSeconds(goal, selectedVariant));
+    queueMissionStartSpeech(goal, selectedVariant);
     void persistMissionCurrentTaskState({ resetStartedAt: true }).catch(() => {});
   }
 }
