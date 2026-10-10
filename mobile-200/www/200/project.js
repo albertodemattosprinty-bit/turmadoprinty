@@ -977,7 +977,7 @@ const runningTaskListButton = document.getElementById("runningTaskListButton");
 const runningTaskFinalizeButton = document.getElementById("runningTaskFinalizeButton");
 const runningTaskRestoreButton = document.getElementById("runningTaskRestoreButton");
 const runningTaskGiveUpButton = document.getElementById("runningTaskGiveUpButton");
-const runningTaskMusicButton = document.getElementById("runningTaskMusicButton");
+const runningTaskVoiceButton = document.getElementById("runningTaskVoiceButton");
 const runningTaskStartNextButton = document.getElementById("runningTaskStartNextButton");
 const runningConfirmModal = document.getElementById("runningConfirmModal");
 const runningConfirmTitle = document.getElementById("runningConfirmTitle");
@@ -1695,6 +1695,7 @@ const state = {
     continuousTasksEnabled: false,
     minuteNotificationInterval: 1,
     finalMinuteNotificationsEnabled: true,
+    runningMinuteVoiceEnabled: true,
     backgroundTheme: "edge",
     screenLockEnabled: false,
     stopMusicOnFinish: false,
@@ -1763,8 +1764,10 @@ const state = {
   runningMinuteCue: {
     actionId: "",
     optionKey: "",
+    generation: 0,
     played: new Set(),
     preparedKey: "",
+    pendingPlayback: false,
     playTimer: 0,
     preloadTimer: 0,
     workerCue: null
@@ -3578,7 +3581,7 @@ function primeRunningIdleHomeShell() {
   if (runningTaskQuickButton) runningTaskQuickButton.hidden = true;
   if (runningTaskListButton) runningTaskListButton.hidden = true;
   if (runningTaskMissionButton) runningTaskMissionButton.hidden = true;
-  if (runningTaskMusicButton) runningTaskMusicButton.hidden = true;
+  if (runningTaskVoiceButton) runningTaskVoiceButton.hidden = true;
   if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = true;
   if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = true;
   if (runningTaskGiveUpButton) runningTaskGiveUpButton.hidden = true;
@@ -3684,7 +3687,7 @@ function renderRunningCompletionCelebration() {
   if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = true;
   if (runningTaskGiveUpButton) runningTaskGiveUpButton.hidden = true;
   if (runningTaskListButton) runningTaskListButton.hidden = true;
-  if (runningTaskMusicButton) runningTaskMusicButton.hidden = true;
+  if (runningTaskVoiceButton) runningTaskVoiceButton.hidden = true;
   if (runningTaskStartNextButton) runningTaskStartNextButton.hidden = true;
   setRunningHomeVisibility(false);
   if (runningCompletionLabel) {
@@ -3750,7 +3753,8 @@ function renderRunningCompletionNextView() {
     setRunningNextDisplay("Sem próxima tarefa", 0);
   }
   if (runningTaskListButton) runningTaskListButton.hidden = false;
-  if (runningTaskMusicButton) runningTaskMusicButton.hidden = false;
+  if (runningTaskVoiceButton) runningTaskVoiceButton.hidden = false;
+  renderRunningMinuteVoiceToggle();
   if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = true;
   if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = true;
   if (runningTaskGiveUpButton) runningTaskGiveUpButton.hidden = true;
@@ -4192,6 +4196,16 @@ function clearRunningMinuteCuePlayers() {
   runningMinuteCuePlayers = [];
 }
 
+function renderRunningMinuteVoiceToggle() {
+  if (!runningTaskVoiceButton) return;
+  const enabled = state.options.runningMinuteVoiceEnabled !== false;
+  runningTaskVoiceButton.classList.toggle("is-off", !enabled);
+  runningTaskVoiceButton.setAttribute("aria-pressed", enabled ? "true" : "false");
+  const label = enabled ? "Desativar avisos de voz do contador" : "Ativar avisos de voz do contador";
+  runningTaskVoiceButton.setAttribute("aria-label", label);
+  runningTaskVoiceButton.title = enabled ? "Avisos de voz do contador ligados" : "Avisos de voz do contador desligados";
+}
+
 function clearRunningMinuteCueTimers() {
   if (state.runningMinuteCue.playTimer) {
     window.clearTimeout(state.runningMinuteCue.playTimer);
@@ -4208,15 +4222,17 @@ function clearRunningMinuteCueTimers() {
 function resetRunningMinuteCueState(actionId = "", optionKey = "") {
   clearRunningMinuteCueTimers();
   clearRunningMinuteCuePlayers();
+  state.runningMinuteCue.generation += 1;
   state.runningMinuteCue.actionId = String(actionId || "");
   state.runningMinuteCue.optionKey = String(optionKey || "");
   state.runningMinuteCue.played = new Set();
   state.runningMinuteCue.preparedKey = "";
+  state.runningMinuteCue.pendingPlayback = false;
 }
 
-async function playRunningMinuteCuePlayers(minute, taskTitle) {
+async function playRunningMinuteCuePlayers(minute, taskTitle, actionId, generation) {
   const players = [...runningMinuteCuePlayers];
-  if (!players.length) return;
+  if (!players.length || !state.options.runningMinuteVoiceEnabled || state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.generation !== generation) return;
   const baseVolume = runningAudio ? Number(runningAudio.volume || 1) : 1;
   const shouldRestoreMusic = Boolean(runningAudio && !runningAudio.paused);
   try {
@@ -4224,12 +4240,18 @@ async function playRunningMinuteCuePlayers(minute, taskTitle) {
       await fadeAudioVolume(runningAudio, Math.max(0.1, baseVolume * 0.25), 700);
     }
     for (const audio of players) {
-      if (state.runningMinuteCue.actionId === "") break;
+      if (!state.options.runningMinuteVoiceEnabled || state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.generation !== generation) break;
       audio.currentTime = 0;
       await new Promise((resolve) => {
-        const finish = () => resolve();
+        const finish = () => {
+          audio.removeEventListener("ended", finish);
+          audio.removeEventListener("error", finish);
+          audio.removeEventListener("pause", finish);
+          resolve();
+        };
         audio.addEventListener("ended", finish, { once: true });
         audio.addEventListener("error", finish, { once: true });
+        audio.addEventListener("pause", finish, { once: true });
         audio.play().catch(finish);
       });
     }
@@ -4243,6 +4265,21 @@ async function playRunningMinuteCuePlayers(minute, taskTitle) {
     clearRunningMinuteCuePlayers();
     state.runningMinuteCue.preparedKey = "";
   }
+}
+
+function queueRunningMinuteCuePlayback(minute, taskTitle, actionId) {
+  const generation = state.runningMinuteCue.generation;
+  state.runningMinuteCue.pendingPlayback = true;
+  const playSequence = () => playRunningMinuteCuePlayers(minute, taskTitle, actionId, generation);
+  taskSpeechPlaybackQueue = taskSpeechPlaybackQueue.then(playSequence, playSequence).finally(() => {
+    if (state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.generation !== generation) return;
+    state.runningMinuteCue.pendingPlayback = false;
+    if (isMissionRunModalOpen() && state.missionRun?.goalId) {
+      renderMissionRunState();
+    } else {
+      renderHomeRunningTask();
+    }
+  });
 }
 
 function prepareRunningMinuteCue(entry, actionId, taskTitle, secondsUntilCue) {
@@ -4260,9 +4297,9 @@ function prepareRunningMinuteCue(entry, actionId, taskTitle, secondsUntilCue) {
   if (state.runningMinuteCue.playTimer) return;
   state.runningMinuteCue.playTimer = window.setTimeout(() => {
     state.runningMinuteCue.playTimer = 0;
-    if (state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.played.has(entry.minute)) return;
+    if (!state.options.runningMinuteVoiceEnabled || state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.played.has(entry.minute)) return;
     state.runningMinuteCue.played.add(entry.minute);
-    void playRunningMinuteCuePlayers(entry.minute, taskTitle);
+    queueRunningMinuteCuePlayback(entry.minute, taskTitle, actionId);
   }, Math.max(0, Math.round(secondsUntilCue * 1000)));
 }
 
@@ -4301,9 +4338,9 @@ if (runningMinuteCueWorker) {
     }
     if (payload.type === "play") {
       state.runningMinuteCue.workerCue = null;
-      if (state.runningMinuteCue.played.has(workerCue.entry.minute)) return;
+      if (!state.options.runningMinuteVoiceEnabled || state.runningMinuteCue.played.has(workerCue.entry.minute)) return;
       state.runningMinuteCue.played.add(workerCue.entry.minute);
-      void playRunningMinuteCuePlayers(workerCue.entry.minute, workerCue.taskTitle);
+      queueRunningMinuteCuePlayback(workerCue.entry.minute, workerCue.taskTitle, workerCue.actionId);
     }
   });
 }
@@ -4315,14 +4352,15 @@ function stopRunningMinuteCueSchedule() {
 function syncRunningMinuteCueSchedule(actionId, taskTitle, remainingSeconds) {
   const interval = normalizeMinuteCueInterval(state.options.minuteNotificationInterval);
   const finalMinutesEnabled = Boolean(state.options.finalMinuteNotificationsEnabled);
-  const optionKey = `${interval}:${finalMinutesEnabled ? 1 : 0}`;
-  if (!actionId || (!interval && !finalMinutesEnabled)) {
+  const optionKey = `${interval}:${finalMinutesEnabled ? 1 : 0}:${state.options.runningMinuteVoiceEnabled === false ? 0 : 1}`;
+  if (!actionId || state.options.runningMinuteVoiceEnabled === false || (!interval && !finalMinutesEnabled)) {
     stopRunningMinuteCueSchedule();
     return;
   }
   if (state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.optionKey !== optionKey) {
     resetRunningMinuteCueState(actionId, optionKey);
   }
+  if (state.runningMinuteCue.pendingPlayback) return;
   const nextEntry = buildMinuteCueSchedule(remainingSeconds, interval, finalMinutesEnabled)
     .find((entry) => !state.runningMinuteCue.played.has(entry.minute));
   if (!nextEntry) return;
@@ -4627,7 +4665,8 @@ function renderHomeRunningTask() {
   if (runningTaskMissionButton) runningTaskMissionButton.hidden = false;
   if (runningTaskHomeButton) runningTaskHomeButton.hidden = true;
   if (runningTaskQuickButton) runningTaskQuickButton.hidden = true;
-  if (runningTaskMusicButton) runningTaskMusicButton.hidden = false;
+  if (runningTaskVoiceButton) runningTaskVoiceButton.hidden = false;
+  renderRunningMinuteVoiceToggle();
   if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = false;
   if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = false;
   if (runningTaskStartNextButton) {
@@ -19483,6 +19522,7 @@ async function loadOptionsConfig() {
       state.options.continuousTasksEnabled = parsed.continuousTasksEnabled === true;
       state.options.minuteNotificationInterval = normalizeMinuteCueInterval(parsed.minuteNotificationInterval);
       state.options.finalMinuteNotificationsEnabled = parsed.finalMinuteNotificationsEnabled !== false;
+      state.options.runningMinuteVoiceEnabled = parsed.runningMinuteVoiceEnabled !== false;
       state.options.backgroundTheme = normalizeBackgroundTheme(parsed.backgroundTheme);
       state.options.screenLockEnabled = parsed.screenLockEnabled === true;
       state.options.stopMusicOnFinish = parsed.stopMusicOnFinish === true;
@@ -19497,6 +19537,7 @@ async function loadOptionsConfig() {
       state.options.continuousTasksEnabled = false;
       state.options.minuteNotificationInterval = 1;
       state.options.finalMinuteNotificationsEnabled = true;
+      state.options.runningMinuteVoiceEnabled = true;
       state.options.backgroundTheme = "edge";
       state.options.screenLockEnabled = false;
       state.options.stopMusicOnFinish = false;
@@ -19520,6 +19561,7 @@ function saveOptionsConfig() {
     continuousTasksEnabled: Boolean(state.options.continuousTasksEnabled),
     minuteNotificationInterval: normalizeMinuteCueInterval(state.options.minuteNotificationInterval),
     finalMinuteNotificationsEnabled: Boolean(state.options.finalMinuteNotificationsEnabled),
+    runningMinuteVoiceEnabled: state.options.runningMinuteVoiceEnabled !== false,
     backgroundTheme: normalizeBackgroundTheme(state.options.backgroundTheme),
     screenLockEnabled: Boolean(state.options.screenLockEnabled),
     stopMusicOnFinish: Boolean(state.options.stopMusicOnFinish),
@@ -21821,7 +21863,20 @@ runningTaskQuickButton?.addEventListener("click", () => {
 runningTaskMissionButton?.addEventListener("click", () => {
   void openRunningMissionQuickModal();
 });
-runningTaskMusicButton?.addEventListener("click", toggleRunningPlayPause);
+runningTaskVoiceButton?.addEventListener("click", () => {
+  state.options.runningMinuteVoiceEnabled = state.options.runningMinuteVoiceEnabled === false;
+  saveOptionsConfig();
+  renderRunningMinuteVoiceToggle();
+  if (state.options.runningMinuteVoiceEnabled) {
+    if (isMissionRunModalOpen() && state.missionRun?.goalId) {
+      renderMissionRunState();
+    } else {
+      renderHomeRunningTask();
+    }
+  } else {
+    stopRunningMinuteCueSchedule();
+  }
+});
 function openSynchronizedRunningMusicList() {
   syncRunningPlayerSelectionToAudio();
   state.startDecisionContext.actionId = "";

@@ -1457,7 +1457,7 @@ body.screen-locked .project-login-overlay.active {
 .running-task-mission-btn,
 .running-task-restore-btn,
 .running-task-giveup-btn,
-.running-task-music-btn {
+.running-task-voice-btn {
   transform: scale(0.9);
 }
 
@@ -1554,8 +1554,20 @@ body.screen-locked .project-login-overlay.active {
   color: #d9dee7;
 }
 
-.running-task-music-btn {
-  background: linear-gradient(145deg, #ffb14f, #ef6b24);
+.running-task-voice-btn {
+  background: linear-gradient(145deg, #9b7bff, #6f42c1);
+}
+
+.running-task-voice-btn.is-off {
+  background: linear-gradient(145deg, #59447f, #392758);
+}
+
+.running-task-voice-off-mark {
+  display: none;
+}
+
+.running-task-voice-btn.is-off .running-task-voice-off-mark {
+  display: block;
 }
 
 .running-mission-quick-close {
