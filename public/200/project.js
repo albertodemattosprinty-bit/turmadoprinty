@@ -1277,6 +1277,13 @@ let runningTaskTicker = null;
 let runningTaskTickerGeneration = 0;
 let continuousTaskTransitionTimer = 0;
 let taskSpeechPlaybackQueue = Promise.resolve();
+let taskSpeechContextKey = "";
+let taskSpeechGeneration = 0;
+const taskSpeechControllers = new Set();
+const taskSpeechCancellations = new Set();
+const minuteCueBlobRequests = new Map();
+let actionsLoadGeneration = 0;
+let actionsMutationGeneration = 0;
 const taskSpeechBlobCache = new Map();
 let pendingActionsAnchorId = "";
 let actionCompletionAnimationId = "";
@@ -1390,9 +1397,10 @@ let runningDefaultAutoplayRetryTimer = null;
 let runningNextMetricTimer = null;
 let taskBeepAudioContext = null;
 let runningMinuteCuePlayers = [];
-const runningMinuteCueWorker = typeof Worker !== "undefined"
-  ? new Worker("/200/minute-cue-worker.js?v=20260716-ptbr-minute-cues")
-  : null;
+let runningMinuteCueWorker = null;
+try {
+  if (typeof Worker !== "undefined") runningMinuteCueWorker = new Worker("/200/minute-cue-worker.js?v=20260716-ptbr-minute-cues");
+} catch { /* Os timers da página continuam funcionando sem o worker. */ }
 let postponeNavHoldTimer = null;
 let postponeNavHoldInterval = null;
 let postponeNavLongPressHandled = false;
@@ -2084,28 +2092,9 @@ function resolveLoadingIconForPath(path = "", preferredIcon = "") {
 }
 
 function beginGlobalLoading(iconSrc = "") {
-  if (startupLoadingActive || startupLoadingHasCompleted) return false;
-  globalLoadingCount += 1;
-  if (globalLoadingCount === 1) {
-    window.__project200LoadingShownAt = Date.now();
-    globalLoadingTimedOut = false;
-    if (globalLoadingIcon) globalLoadingIcon.src = "/200/images/ilife-mindsetplan-home.png";
-    if (globalLoadingCopy) globalLoadingCopy.textContent = "Carregando informações...";
-    if (globalLoadingOverlay) {
-      globalLoadingOverlay.style.removeProperty("display");
-      globalLoadingOverlay.hidden = false;
-      globalLoadingOverlay.classList.remove("is-leaving");
-      globalLoadingOverlay.setAttribute("aria-hidden", "false");
-    }
-    if (globalLoadingFallbackTimer) window.clearTimeout(globalLoadingFallbackTimer);
-    globalLoadingFallbackTimer = window.setTimeout(() => {
-      globalLoadingFallbackTimer = null;
-      globalLoadingTimedOut = true;
-      hideGlobalLoadingOverlay();
-    }, 6000);
-  }
+  // Requisições de dados não bloqueiam a superfície que o usuário está usando.
   void iconSrc;
-  return true;
+  return false;
 }
 
 function hideGlobalLoadingOverlay() {
@@ -3075,12 +3064,12 @@ function getRunningActionProgressState(action) {
     : 0;
   const persistedStartedAtMs = new Date(action?.startedAt || "").getTime();
   const localStartedAtMs = Number(state.runningLocalStarts?.[String(action?.id || "")] || 0);
-  const startedAtMs = Number.isFinite(runtimeStartedAtMs) && runtimeStartedAtMs > 0
-    ? runtimeStartedAtMs
+  const startedAtMs = Number.isFinite(localStartedAtMs) && localStartedAtMs > 0
+    ? localStartedAtMs
     : Number.isFinite(persistedStartedAtMs) && persistedStartedAtMs > 0
       ? persistedStartedAtMs
-      : Number.isFinite(localStartedAtMs) && localStartedAtMs > 0
-        ? localStartedAtMs
+      : Number.isFinite(runtimeStartedAtMs) && runtimeStartedAtMs > 0
+        ? runtimeStartedAtMs
         : new Date(action?.startAt).getTime();
   if (!Number.isFinite(startedAtMs)) {
     return { percent: 0, remainingMinutes: durationMinutes };
@@ -3095,7 +3084,7 @@ function getRunningActionProgressState(action) {
   const scheduleDeltaMinutes = Number.isFinite(startAtMs)
     ? Math.round((startedAtMs - startAtMs) / (60 * 1000))
     : 0;
-  return { percent, percentPrecise, remainingMinutes: remainingBudget, elapsedMinutes, durationMinutes, scheduleDeltaMinutes };
+  return { percent, percentPrecise, remainingMinutes: remainingBudget, remainingSeconds: Math.max(0, Math.ceil((totalBudget - elapsedMinutes) * 60)), elapsedMinutes, durationMinutes, scheduleDeltaMinutes };
 }
 
 function formatSignedDelay(minutesValue) {
@@ -4187,13 +4176,60 @@ if (sleepFrequencyAudio) {
 }
 function clearRunningMinuteCuePlayers() {
   runningMinuteCuePlayers.forEach((audio) => {
+    audio._project200Cancelled = true;
     try {
       audio.pause();
       audio.removeAttribute("src");
       audio.load();
     } catch {}
+    if (audio._project200BlobUrl) URL.revokeObjectURL(audio._project200BlobUrl);
   });
   runningMinuteCuePlayers = [];
+}
+
+async function loadMinuteCueBlob(url) {
+  if (minuteCueBlobRequests.has(url)) return minuteCueBlobRequests.get(url);
+  const request = (async () => {
+    let cache;
+    try {
+      cache = await window.caches?.open("project200-minute-voice-v1");
+      const cached = await cache?.match(url);
+      if (cached) return cached.blob();
+    } catch {}
+    if (navigator.onLine === false) return null;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 6000);
+    try {
+      const response = await fetch(url, { cache: "force-cache", signal: controller.signal });
+      if (!response.ok) return null;
+      if (cache) void cache.put(url, response.clone()).catch(() => {});
+      return await response.blob();
+    } catch { return null; }
+    finally { window.clearTimeout(timer); }
+  })().finally(() => minuteCueBlobRequests.delete(url));
+  minuteCueBlobRequests.set(url, request);
+  return request;
+}
+
+function createRunningMinuteCueAudio(url) {
+  const audio = new Audio();
+  audio.preload = "auto";
+  audio._project200Ready = loadMinuteCueBlob(url).then((blob) => {
+    if (audio._project200Cancelled) return;
+    audio._project200BlobUrl = blob ? URL.createObjectURL(blob) : "";
+    audio.src = audio._project200BlobUrl || url;
+    audio.load();
+  });
+  return audio;
+}
+
+async function warmRunningMinuteCueAudio(remainingSeconds, interval, finalMinutesEnabled) {
+  if (navigator.onLine === false) return;
+  const urls = [...new Set(buildMinuteCueSchedule(remainingSeconds, interval, finalMinutesEnabled).flatMap((entry) => entry.urls))];
+  let index = 0;
+  await Promise.all(Array.from({ length: Math.min(3, urls.length) }, async () => {
+    while (index < urls.length && navigator.onLine !== false) await loadMinuteCueBlob(urls[index++]);
+  }));
 }
 
 function renderRunningMinuteVoiceToggle() {
@@ -4233,37 +4269,30 @@ function resetRunningMinuteCueState(actionId = "", optionKey = "") {
 async function playRunningMinuteCuePlayers(minute, taskTitle, actionId, generation) {
   const players = [...runningMinuteCuePlayers];
   if (!players.length || !state.options.runningMinuteVoiceEnabled || state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.generation !== generation) return;
-  const baseVolume = runningAudio ? Number(runningAudio.volume || 1) : 1;
+  const baseVolume = runningAudio ? Number(runningAudio.volume ?? 1) : 1;
+  const musicSrc = String(runningAudio?.currentSrc || runningAudio?.src || "");
   const shouldRestoreMusic = Boolean(runningAudio && !runningAudio.paused);
   try {
     if (shouldRestoreMusic) {
-      await fadeAudioVolume(runningAudio, Math.max(0.1, baseVolume * 0.25), 700);
+      await fadeAudioVolume(runningAudio, baseVolume * 0.25, 200);
     }
     for (const audio of players) {
+      await audio._project200Ready;
       if (!state.options.runningMinuteVoiceEnabled || state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.generation !== generation) break;
       audio.currentTime = 0;
-      await new Promise((resolve) => {
-        const finish = () => {
-          audio.removeEventListener("ended", finish);
-          audio.removeEventListener("error", finish);
-          audio.removeEventListener("pause", finish);
-          resolve();
-        };
-        audio.addEventListener("ended", finish, { once: true });
-        audio.addEventListener("error", finish, { once: true });
-        audio.addEventListener("pause", finish, { once: true });
-        audio.play().catch(finish);
-      });
+      await playVoiceAudioWithTimeout(audio);
     }
   } finally {
-    if (shouldRestoreMusic && runningAudio && !runningAudio.paused) {
-      await fadeAudioVolume(runningAudio, baseVolume, 700);
+    if (shouldRestoreMusic && runningAudio && !runningAudio.paused && musicSrc === String(runningAudio.currentSrc || runningAudio.src || "")) {
+      await fadeAudioVolume(runningAudio, baseVolume, 200);
     }
     if ("mediaSession" in navigator) {
       try { navigator.mediaSession.playbackState = runningAudio && !runningAudio.paused ? "playing" : "none"; } catch {}
     }
-    clearRunningMinuteCuePlayers();
-    state.runningMinuteCue.preparedKey = "";
+    if (state.runningMinuteCue.actionId === actionId && state.runningMinuteCue.generation === generation) {
+      clearRunningMinuteCuePlayers();
+      state.runningMinuteCue.preparedKey = "";
+    }
   }
 }
 
@@ -4279,19 +4308,14 @@ function queueRunningMinuteCuePlayback(minute, taskTitle, actionId) {
     } else {
       renderHomeRunningTask();
     }
-  });
+  }).catch((error) => console.warn("Falha ao reproduzir um aviso do contador:", error));
 }
 
 function prepareRunningMinuteCue(entry, actionId, taskTitle, secondsUntilCue) {
-  const cueKey = `${actionId}:${entry.minute}`;
+  const cueKey = `${actionId}:${entry.minute}:${state.runningMinuteCue.generation}`;
   if (state.runningMinuteCue.preparedKey !== cueKey) {
     clearRunningMinuteCuePlayers();
-    runningMinuteCuePlayers = entry.urls.map((url) => {
-      const audio = new Audio(url);
-      audio.preload = "auto";
-      audio.load();
-      return audio;
-    });
+    runningMinuteCuePlayers = entry.urls.map(createRunningMinuteCueAudio);
     state.runningMinuteCue.preparedKey = cueKey;
   }
   if (state.runningMinuteCue.playTimer) return;
@@ -4305,8 +4329,9 @@ function prepareRunningMinuteCue(entry, actionId, taskTitle, secondsUntilCue) {
 
 function scheduleRunningMinuteCueWorker(entry, actionId, taskTitle, secondsUntilCue) {
   if (!runningMinuteCueWorker) return false;
-  const cueKey = `${actionId}:${entry.minute}`;
+  const cueKey = `${actionId}:${entry.minute}:${state.runningMinuteCue.generation}`;
   if (state.runningMinuteCue.workerCue?.key === cueKey) return true;
+  clearRunningMinuteCueTimers();
   state.runningMinuteCue.workerCue = { key: cueKey, entry, actionId, taskTitle };
   runningMinuteCueWorker.postMessage({
     type: "schedule",
@@ -4315,10 +4340,24 @@ function scheduleRunningMinuteCueWorker(entry, actionId, taskTitle, secondsUntil
     preloadDelayMs: Math.max(0, Math.round((secondsUntilCue - MINUTE_CUE_PRELOAD_SECONDS) * 1000)),
     playDelayMs: Math.max(0, Math.round(Math.min(MINUTE_CUE_PRELOAD_SECONDS, secondsUntilCue) * 1000))
   });
+  // O worker pode ser suspenso ou falhar offline; a página conserva o mesmo prazo.
+  const deadline = Date.now() + Math.max(0, secondsUntilCue * 1000);
+  state.runningMinuteCue.preloadTimer = window.setTimeout(() => {
+    if (state.runningMinuteCue.workerCue?.key !== cueKey || state.runningMinuteCue.played.has(entry.minute)) return;
+    state.runningMinuteCue.preloadTimer = 0;
+    prepareRunningMinuteCue(entry, actionId, taskTitle, Math.max(0, (deadline - Date.now()) / 1000));
+  }, Math.max(0, (secondsUntilCue - MINUTE_CUE_PRELOAD_SECONDS) * 1000));
   return true;
 }
 
 if (runningMinuteCueWorker) {
+  runningMinuteCueWorker.addEventListener("error", () => {
+    try { runningMinuteCueWorker?.terminate(); } catch {}
+    runningMinuteCueWorker = null;
+    clearRunningMinuteCueTimers();
+    if (isMissionRunModalOpen() && state.missionRun?.goalId) renderMissionRunState();
+    else renderHomeRunningTask();
+  });
   runningMinuteCueWorker.addEventListener("message", (event) => {
     const payload = event.data || {};
     const workerCue = state.runningMinuteCue.workerCue;
@@ -4326,12 +4365,7 @@ if (runningMinuteCueWorker) {
     if (payload.type === "preload") {
       if (state.runningMinuteCue.preparedKey !== workerCue.key) {
         clearRunningMinuteCuePlayers();
-        runningMinuteCuePlayers = workerCue.entry.urls.map((url) => {
-          const audio = new Audio(url);
-          audio.preload = "auto";
-          audio.load();
-          return audio;
-        });
+        runningMinuteCuePlayers = workerCue.entry.urls.map(createRunningMinuteCueAudio);
         state.runningMinuteCue.preparedKey = workerCue.key;
       }
       return;
@@ -4359,13 +4393,14 @@ function syncRunningMinuteCueSchedule(actionId, taskTitle, remainingSeconds) {
   }
   if (state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.optionKey !== optionKey) {
     resetRunningMinuteCueState(actionId, optionKey);
+    void warmRunningMinuteCueAudio(remainingSeconds, interval, finalMinutesEnabled);
   }
   if (state.runningMinuteCue.pendingPlayback) return;
   const nextEntry = buildMinuteCueSchedule(remainingSeconds, interval, finalMinutesEnabled)
     .find((entry) => !state.runningMinuteCue.played.has(entry.minute));
   if (!nextEntry) return;
   const secondsUntilCue = Math.max(0, Number(remainingSeconds || 0) - nextEntry.remainingSeconds);
-  const cueKey = `${actionId}:${nextEntry.minute}`;
+  const cueKey = `${actionId}:${nextEntry.minute}:${state.runningMinuteCue.generation}`;
   if (scheduleRunningMinuteCueWorker(nextEntry, actionId, taskTitle, secondsUntilCue)) {
     return;
   }
@@ -4473,6 +4508,7 @@ function anchorToCurrentAction() {
 }
 
 function renderHomeRunningTask() {
+  syncTaskSpeechContext();
   applyHomeViewMode();
   renderAppsHomeHeader(new Date(getServerNowMs()));
   const missionOwnsMinuteCueSchedule = isMissionRunModalOpen() && Boolean(state.missionRun?.goalId);
@@ -4594,7 +4630,7 @@ function renderHomeRunningTask() {
     renderRunningMusicPlayer();
     return;
   }
-  const { percent, percentPrecise, elapsedMinutes, durationMinutes, scheduleDeltaMinutes } = getRunningActionProgressState(action);
+  const { percent, percentPrecise, remainingSeconds, scheduleDeltaMinutes } = getRunningActionProgressState(action);
   setHomeRunningSurfaceState(true);
   if (state.runningEndBell.actionId !== runningActionId) {
     state.runningEndBell.actionId = runningActionId;
@@ -4615,7 +4651,6 @@ function renderHomeRunningTask() {
     runningTaskCategoryIcon.hidden = true;
   }
   setRunningRingPercent(percent);
-  const remainingSeconds = Math.max(0, Math.round((durationMinutes - elapsedMinutes) * 60));
   const estimatedRemaining = Math.max(0, Math.ceil(remainingSeconds / 60));
   const showPercent = state.runningCenterMode === "percent"
     ? true
@@ -4630,8 +4665,7 @@ function renderHomeRunningTask() {
   }
   if (remainingSeconds <= 0) {
     void playRunningEndBellCue(runningActionId);
-    if ((isQuickTaskAction(action) || (state.options.continuousTasksEnabled && !action._continuousAutoFinalized)) && !state.quickTaskAutoFinalizing) {
-      if (state.options.continuousTasksEnabled) action._continuousAutoFinalized = true;
+    if ((isQuickTaskAction(action) || state.options.continuousTasksEnabled) && !state.quickTaskAutoFinalizing) {
       state.quickTaskAutoFinalizing = true;
       void performRunningFinalize(action);
     }
@@ -6188,7 +6222,7 @@ function startRunningTaskTicker() {
   const tickRunningTask = () => {
     if (generation !== runningTaskTickerGeneration) return;
     try {
-      if (!document.hidden) renderSafely();
+      renderSafely();
     } finally {
       if (generation === runningTaskTickerGeneration) {
         runningTaskTicker = window.setTimeout(tickRunningTask, 1000);
@@ -6530,6 +6564,7 @@ async function apiRequest(path, options = {}) {
 
   const {
     offlineQueue,
+    offlineImmediate,
     offlineResponse,
     offlineInvalidates,
     forceNetwork,
@@ -6551,30 +6586,45 @@ async function apiRequest(path, options = {}) {
     ...options,
     headers,
     offlineQueue,
+    offlineImmediate,
     offlineResponse,
     offlineInvalidates: resolvedOfflineInvalidates,
     forceNetwork,
     cacheMaxAgeMs
   };
   const executeNetworkRequest = ({ background = false } = {}) => runWithGlobalLoading(async () => {
-    const response = await fetch(getApiUrl(path), {
-      ...fetchOptions,
-      headers
-    });
-
-    const payload = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      const requestError = new Error(payload?.error || "Falha na requisicao.");
-      requestError.code = String(payload?.code || "").trim();
-      requestError.overlaps = Array.isArray(payload?.overlaps) ? payload.overlaps : [];
-      requestError.runningAction = payload?.runningAction || null;
-      requestError.httpResponse = true;
-      requestError.status = response.status;
-      throw requestError;
+    const controller = background || offlineQueue ? new AbortController() : null;
+    const forwardAbort = () => controller?.abort();
+    const parentSignal = background ? null : fetchOptions.signal;
+    if (controller && parentSignal) {
+      if (parentSignal.aborted) controller.abort();
+      else parentSignal.addEventListener("abort", forwardAbort, { once: true });
     }
+    const timer = controller ? window.setTimeout(() => controller.abort(), 8000) : 0;
+    try {
+      const response = await fetch(getApiUrl(path), {
+        ...fetchOptions,
+        ...(controller ? { signal: controller.signal } : {}),
+        headers
+      });
 
-    return payload;
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const requestError = new Error(payload?.error || "Falha na requisicao.");
+        requestError.code = String(payload?.code || "").trim();
+        requestError.overlaps = Array.isArray(payload?.overlaps) ? payload.overlaps : [];
+        requestError.runningAction = payload?.runningAction || null;
+        requestError.httpResponse = true;
+        requestError.status = response.status;
+        throw requestError;
+      }
+
+      return payload;
+    } finally {
+      if (timer) window.clearTimeout(timer);
+      parentSignal?.removeEventListener("abort", forwardAbort);
+    }
   }, {
     path,
     iconSrc: loadingIcon || "",
@@ -8732,6 +8782,9 @@ function showDbLoadingState(target, minHeight = 140) {
 
 async function loadActions(options = {}) {
   renderDateHeader();
+  const generation = ++actionsLoadGeneration;
+  const mutationGeneration = actionsMutationGeneration;
+  const accountToken = getToken();
 
   if (!getToken()) {
     state.actions = [];
@@ -8748,15 +8801,28 @@ async function loadActions(options = {}) {
     showDbLoadingState(actionsList, 220);
   }
   try {
-    const payload = await apiRequestWithTimeout(actionsPath, {
+    const payload = options.payload || await apiRequestWithTimeout(actionsPath, {
       skipGlobalLoading: options.silent === true,
       forceNetwork: options.forceNetwork === true
     }, 7000);
-    state.actions = Array.isArray(payload.actions) ? payload.actions : [];
+    if (generation !== actionsLoadGeneration || accountToken !== getToken()) return;
+    // Uma resposta iniciada antes de um toque não pode desfazer esse toque.
+    if (mutationGeneration !== actionsMutationGeneration) return;
+    const protectedIds = new Set([
+      ...state.optimisticActionIds,
+      ...(window.Project200Offline?.pendingActionIds?.() || [])
+    ].map(String));
+    const actions = new Map((Array.isArray(payload.actions) ? payload.actions : []).map((action) => [String(action.id), action]));
+    state.actions.forEach((action) => {
+      if (protectedIds.has(String(action.id))) actions.set(String(action.id), action);
+    });
+    state.actions = [...actions.values()];
     const nextRunningLocalStarts = {};
     state.actions.forEach((action) => {
       if (normalizeActionStatus(action?.status) !== actionStatuses.inProgress) return;
-      const fromApi = new Date(action?.startedAt || action?.startAt).getTime();
+      const fromApi = protectedIds.has(String(action.id)) && state.runningLocalStarts[String(action.id)]
+        ? state.runningLocalStarts[String(action.id)]
+        : new Date(action?.startedAt || action?.startAt).getTime();
       if (Number.isFinite(fromApi)) {
         nextRunningLocalStarts[String(action.id || "")] = fromApi;
       }
@@ -8767,33 +8833,14 @@ async function loadActions(options = {}) {
       state.serverNowMs = parsedServerNow;
       state.serverNowCapturedAtMs = Date.now();
       state.homeSnapshotReady = true;
-    } else {
-      state.homeSnapshotReady = false;
     }
-    try {
-      if (hasLocalActions && options.forceNetwork !== true) throw new Error("runtime-local");
-      const runtimePayload = await apiRequestWithTimeout(runtimeStateEndpoint, {}, 5000);
-      state.runtimeState = runtimePayload?.runtimeState || null;
-      const runtimeActionId = String(state.runtimeState?.actionId || "").trim();
-      const runtimeStartedAt = new Date(state.runtimeState?.startedAt || "").getTime();
-      const runtimeEventType = String(state.runtimeState?.eventType || "").trim().toLowerCase();
-      const runtimeAction = state.actions.find((action) => String(action?.id || "") === runtimeActionId);
-      if (runtimeActionId && ["start", "resume"].includes(runtimeEventType)
-        && normalizeActionStatus(runtimeAction?.status) === actionStatuses.inProgress
-        && Number.isFinite(runtimeStartedAt) && runtimeStartedAt > 0) {
-        state.runningLocalStarts[runtimeActionId] = runtimeStartedAt;
-        state.actions = state.actions.map((action) => String(action?.id || "") === runtimeActionId
-          ? { ...action, startedAt: state.runtimeState?.startedAt || action.startedAt }
-          : action);
-      }
-    } catch {
-      state.runtimeState = null;
-    }
+    state.homeSnapshotReady = true;
+    state.runtimeState = null;
     renderActions();
     if (state.activeOffset === 0) void scheduleMissionNotifications();
     registerDayCloseEventIfNeeded();
   } catch (error) {
-    state.homeSnapshotReady = false;
+    if (generation !== actionsLoadGeneration || accountToken !== getToken()) return;
     if (options.silent !== true || !state.actions.length) {
       actionsProgress.hidden = true;
       actionsList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
@@ -8821,9 +8868,10 @@ async function completeActionImmediately(action, { returnToActions = true, actio
     const requestResult = apiRequest("/api/actions/" + encodeURIComponent(actionId) + "/status/manual", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "direct_complete" }),
+      body: JSON.stringify({ mode: "direct_complete", completedAt: optimisticAction.completedAt }),
       skipGlobalLoading: true,
       offlineQueue: true,
+      offlineImmediate: true,
       offlineResponse: { action: optimisticAction },
       offlineInvalidates: ["/api/actions", "/api/200/extra-goals"]
     }).then(
@@ -8885,9 +8933,10 @@ async function completeActionImmediately(action, { returnToActions = true, actio
     const payload = await apiRequest(`/api/actions/${encodeURIComponent(actionId)}/status/manual`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "direct_complete" }),
+      body: JSON.stringify({ mode: "direct_complete", completedAt: optimisticAction.completedAt }),
       skipGlobalLoading: true,
       offlineQueue: true,
+      offlineImmediate: true,
       offlineResponse: { action: optimisticAction },
       offlineInvalidates: ["/api/actions", "/api/200/extra-goals"]
     });
@@ -8917,63 +8966,121 @@ function getTaskSpeechCacheKey(payload) {
 }
 
 async function requestTaskSpeechBlob(payload) {
-  const cacheKey = getTaskSpeechCacheKey(payload);
-  if (taskSpeechBlobCache.has(cacheKey)) return taskSpeechBlobCache.get(cacheKey);
   const token = getToken();
+  const cacheKey = `${token}:${getTaskSpeechCacheKey(payload)}`;
+  if (taskSpeechBlobCache.has(cacheKey)) return taskSpeechBlobCache.get(cacheKey);
   const headers = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(getApiUrl("/api/200/task-speech"), {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload)
-  });
-  if (!response.ok) {
-    const errorPayload = await response.json().catch(() => ({}));
-    throw new Error(errorPayload?.error || "Não foi possível carregar o áudio da tarefa.");
+  let audioCache;
+  let storageKey;
+  try {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(cacheKey));
+    const keyHash = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    storageKey = `${location.origin}/200/task-speech-cache/${keyHash}`;
+    audioCache = await window.caches?.open("project200-task-voice-v1");
+    const cached = await audioCache?.match(storageKey);
+    if (cached) {
+      const blob = await cached.blob();
+      taskSpeechBlobCache.set(cacheKey, blob);
+      return blob;
+    }
+  } catch {}
+  if (navigator.onLine === false) throw new Error("Áudio ainda não disponível offline.");
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 6000);
+  taskSpeechControllers.add(controller);
+  try {
+    const response = await fetch(getApiUrl("/api/200/task-speech"), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      const errorPayload = await response.json().catch(() => ({}));
+      throw new Error(errorPayload?.error || "Não foi possível carregar o áudio da tarefa.");
+    }
+    if (audioCache && storageKey) void audioCache.put(storageKey, response.clone()).catch(() => {});
+    const blob = await response.blob();
+    taskSpeechBlobCache.set(cacheKey, blob);
+    return blob;
+  } finally {
+    window.clearTimeout(timer);
+    taskSpeechControllers.delete(controller);
   }
-  const blob = await response.blob();
-  taskSpeechBlobCache.set(cacheKey, blob);
-  return blob;
 }
 
-function playTaskSpeechBlob(blob) {
-  if (!blob || typeof Audio === "undefined") return Promise.resolve();
-  const audio = new Audio(URL.createObjectURL(blob));
-  audio.preload = "auto";
+function playVoiceAudioWithTimeout(audio, cancellations = null) {
   return new Promise((resolve) => {
+    let settled = false;
+    const timer = window.setTimeout(() => finish(), 30000);
     const finish = () => {
-      URL.revokeObjectURL(audio.src);
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      ["ended", "error", "pause"].forEach((name) => audio.removeEventListener(name, finish));
+      cancellations?.delete(finish);
+      try { audio.pause(); } catch {}
       resolve();
     };
-    audio.addEventListener("ended", finish, { once: true });
-    audio.addEventListener("error", finish, { once: true });
-    void audio.play().catch(finish);
+    cancellations?.add(finish);
+    ["ended", "error", "pause"].forEach((name) => audio.addEventListener(name, finish, { once: true }));
+    try { Promise.resolve(audio.play()).catch(finish); } catch { finish(); }
   });
+}
+
+async function playTaskSpeechBlob(blob) {
+  if (!blob || typeof Audio === "undefined") return;
+  const url = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  audio.preload = "auto";
+  try { await playVoiceAudioWithTimeout(audio, taskSpeechCancellations); }
+  finally { URL.revokeObjectURL(url); }
+}
+
+function syncTaskSpeechContext() {
+  const contextKey = isMissionRunModalOpen() && state.missionRun?.goalId
+    ? `mission:${state.missionRun.goalId}`
+    : `action:${getRunningActionForSelectedProfile()?.id || ""}`;
+  if (contextKey === taskSpeechContextKey) return;
+  taskSpeechContextKey = contextKey;
+  taskSpeechGeneration += 1;
+  taskSpeechControllers.forEach((controller) => controller.abort());
+  taskSpeechCancellations.forEach((cancel) => cancel());
 }
 
 function queueTaskSpeechSequence(requests) {
   if (!Array.isArray(requests) || !requests.length) return;
-  const playSequence = async () => {
-    const playback = getRunningPlaybackState();
-    const resumeMusic = Boolean(runningAudio && !runningAudio.paused);
-    const resumeTime = Number(runningAudio?.currentTime || 0);
-    if (resumeMusic) runningAudio.pause();
-    try {
-      const blobs = await Promise.all(requests.map((request) => requestTaskSpeechBlob(request)));
-      for (const blob of blobs) await playTaskSpeechBlob(blob);
-    } catch {
-      // Áudio de voz não deve interromper o início ou a contagem da atividade.
-    } finally {
-      if (resumeMusic && runningAudio) {
-        try {
-          runningAudio.currentTime = resumeTime;
-          await runningAudio.play();
-        } catch {}
+  syncTaskSpeechContext();
+  const generation = taskSpeechGeneration;
+  // Carregar uma fala não ocupa a fila do contador nem pausa a música.
+  const prepared = Promise.all(requests.map((request) => requestTaskSpeechBlob(request))).catch(() => null);
+  void prepared.then((blobs) => {
+    if (!blobs || generation !== taskSpeechGeneration) return;
+    const playSequence = async () => {
+      if (generation !== taskSpeechGeneration) return;
+      const playback = getRunningPlaybackState();
+      const musicSrc = String(runningAudio?.currentSrc || runningAudio?.src || "");
+      const baseVolume = Number(runningAudio?.volume ?? 1);
+      const duckMusic = Boolean(runningAudio && !runningAudio.paused);
+      try {
+        if (duckMusic) await fadeAudioVolume(runningAudio, baseVolume * 0.25, 200);
+        for (const blob of blobs) {
+          if (generation !== taskSpeechGeneration) break;
+          await playTaskSpeechBlob(blob);
+        }
+      } catch {
+        // Áudio de voz não deve interromper o início ou a contagem da atividade.
+      } finally {
+        if (duckMusic && runningAudio && !runningAudio.paused && musicSrc === String(runningAudio.currentSrc || runningAudio.src || "")) {
+          await fadeAudioVolume(runningAudio, baseVolume, 200);
+        }
+        if (playback?.track) renderRunningMusicPlayer();
       }
-      if (playback?.track) renderRunningMusicPlayer();
-    }
-  };
-  taskSpeechPlaybackQueue = taskSpeechPlaybackQueue.then(playSequence, playSequence);
+    };
+    taskSpeechPlaybackQueue = taskSpeechPlaybackQueue.then(playSequence, playSequence)
+      .catch((error) => console.warn("Falha ao reproduzir a fala de início:", error));
+  });
 }
 
 function queueActionStartSpeech(action) {
@@ -9003,6 +9110,8 @@ function scheduleContinuousTaskTransition(completedAction) {
   continuousTaskTransitionTimer = window.setTimeout(async () => {
     continuousTaskTransitionTimer = 0;
     if (!state.options.continuousTasksEnabled) return;
+    if (getRunningActionForSelectedProfile()) return;
+    if (normalizeActionStatus(state.actions.find((action) => String(action.id) === String(completedAction.id))?.status) !== actionStatuses.completed) return;
     const nextAction = getNextTimelineEntryForRunning(completedAction);
     const now = getServerNowMs();
     const activeWindowEnd = Number(getActiveTimeWindow(now)?.endMs || 0);
@@ -9016,21 +9125,32 @@ function scheduleContinuousTaskTransition(completedAction) {
     if (!Number.isFinite(activeWindowEnd) || activeWindowEnd <= now || (hasNextAction && nextStart > activeWindowEnd)) return;
     const freeTimeEnd = Math.min(hasNextAction ? nextStart : activeWindowEnd, activeWindowEnd, now + (24 * 60 * 60 * 1000));
     try {
+      const clientActionId = crypto.randomUUID();
+      const optimistic = {
+        id: clientActionId, title: "Tempo livre", assignee: state.selectedProfile || getDefaultProfileName(),
+        categoryId: "free_time", startAt: new Date(now).toISOString(), endAt: new Date(freeTimeEnd).toISOString(),
+        startedAt: new Date(now).toISOString(), status: actionStatuses.inProgress, accumulatedSeconds: 0, completionPercent: 0
+      };
       const payload = await apiRequest("/api/actions/free-time", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          clientActionId,
           profile: state.selectedProfile || getDefaultProfileName(),
           startAt: new Date(now).toISOString(),
           endAt: new Date(freeTimeEnd).toISOString()
         }),
         skipGlobalLoading: true,
+        offlineQueue: true,
+        offlineImmediate: true,
+        offlineResponse: { action: optimistic },
         offlineInvalidates: ["/api/actions"]
       });
       const freeTimeAction = payload?.action;
       if (!freeTimeAction?.id) throw new Error("Não foi possível iniciar o tempo livre.");
       state.actions = [...state.actions.filter((item) => String(item?.id || "") !== String(freeTimeAction.id)), freeTimeAction];
       state.runningLocalStarts[String(freeTimeAction.id)] = new Date(freeTimeAction.startedAt || now).getTime() || now;
+      cacheCurrentActionsState();
       resetRunningCompletionState();
       startRunningTaskTicker();
       renderActions();
@@ -9129,8 +9249,11 @@ async function toggleActionStatus(actionId, options = {}) {
   try {
     const payload = await apiRequest(`/api/actions/${encodeURIComponent(targetId)}/status`, {
       method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: optimisticStatusAction.status, startedAt: optimisticStatusAction.startedAt, occurredAt: new Date(getServerNowMs()).toISOString() }),
       skipGlobalLoading: true,
       offlineQueue: true,
+      offlineImmediate: true,
       offlineResponse: { action: optimisticStatusAction },
       offlineInvalidates: ["/api/actions", "/api/200/extra-goals"]
     });
@@ -11004,10 +11127,10 @@ function buildOptimisticAction(action, status) {
   return {
     ...action,
     status: nextStatus,
-    startedAt: nextStatus === actionStatuses.inProgress ? (action?.startedAt || nowIso) : (action?.startedAt || nowIso),
+    startedAt: nextStatus === actionStatuses.inProgress ? nowIso : nextStatus === actionStatuses.pending || nextStatus === actionStatuses.paused ? null : (action?.startedAt || nowIso),
     completedAt: nextStatus === actionStatuses.completed ? nowIso : null,
-    completionPercent: nextStatus === actionStatuses.completed ? 100 : Math.max(0, Number(action?.completionPercent || 0)),
-    accumulatedSeconds: nextStatus === actionStatuses.completed ? plannedSeconds : Math.max(0, Number(action?.accumulatedSeconds || 0))
+    completionPercent: nextStatus === actionStatuses.completed ? 100 : nextStatus === actionStatuses.pending ? 0 : Math.max(0, Number(action?.completionPercent || 0)),
+    accumulatedSeconds: nextStatus === actionStatuses.completed ? plannedSeconds : nextStatus === actionStatuses.pending ? 0 : Math.max(0, Number(action?.accumulatedSeconds || 0))
   };
 }
 
@@ -11025,6 +11148,7 @@ function updateActionInState(nextAction) {
 }
 
 function cacheCurrentActionsState() {
+  actionsMutationGeneration += 1;
   if (!window.Project200Offline?.put) return;
   const date = dateFromOffset(state.activeOffset);
   const rangeStartDate = projectDateKeyToDate(addDaysToDateKey(getProjectDateKey(date), -(Math.max(1, state.actionPeriodDays) - 1)));
@@ -11142,8 +11266,7 @@ async function refreshHomeSnapshot(options = {}) {
           await loadProject200Profiles();
         } catch {}
       }
-      state.homeSnapshotReady = false;
-      await loadActions();
+      await loadActions({ silent: state.homeSnapshotReady });
       await loadSocialSnapshot({
         skipGlobalLoading: true,
         silent: true
@@ -12307,18 +12430,22 @@ function requestPartialTaskPercent(action) {
 
 async function pauseActionPartially(actionId, completionPercent) {
   const current = state.actions.find((item) => String(item?.id || "") === String(actionId || ""));
+  const percent = normalizePartialTaskPercent(completionPercent);
   const optimistic = current ? {
-    ...buildOptimisticAction(current, actionStatuses.paused),
-    completionPercent: normalizePartialTaskPercent(completionPercent)
+    ...buildOptimisticAction(current, percent >= 100 ? actionStatuses.completed : actionStatuses.paused),
+    completionPercent: percent,
+    accumulatedSeconds: Math.round(getActionDurationMinutes(current) * 60 * percent / 100)
   } : null;
   const payload = await apiRequest(`/api/actions/${encodeURIComponent(actionId)}/status/manual`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       mode: "pause",
-      completionPercent: normalizePartialTaskPercent(completionPercent)
+      completionPercent: percent,
+      occurredAt: new Date(getServerNowMs()).toISOString()
     }),
     offlineQueue: true,
+    offlineImmediate: true,
     offlineResponse: { action: optimistic },
     offlineInvalidates: ["/api/actions", "/api/200/extra-goals"]
   });
@@ -12350,6 +12477,7 @@ async function restoreActionToPending(actionId) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ mode: "restore" }),
     offlineQueue: true,
+    offlineImmediate: true,
     offlineResponse: { action: optimistic },
     offlineInvalidates: ["/api/actions", "/api/200/extra-goals"]
   });
@@ -21790,13 +21918,19 @@ document.querySelectorAll("[data-ai-time-nav]").forEach((button) => {
 });
 
 async function performRunningFinalize(runningAction) {
-  if (!runningAction || state.optimisticActionIds.includes(String(runningAction.id || ""))) return;
+  if (!runningAction || state.optimisticActionIds.includes(String(runningAction.id || ""))) {
+    state.quickTaskAutoFinalizing = false;
+    return;
+  }
   state.quickTaskAutoFinalizing = true;
   if (state.options.stopMusicOnFinish && runningAudio) {
     stopRunningMusicAfterFinishedActivity();
   }
-  await completeActionImmediately(runningAction, { returnToActions: !state.options.continuousTasksEnabled });
-  state.quickTaskAutoFinalizing = false;
+  try {
+    await completeActionImmediately(runningAction, { returnToActions: !state.options.continuousTasksEnabled });
+  } finally {
+    state.quickTaskAutoFinalizing = false;
+  }
 
 }
 
@@ -21863,7 +21997,8 @@ runningTaskQuickButton?.addEventListener("click", () => {
 runningTaskMissionButton?.addEventListener("click", () => {
   void openRunningMissionQuickModal();
 });
-runningTaskVoiceButton?.addEventListener("click", () => {
+runningTaskVoiceButton?.addEventListener("click", (event) => {
+  event.stopPropagation();
   state.options.runningMinuteVoiceEnabled = state.options.runningMinuteVoiceEnabled === false;
   saveOptionsConfig();
   renderRunningMinuteVoiceToggle();
@@ -22870,14 +23005,12 @@ void (async () => {
   window.__project200OfflineRefreshBridgeInstalled = true;
 
   window.addEventListener("project200:offline-queued", () => {
-    if (typeof showFloatingNotice === "function") {
-      showFloatingNotice("Alteração salva offline. Vamos sincronizar ao voltar a internet.");
-    }
+    // A gravação local e a sincronização não precisam interromper o uso.
   });
 
   window.addEventListener("project200:offline-data-updated", (event) => {
     const path = String(event?.detail?.path || "");
-    if (path.startsWith("/api/actions?")) void loadActions({ silent: true });
+    if (path.startsWith("/api/actions?")) void loadActions({ silent: true, payload: event.detail.payload });
     if (path.startsWith("/api/200/extra-goals?")) {
       void Promise.all([loadMissions(), loadActionMissions()]).then(() => {
         renderMissions();
@@ -22892,8 +23025,26 @@ void (async () => {
     }
   });
 
-  window.addEventListener("project200:offline-sync-complete", () => {
-    if (actionsModal?.classList.contains("active")) void loadActions({ silent: true });
+  window.addEventListener("project200:offline-mutation-synced", (event) => {
+    const action = event.detail?.payload?.action;
+    const pending = new Set(window.Project200Offline?.pendingActionIds?.() || []);
+    if (action?.id && !pending.has(String(action.id)) && !state.optimisticActionIds.includes(String(action.id))) {
+      updateActionInState(action);
+      if (normalizeActionStatus(action.status) === actionStatuses.inProgress) {
+        state.runningLocalStarts[String(action.id)] = new Date(action.startedAt).getTime();
+      }
+      renderActions();
+      renderHomeRunningTask();
+    }
+    enqueueActionPointsUpdateFeedback(event.detail?.payload?.pointsUpdate, 120);
+  });
+
+  window.addEventListener("project200:offline-sync-error", (event) => {
+    showFloatingNotice(event.detail?.message || "Não foi possível sincronizar uma alteração.");
+  });
+
+  window.addEventListener("project200:offline-sync-complete", (event) => {
+    if (!event.detail?.pending) void loadActions({ silent: true, forceNetwork: true });
     if (document.getElementById("historyModal")?.classList.contains("active")) void loadMissions().then(renderMissions);
     if (document.getElementById("financeModal")?.classList.contains("active")) void loadFinanceSummary();
     if (document.getElementById("platformModal")?.classList.contains("active")) void loadPlatformFinance();

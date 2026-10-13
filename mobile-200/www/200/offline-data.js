@@ -17,9 +17,9 @@
     /^\/api\/200\/projects(?:\?|$)/,
   ];
 
-  let activityCount = 0;
   let syncPromise = null;
-  let refreshTimer = null;
+  const refreshes = new Map();
+  const cacheRevisions = new Map();
 
   function accountKey() {
     const token = String(global.localStorage.getItem("turma_do_printy_token") || global.localStorage.getItem("tdpToken") || global.localStorage.getItem("token") || "anonymous");
@@ -31,44 +31,388 @@
     return (hash >>> 0).toString(36);
   }
 
-  function cacheStorageKey() { return `${CACHE_PREFIX}${accountKey()}`; }
-  function outboxStorageKey() { return `${OUTBOX_PREFIX}${accountKey()}`; }
-  function readJson(key, fallback) { try { const parsed = JSON.parse(global.localStorage.getItem(key) || "null"); return parsed == null ? fallback : parsed; } catch { return fallback; } }
-  function writeJson(key, value) { try { global.localStorage.setItem(key, JSON.stringify(value)); return true; } catch { return false; } }
-  function clone(value) { if (value == null) return value; try { return global.structuredClone ? global.structuredClone(value) : JSON.parse(JSON.stringify(value)); } catch { return value; } }
-  function normalizePath(path) { return String(path || "").trim(); }
-  function isCacheable(path) { return CACHEABLE_GETS.some((pattern) => pattern.test(normalizePath(path))); }
-  function getCacheRecord(path) { const records = readJson(cacheStorageKey(), {}); const record = records[normalizePath(path)]; return record && typeof record === "object" && Object.prototype.hasOwnProperty.call(record, "payload") ? record : null; }
-  function put(path, payload) { const normalized = normalizePath(path); if (!normalized || payload == null) return; const records = readJson(cacheStorageKey(), {}); records[normalized] = { savedAt: Date.now(), payload: clone(payload) }; const ordered = Object.entries(records).sort((left, right) => Number(right[1]?.savedAt || 0) - Number(left[1]?.savedAt || 0)); writeJson(cacheStorageKey(), Object.fromEntries(ordered.slice(0, MAX_CACHE_ENTRIES))); }
-  function peek(path) { return clone(getCacheRecord(path)?.payload ?? null); }
-  function hasCached(path) { return Boolean(getCacheRecord(path)); }
-  function invalidate(prefixes) { const values = (Array.isArray(prefixes) ? prefixes : [prefixes]).map(normalizePath).filter(Boolean); if (!values.length) return; const records = readJson(cacheStorageKey(), {}); let changed = false; Object.keys(records).forEach((path) => { if (values.some((prefix) => path.startsWith(prefix))) { delete records[path]; changed = true; } }); if (changed) writeJson(cacheStorageKey(), records); }
-  function markStale(prefixes) { const values = (Array.isArray(prefixes) ? prefixes : [prefixes]).map(normalizePath).filter(Boolean); if (!values.length) return; const records = readJson(cacheStorageKey(), {}); let changed = false; Object.keys(records).forEach((path) => { if (!values.some((prefix) => path.startsWith(prefix))) return; records[path] = { ...records[path], savedAt: 0 }; changed = true; }); if (changed) writeJson(cacheStorageKey(), records); }
-  function updateCached(prefixes, updater) { if (typeof updater !== "function") return; const values = (Array.isArray(prefixes) ? prefixes : [prefixes]).map(normalizePath).filter(Boolean); if (!values.length) return; const records = readJson(cacheStorageKey(), {}); let changed = false; Object.entries(records).forEach(([path, record]) => { if (!values.some((prefix) => path.startsWith(prefix))) return; const nextPayload = updater(clone(record?.payload), path); if (nextPayload === undefined) return; records[path] = { ...record, payload: clone(nextPayload) }; changed = true; }); if (changed) writeJson(cacheStorageKey(), records); }
-
-  function ensureFeedback() {
-    let feedback = document.getElementById("project200OfflineFeedback");
-    if (feedback) return feedback;
-    const style = document.createElement("style");
-    style.textContent = `#project200OfflineFeedback{position:fixed;top:max(10px,env(safe-area-inset-top));left:50%;z-index:100000;display:flex;align-items:center;gap:8px;max-width:calc(100vw - 28px);padding:8px 13px;border:1px solid rgba(255,255,255,.2);border-radius:999px;background:rgba(13,27,49,.92);color:#f7fbff;font:700 12px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.01em;box-shadow:0 8px 28px rgba(0,0,0,.24);backdrop-filter:blur(14px);transform:translate(-50%,-150%);opacity:0;pointer-events:none;transition:transform .22s ease,opacity .22s ease}#project200OfflineFeedback.is-visible{transform:translate(-50%,0);opacity:1}#project200OfflineFeedback .project200-offline-spinner{width:13px;height:13px;flex:0 0 auto;border:2px solid rgba(255,255,255,.28);border-top-color:#fff;border-radius:50%;animation:project200OfflineSpin .75s linear infinite}@keyframes project200OfflineSpin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){#project200OfflineFeedback{transition:none}#project200OfflineFeedback .project200-offline-spinner{animation-duration:1.6s}}`;
-    document.head.appendChild(style);
-    feedback = document.createElement("div"); feedback.id = "project200OfflineFeedback"; feedback.setAttribute("role", "status"); feedback.setAttribute("aria-live", "polite"); feedback.innerHTML = '<span class="project200-offline-spinner" aria-hidden="true"></span><span>Carregando elementos</span>'; document.body.appendChild(feedback); return feedback;
+  function cacheStorageKey() {
+    return `${CACHE_PREFIX}${accountKey()}`;
   }
-  function beginActivity() { activityCount += 1; ensureFeedback().classList.add("is-visible"); }
-  function endActivity() { activityCount = Math.max(0, activityCount - 1); if (activityCount) return; global.clearTimeout(refreshTimer); refreshTimer = global.setTimeout(() => ensureFeedback().classList.remove("is-visible"), 280); }
-  function emit(name, detail) { global.dispatchEvent(new CustomEvent(name, { detail })); }
-  function samePayload(left, right) { try { const ignoreVolatileClock = (key, value) => (["serverNow", "generatedAt", "fetchedAt", "responseAt"].includes(String(key)) ? undefined : value); return JSON.stringify(left, ignoreVolatileClock) === JSON.stringify(right, ignoreVolatileClock); } catch { return false; } }
-  function uuid() { return global.crypto?.randomUUID?.() || `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
-  function sanitizeHeaders(headers) { const safe = {}; Object.entries(headers || {}).forEach(([key, value]) => { if (String(key).toLowerCase() !== "authorization") safe[key] = value; }); return safe; }
-  function enqueue(path, options) { const outbox = readJson(outboxStorageKey(), []); outbox.push({ id: uuid(), path: normalizePath(path), method: String(options.method || "POST").toUpperCase(), headers: sanitizeHeaders(options.headers), body: typeof options.body === "string" ? options.body : options.body == null ? null : JSON.stringify(options.body), invalidates: Array.isArray(options.offlineInvalidates) ? options.offlineInvalidates : [], createdAt: Date.now() }); writeJson(outboxStorageKey(), outbox.slice(-300)); emit("project200:offline-queued", { path, pending: Math.min(outbox.length, 300) }); }
-  function getApiUrl(path) { const value = normalizePath(path); if (/^https?:\/\//i.test(value)) return value; const override = String(global.__TDP_API_BASE_URL__ || "").trim().replace(/\/+$/, ""); if (override) return `${override}${value.startsWith("/") ? value : `/${value}`}`; const isNative = Boolean(global.Capacitor?.isNativePlatform?.()); if (isNative || global.location?.protocol === "file:") return `https://www.turmadoprinty.com.br${value.startsWith("/") ? value : `/${value}`}`; return value; }
-  async function sendQueued(item) { const headers = { ...(item.headers || {}) }; const token = String(global.localStorage.getItem("turma_do_printy_token") || global.localStorage.getItem("tdpToken") || global.localStorage.getItem("token") || "").trim(); if (token) headers.Authorization = `Bearer ${token}`; const response = await global.fetch(getApiUrl(item.path), { method: item.method, headers, body: item.body, cache: "no-store" }); const payload = await response.json().catch(() => ({})); if (!response.ok) { const error = new Error(payload?.error || "Nao foi possivel sincronizar os dados offline."); error.httpResponse = true; error.status = response.status; throw error; } return payload; }
-  async function sync() { if (syncPromise) return syncPromise; if (global.navigator?.onLine === false) return { synced: 0, pending: readJson(outboxStorageKey(), []).length }; syncPromise = (async () => { let outbox = readJson(outboxStorageKey(), []); if (!outbox.length) return { synced: 0, pending: 0 }; beginActivity(); let synced = 0; const invalidates = new Set(); try { while (outbox.length && global.navigator?.onLine !== false) { const item = outbox[0]; try { await sendQueued(item); } catch (error) { if (error?.httpResponse && [400, 404, 409, 410, 422].includes(Number(error.status))) { outbox.shift(); writeJson(outboxStorageKey(), outbox); emit("project200:offline-sync-error", { path: item.path, message: error.message }); continue; } break; } outbox.shift(); writeJson(outboxStorageKey(), outbox); synced += 1; (item.invalidates || []).forEach((prefix) => invalidates.add(prefix)); } if (invalidates.size) markStale([...invalidates]); if (synced) emit("project200:offline-sync-complete", { synced, pending: outbox.length, invalidates: [...invalidates] }); return { synced, pending: outbox.length }; } finally { endActivity(); } })().finally(() => { syncPromise = null; }); return syncPromise; }
-  function isOfflineFailure(error) { return global.navigator?.onLine === false || !error?.httpResponse; }
-  async function backgroundRefresh(path, options, execute, previousPayload) { let changed = false; try { const payload = await execute({ background: true }); changed = !samePayload(previousPayload, payload); if (!changed) { put(path, payload); return; } beginActivity(); put(path, payload); emit("project200:offline-data-updated", { path, payload: clone(payload) }); await new Promise((resolve) => global.requestAnimationFrame(() => global.requestAnimationFrame(resolve))); } catch {} finally { if (changed) endActivity(); } }
-  async function request(path, options, execute) { const normalized = normalizePath(path); const requestOptions = options || {}; const method = String(requestOptions.method || "GET").toUpperCase(); const cacheable = method === "GET" && isCacheable(normalized); const maxAgeMs = Math.max(0, Number(requestOptions.cacheMaxAgeMs ?? DEFAULT_MAX_AGE_MS)); const cached = cacheable ? getCacheRecord(normalized) : null; if (cacheable && cached && !requestOptions.forceNetwork) { const isFresh = Date.now() - Number(cached.savedAt || 0) <= maxAgeMs; if (!isFresh && global.navigator?.onLine !== false) void backgroundRefresh(normalized, requestOptions, execute, cached.payload); return clone(cached.payload); } try { const payload = await execute({ background: false }); if (cacheable) put(normalized, payload); if (method !== "GET" && requestOptions.offlineInvalidates) markStale(requestOptions.offlineInvalidates); return payload; } catch (error) { if (cacheable && cached) return clone(cached.payload); if (method !== "GET" && requestOptions.offlineQueue && isOfflineFailure(error)) { enqueue(normalized, requestOptions); const fallback = clone(requestOptions.offlineResponse || {}); return fallback && typeof fallback === "object" ? { ...fallback, offlineQueued: true } : { offlineQueued: true, value: fallback }; } throw error; } }
+
+  function outboxStorageKey() {
+    return `${OUTBOX_PREFIX}${accountKey()}`;
+  }
+
+  function revisionKey(path) {
+    return `${cacheStorageKey()}:${normalizePath(path)}`;
+  }
+
+  function revisionFor(path) {
+    const key = revisionKey(path);
+    if (!cacheRevisions.has(key)) cacheRevisions.set(key, 0);
+    return cacheRevisions.get(key);
+  }
+
+  function bumpRevision(path) {
+    cacheRevisions.set(revisionKey(path), revisionFor(path) + 1);
+  }
+
+  function bumpPrefixes(prefixes) {
+    const base = `${cacheStorageKey()}:`;
+    cacheRevisions.forEach((revision, key) => {
+      if (key.startsWith(base) && prefixes.some((prefix) => key.slice(base.length).startsWith(prefix))) {
+        cacheRevisions.set(key, revision + 1);
+      }
+    });
+  }
+
+  function readJson(key, fallback) {
+    try {
+      const parsed = JSON.parse(global.localStorage.getItem(key) || "null");
+      return parsed == null ? fallback : parsed;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function writeJson(key, value) {
+    try {
+      global.localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function clone(value) {
+    if (value == null) return value;
+    try {
+      return global.structuredClone ? global.structuredClone(value) : JSON.parse(JSON.stringify(value));
+    } catch {
+      return value;
+    }
+  }
+
+  function normalizePath(path) {
+    return String(path || "").trim();
+  }
+
+  function isCacheable(path) {
+    return CACHEABLE_GETS.some((pattern) => pattern.test(normalizePath(path)));
+  }
+
+  function getCacheRecord(path) {
+    const records = readJson(cacheStorageKey(), {});
+    const record = records[normalizePath(path)];
+    return record && typeof record === "object" && Object.prototype.hasOwnProperty.call(record, "payload") ? record : null;
+  }
+
+  function put(path, payload) {
+    const normalized = normalizePath(path);
+    if (!normalized || payload == null) return;
+    const records = readJson(cacheStorageKey(), {});
+    records[normalized] = { savedAt: Date.now(), capturedAt: Date.now(), payload: clone(payload) };
+    bumpRevision(normalized);
+    const ordered = Object.entries(records).sort((left, right) => Number(right[1]?.savedAt || 0) - Number(left[1]?.savedAt || 0));
+    writeJson(cacheStorageKey(), Object.fromEntries(ordered.slice(0, MAX_CACHE_ENTRIES)));
+  }
+
+  function peek(path) {
+    return readCachedPayload(getCacheRecord(path));
+  }
+
+  function readCachedPayload(record) {
+    const payload = clone(record?.payload ?? null);
+    const serverNow = new Date(payload?.serverNow || "").getTime();
+    if (payload && Number.isFinite(serverNow)) {
+      // A hora da resposta continua avançando, mesmo se o cache foi marcado como antigo.
+      const capturedAt = Number(record.capturedAt || record.savedAt || 0);
+      payload.serverNow = new Date(capturedAt > 0 ? serverNow + Math.max(0, Date.now() - capturedAt) : Date.now()).toISOString();
+    }
+    return payload;
+  }
+
+  function hasCached(path) {
+    return Boolean(getCacheRecord(path));
+  }
+
+  function invalidate(prefixes) {
+    const values = (Array.isArray(prefixes) ? prefixes : [prefixes]).map(normalizePath).filter(Boolean);
+    if (!values.length) return;
+    bumpPrefixes(values);
+    const records = readJson(cacheStorageKey(), {});
+    let changed = false;
+    Object.keys(records).forEach((path) => {
+      if (values.some((prefix) => path.startsWith(prefix))) {
+        delete records[path];
+        changed = true;
+      }
+    });
+    if (changed) writeJson(cacheStorageKey(), records);
+  }
+
+  function markStale(prefixes) {
+    const values = (Array.isArray(prefixes) ? prefixes : [prefixes]).map(normalizePath).filter(Boolean);
+    if (!values.length) return;
+    bumpPrefixes(values);
+    const records = readJson(cacheStorageKey(), {});
+    let changed = false;
+    Object.keys(records).forEach((path) => {
+      if (!values.some((prefix) => path.startsWith(prefix))) return;
+      records[path] = { ...records[path], savedAt: 0 };
+      changed = true;
+    });
+    if (changed) writeJson(cacheStorageKey(), records);
+  }
+
+  function updateCached(prefixes, updater) {
+    if (typeof updater !== "function") return;
+    const values = (Array.isArray(prefixes) ? prefixes : [prefixes]).map(normalizePath).filter(Boolean);
+    if (!values.length) return;
+    bumpPrefixes(values);
+    const records = readJson(cacheStorageKey(), {});
+    let changed = false;
+    Object.entries(records).forEach(([path, record]) => {
+      if (!values.some((prefix) => path.startsWith(prefix))) return;
+      const nextPayload = updater(clone(record?.payload), path);
+      if (nextPayload === undefined) return;
+      records[path] = { ...record, payload: clone(nextPayload) };
+      changed = true;
+    });
+    if (changed) writeJson(cacheStorageKey(), records);
+  }
+
+  function emit(name, detail) {
+    global.dispatchEvent(new CustomEvent(name, { detail }));
+  }
+
+  function samePayload(left, right) {
+    try {
+      const ignoreVolatileClock = (key, value) => (
+        ["serverNow", "generatedAt", "fetchedAt", "responseAt"].includes(String(key)) ? undefined : value
+      );
+      return JSON.stringify(left, ignoreVolatileClock) === JSON.stringify(right, ignoreVolatileClock);
+    } catch {
+      return false;
+    }
+  }
+
+  function uuid() {
+    return global.crypto?.randomUUID?.() || `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  function sanitizeHeaders(headers) {
+    const safe = {};
+    Object.entries(headers || {}).forEach(([key, value]) => {
+      if (String(key).toLowerCase() !== "authorization") safe[key] = value;
+    });
+    return safe;
+  }
+
+  function enqueue(path, options) {
+    const outbox = readJson(outboxStorageKey(), []);
+    outbox.push({
+      id: uuid(),
+      path: normalizePath(path),
+      method: String(options.method || "POST").toUpperCase(),
+      headers: sanitizeHeaders(options.headers),
+      body: typeof options.body === "string" ? options.body : options.body == null ? null : JSON.stringify(options.body),
+      invalidates: Array.isArray(options.offlineInvalidates) ? options.offlineInvalidates : [],
+      createdAt: Date.now(),
+    });
+    if (!writeJson(outboxStorageKey(), outbox)) throw new Error("Não foi possível salvar a alteração no aparelho.");
+    markStale(options.offlineInvalidates || []);
+    emit("project200:offline-queued", { path, pending: outbox.length });
+  }
+
+  function pendingActionIds() {
+    return readJson(outboxStorageKey(), []).map((item) => {
+      const match = String(item.path || "").match(/^\/api\/actions\/([^/?]+)\/status(?:\/manual)?$/);
+      if (match) return decodeURIComponent(match[1]);
+      if (item.path === "/api/actions/free-time") {
+        try { return JSON.parse(item.body || "{}").clientActionId || ""; } catch {}
+      }
+      return "";
+    }).filter(Boolean);
+  }
+
+  function protectPendingActions(path, payload) {
+    if (!/^\/api\/actions(?:\?|$)/.test(path) || !Array.isArray(payload?.actions)) return payload;
+    const pending = new Set(pendingActionIds());
+    const local = peek(path)?.actions || [];
+    const actions = new Map(payload.actions.map((action) => [String(action.id), action]));
+    local.forEach((action) => { if (pending.has(String(action.id))) actions.set(String(action.id), action); });
+    return { ...payload, actions: [...actions.values()] };
+  }
+
+  function getApiUrl(path) {
+    const value = normalizePath(path);
+    if (/^https?:\/\//i.test(value)) return value;
+    const override = String(global.__TDP_API_BASE_URL__ || "").trim().replace(/\/+$/, "");
+    if (override) return `${override}${value.startsWith("/") ? value : `/${value}`}`;
+    const isNative = Boolean(global.Capacitor?.isNativePlatform?.());
+    if (isNative || global.location?.protocol === "file:") return `https://www.turmadoprinty.com.br${value.startsWith("/") ? value : `/${value}`}`;
+    return value;
+  }
+
+  async function sendQueued(item) {
+    const headers = { ...(item.headers || {}) };
+    const token = String(global.localStorage.getItem("turma_do_printy_token") || global.localStorage.getItem("tdpToken") || global.localStorage.getItem("token") || "").trim();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const controller = new AbortController();
+    const timer = global.setTimeout(() => controller.abort(), 8000);
+    let response;
+    let payload;
+    try {
+      response = await global.fetch(getApiUrl(item.path), {
+        method: item.method, headers, body: item.body, cache: "no-store", signal: controller.signal,
+      });
+      payload = await response.json().catch(() => ({}));
+    } finally {
+      global.clearTimeout(timer);
+    }
+    if (!response.ok) {
+      const error = new Error(payload?.error || "Nao foi possivel sincronizar os dados offline.");
+      error.httpResponse = true;
+      error.status = response.status;
+      throw error;
+    }
+    return payload;
+  }
+
+  async function sync() {
+    if (syncPromise) return syncPromise;
+    if (global.navigator?.onLine === false) return { synced: 0, pending: readJson(outboxStorageKey(), []).length };
+    const storageKey = outboxStorageKey();
+    syncPromise = Promise.resolve().then(async () => {
+      let outbox = readJson(storageKey, []);
+      if (!outbox.length) return { synced: 0, pending: 0 };
+      let synced = 0;
+      let rejected = 0;
+      const invalidates = new Set();
+      while (outbox.length && global.navigator?.onLine !== false && outboxStorageKey() === storageKey) {
+        const item = outbox[0];
+        let payload;
+        try {
+          payload = await sendQueued(item);
+        } catch (error) {
+          if (error?.httpResponse && [400, 404, 409, 410, 422].includes(Number(error.status))) {
+            outbox = readJson(storageKey, []).filter((queued) => queued.id !== item.id);
+            writeJson(storageKey, outbox);
+            rejected += 1;
+            (item.invalidates || []).forEach((prefix) => invalidates.add(prefix));
+            if (outboxStorageKey() === storageKey) emit("project200:offline-sync-error", { path: item.path, message: error.message });
+            continue;
+          }
+          break;
+        }
+        // Releia: outra tarefa pode ter sido adicionada enquanto a rede respondia.
+        outbox = readJson(storageKey, []).filter((queued) => queued.id !== item.id);
+        writeJson(storageKey, outbox);
+        synced += 1;
+        (item.invalidates || []).forEach((prefix) => invalidates.add(prefix));
+        if (outboxStorageKey() === storageKey) emit("project200:offline-mutation-synced", { path: item.path, payload, pending: outbox.length });
+      }
+      if (outboxStorageKey() === storageKey) {
+        if (invalidates.size) markStale([...invalidates]);
+        if (synced || rejected) emit("project200:offline-sync-complete", { synced, rejected, pending: outbox.length, invalidates: [...invalidates] });
+      }
+      return { synced, pending: outbox.length };
+    }).finally(() => {
+      syncPromise = null;
+    });
+    return syncPromise;
+  }
+
+  function isOfflineFailure(error) {
+    return global.navigator?.onLine === false || !error?.httpResponse;
+  }
+
+  async function backgroundRefresh(path, options, execute, previousPayload) {
+    const account = accountKey();
+    const refreshKey = revisionKey(path);
+    if (refreshes.has(refreshKey)) return refreshes.get(refreshKey);
+    const revision = revisionFor(path);
+    const refresh = (async () => {
+      try {
+        const response = await execute({ background: true });
+        if (account !== accountKey() || revision !== revisionFor(path)) return;
+        const payload = protectPendingActions(path, response);
+        const changed = !samePayload(previousPayload, payload);
+        put(path, payload);
+        if (changed) emit("project200:offline-data-updated", { path, payload: clone(payload) });
+      } catch {
+        // O cache continua sendo a fonte segura quando a atualização em segundo plano falha.
+      } finally {
+        refreshes.delete(refreshKey);
+      }
+    })();
+    refreshes.set(refreshKey, refresh);
+    return refresh;
+  }
+
+  async function request(path, options, execute) {
+    const account = accountKey();
+    const normalized = normalizePath(path);
+    const requestOptions = options || {};
+    const method = String(requestOptions.method || "GET").toUpperCase();
+    const cacheable = method === "GET" && isCacheable(normalized);
+    const maxAgeMs = Math.max(0, Number(requestOptions.cacheMaxAgeMs ?? DEFAULT_MAX_AGE_MS));
+    const cached = cacheable ? getCacheRecord(normalized) : null;
+
+    const queuedResponse = () => {
+      enqueue(normalized, requestOptions);
+      if (global.navigator?.onLine !== false) void sync();
+      const fallback = clone(requestOptions.offlineResponse || {});
+      return { ...fallback, offlineQueued: true };
+    };
+    if (method !== "GET" && requestOptions.offlineQueue
+      && (requestOptions.offlineImmediate || global.navigator?.onLine === false || readJson(outboxStorageKey(), []).length)) {
+      return queuedResponse();
+    }
+
+    if (cacheable && cached && !requestOptions.forceNetwork) {
+      const isFresh = Date.now() - Number(cached.savedAt || 0) <= maxAgeMs;
+      if (!isFresh && global.navigator?.onLine !== false) void backgroundRefresh(normalized, requestOptions, execute, cached.payload);
+      return readCachedPayload(cached);
+    }
+
+    try {
+      const revision = revisionFor(normalized);
+      let payload = await execute({ background: false });
+      if (account !== accountKey()) throw new Error("A conta foi alterada durante a atualização.");
+      if (cacheable && revision !== revisionFor(normalized) && hasCached(normalized)) return peek(normalized);
+      if (cacheable) payload = protectPendingActions(normalized, payload);
+      if (cacheable) put(normalized, payload);
+      if (method !== "GET" && requestOptions.offlineInvalidates) markStale(requestOptions.offlineInvalidates);
+      return payload;
+    } catch (error) {
+      if (account !== accountKey()) throw error;
+      if (cacheable && hasCached(normalized)) return peek(normalized);
+      if (method !== "GET" && requestOptions.offlineQueue && isOfflineFailure(error)) {
+        return queuedResponse();
+      }
+      throw error;
+    }
+  }
+
   global.addEventListener("online", () => void sync());
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && global.navigator?.onLine !== false) void sync(); });
-  global.setTimeout(() => { ensureFeedback(); if (global.navigator?.onLine !== false) void sync(); }, 0);
-  global.Project200Offline = { request, sync, peek, put, hasCached, invalidate, markStale, updateCached, isOnline: () => global.navigator?.onLine !== false, pendingCount: () => readJson(outboxStorageKey(), []).length, activity: async (task) => { beginActivity(); try { return await task(); } finally { endActivity(); } } };
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && global.navigator?.onLine !== false) void sync();
+  });
+  global.setTimeout(() => {
+    if (global.navigator?.onLine !== false) void sync();
+  }, 0);
+  global.setInterval(() => { if (global.navigator?.onLine !== false) void sync(); }, 15000);
+
+  global.Project200Offline = {
+    request,
+    sync,
+    peek,
+    put,
+    hasCached,
+    invalidate,
+    markStale,
+    updateCached,
+    pendingActionIds,
+    isOnline: () => global.navigator?.onLine !== false,
+    pendingCount: () => readJson(outboxStorageKey(), []).length,
+    activity: async (task) => task(),
+  };
 })(window);

@@ -1279,7 +1279,7 @@ export async function updateUserAction(userId, actionId, payload) {
   return getUserActionById(userId, action.id);
 }
 
-export async function updateUserActionStatus(userId, actionId) {
+export async function updateUserActionStatus(userId, actionId, payload = {}) {
   await ensureActionsSchema();
 
   const action = await getUserActionById(userId, actionId);
@@ -1288,13 +1288,21 @@ export async function updateUserActionStatus(userId, actionId) {
     throw new Error("Tarefa nao encontrada.");
   }
 
-  const nextStatus = getNextActionStatus(action.status);
+  const requestedStatus = String(payload?.status || "").trim().toUpperCase();
+  if (requestedStatus && ![ACTION_STATUS_IN_PROGRESS, ACTION_STATUS_COMPLETED].includes(requestedStatus)) {
+    throw new Error("Status solicitado invalido.");
+  }
+  const nextStatus = requestedStatus || getNextActionStatus(action.status);
+
+  // O reenvio da mesma alteração offline não pode alternar a tarefa outra vez.
+  if (requestedStatus && normalizeActionStatus(action.status) === nextStatus) return action;
+  if (requestedStatus === ACTION_STATUS_IN_PROGRESS && normalizeActionStatus(action.status) === ACTION_STATUS_COMPLETED) return action;
 
   if (action.status === ACTION_STATUS_COMPLETED && nextStatus === ACTION_STATUS_COMPLETED) {
     return action;
   }
 
-  const nowIso = new Date().toISOString();
+  const nowIso = payload?.occurredAt ? parseDate(payload.occurredAt, "Horario da alteração").toISOString() : new Date().toISOString();
   let startedAt = action.startedAt;
   let completedAt = action.completedAt;
   let completionPercent = Math.max(0, Math.min(100, Math.trunc(Number(action.completionPercent || 0) || 0)));
@@ -1326,7 +1334,9 @@ export async function updateUserActionStatus(userId, actionId) {
       throw conflictError;
     }
 
-    startedAt = action.status === ACTION_STATUS_PAUSED ? nowIso : (startedAt || nowIso);
+    startedAt = payload?.startedAt
+      ? parseDate(payload.startedAt, "Horario inicial").toISOString()
+      : action.status === ACTION_STATUS_PAUSED ? nowIso : (startedAt || nowIso);
     completedAt = null;
     await upsertProject200RuntimeState(userId, {
       actionId: action.id,
@@ -1438,10 +1448,12 @@ export async function updateUserActionStatusManual(userId, actionId, payload = {
   }
 
   if (mode === "pause") {
+    if (normalizeActionStatus(action.status) === ACTION_STATUS_PAUSED) return action;
+    if (normalizeActionStatus(action.status) === ACTION_STATUS_COMPLETED && Number(payload?.completionPercent) >= 100) return action;
     if (normalizeActionStatus(action.status) !== ACTION_STATUS_IN_PROGRESS) {
       throw new Error("Somente uma tarefa em andamento pode ser pausada.");
     }
-    const now = new Date();
+    const now = payload?.occurredAt ? parseDate(payload.occurredAt, "Horario da pausa") : new Date();
     const startedAtMs = new Date(action.startedAt || now).getTime();
     const sessionSeconds = Number.isFinite(startedAtMs)
       ? Math.max(0, Math.floor((now.getTime() - startedAtMs) / 1000))
@@ -1502,7 +1514,8 @@ export async function updateUserActionStatusManual(userId, actionId, payload = {
   }
 
   if (mode === "direct_complete") {
-    const now = new Date();
+    if (normalizeActionStatus(action.status) === ACTION_STATUS_COMPLETED) return action;
+    const now = payload?.completedAt ? parseDate(payload.completedAt, "Horario final") : new Date();
     const startedAt = action.startedAt || now.toISOString();
     const completedAt = now.toISOString();
     const plannedSeconds = Math.max(1, Math.round((new Date(action.endAt).getTime() - new Date(action.startAt).getTime()) / 1000));
@@ -1610,6 +1623,42 @@ export async function createQuickUserAction(userId, payload = {}) {
     throw new Error("Nao foi possivel criar a tarefa rapida.");
   }
   return updateUserActionStatus(userId, action.id);
+}
+
+export async function createFreeTimeUserAction(userId, payload = {}) {
+  await ensureActionsSchema();
+  const clientActionId = String(payload.clientActionId || "").trim();
+  if (!clientActionId) {
+    const created = await createUserAction(userId, {
+      title: "Tempo livre", assignee: payload.profile, categoryId: "free_time",
+      repeatRule: "none", repeatDays: [], startAt: payload.startAt, endAt: payload.endAt
+    });
+    return updateUserActionStatus(userId, created[0].id);
+  }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clientActionId)) {
+    throw new Error("Identificador do intervalo invalido.");
+  }
+  const assignee = await resolveProject200ProfileName(userId, normalizeAssignee(payload.profile), { fallbackToDefault: true });
+  const startAt = parseDate(payload.startAt, "Horario inicial");
+  const endAt = parseDate(payload.endAt, "Horario final");
+  if (endAt <= startAt || endAt - startAt > 24 * 60 * 60 * 1000) throw new Error("Intervalo livre invalido.");
+  const existing = await getUserActionById(userId, clientActionId);
+  if (existing && (existing.categoryId !== "free_time" || existing.assignee !== assignee
+    || new Date(existing.startAt).getTime() !== startAt.getTime() || new Date(existing.endAt).getTime() !== endAt.getTime())) {
+    throw new Error("Identificador do intervalo já utilizado.");
+  }
+  if (existing && normalizeActionStatus(existing.status) !== ACTION_STATUS_PENDING) return existing;
+  if (!existing) {
+    await assertActionOverlaps(userId, assignee, [{ startAt, endAt }]);
+    await query(`
+      insert into actions (id, user_id, title, assignee, category_id, start_at, end_at, repeat_rule, repeat_days)
+      values ($1::uuid, $2, 'Tempo livre', $3, 'free_time', $4::timestamptz, $5::timestamptz, 'none', '[]'::jsonb)
+      on conflict (id) do nothing
+    `, [clientActionId, userId, assignee, startAt.toISOString(), endAt.toISOString()]);
+  }
+  return updateUserActionStatus(userId, clientActionId, {
+    status: ACTION_STATUS_IN_PROGRESS, startedAt: startAt.toISOString(), occurredAt: startAt.toISOString()
+  });
 }
 
 export async function extendQuickUserAction(userId, actionId, payload = {}) {

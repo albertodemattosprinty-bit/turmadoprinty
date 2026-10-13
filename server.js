@@ -60,7 +60,7 @@ import { buildEventPromoNarration, composeEventPromoVideo, synthesizeEventPromoN
 import { compileProject200ExerciseVideo } from "./src/project200-exercise-video.js";
 import { EVENT_CHURCH_IMAGE_DEFAULTS, generateEventChurchArtwork } from "./src/event-church-artwork.js";
 import { getEventChurchArtworkFile, saveEventChurchArtwork } from "./src/event-church-artwork-store.js";
-import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, getUserActionById, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
+import { createFreeTimeUserAction, createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, getUserActionById, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
 import { clearProject200CurrentTaskState, getProject200CurrentTaskState, saveProject200CurrentTaskState } from "./src/project200-current-task-state.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
@@ -17453,19 +17453,7 @@ const server = http.createServer(async (request, response) => {
       const user = await requireAuth(request, response);
       if (!user) return;
       const body = await readJsonBody(request);
-      const profile = await resolveProject200ProfileName(user.id, String(body?.profile || ""), { fallbackToDefault: true });
-      const created = await createUserAction(user.id, {
-        title: "Tempo livre",
-        assignee: profile,
-        categoryId: "free_time",
-        repeatRule: "none",
-        repeatDays: [],
-        startAt: body?.startAt,
-        endAt: body?.endAt
-      });
-      const action = created[0];
-      if (!action?.id) throw new Error("Não foi possível registrar o intervalo livre.");
-      const startedAction = await updateUserActionStatus(user.id, action.id);
+      const startedAction = await createFreeTimeUserAction(user.id, body);
       sendJson(response, 201, { ok: true, action: startedAction });
     } catch (error) {
       sendJson(response, Number(error?.statusCode) || 400, {
@@ -17554,8 +17542,9 @@ const server = http.createServer(async (request, response) => {
       }
 
       const actionId = decodeURIComponent(pathname.replace(/^\/api\/actions\/([^/]+)\/status$/, "$1"));
+      const body = await readJsonBody(request);
       const beforeAction = await getUserActionById(user.id, actionId);
-      const action = await updateUserActionStatus(user.id, actionId);
+      const action = await updateUserActionStatus(user.id, actionId, body);
       const pointsResult = await syncProject200ActionPoints(user.id, beforeAction, action);
 
       sendJson(response, action ? 200 : 404, {
