@@ -14,7 +14,7 @@ import {
 } from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
-const project200AppVersion = "1.45";
+const project200AppVersion = "1.55";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
 const project200UpdateBypassPassword = "1444";
@@ -2703,7 +2703,7 @@ function muteActionsTaskForToday(actionId) {
 }
 function buildMissionInstallments({ availableOnly = true, nowMs = getServerNowMs() } = {}) {
   const windowState = getActiveTimeWindow(nowMs);
-  return buildMissionScheduleUnits(nowMs).map((unit) => {
+  const scheduled = buildMissionScheduleUnits(nowMs).map((unit) => {
     const completed = Math.max(0, Math.min(unit.target, Math.trunc(Number(unit.goal?.progressValue || 0))));
     return {
       ...unit,
@@ -2713,7 +2713,17 @@ function buildMissionInstallments({ availableOnly = true, nowMs = getServerNowMs
       startAt: new Date(unit.dueAtMs).toISOString(),
       delayMinutes: Math.floor((nowMs - unit.dueAtMs) / 60000)
     };
-  }).filter((entry) => !entry.completed)
+  });
+  const microtasks = getActionsMissionEntries(nowMs).filter((entry) => entry.variant).map(({ goal, variant, title }) => {
+    const dueAtMs = getMissionVariantTiming(variant, nowMs).dueAtMs;
+    return {
+      goal, goalId: String(goal.id), variant, variantId: String(variant.id), title,
+      unitKey: `${goal.id}:${variant.id}`, installmentNumber: 1, target: 1, completed: false,
+      kind: "mission-installment", id: `microtask-${goal.id}-${variant.id}-${windowState.dateKey}`,
+      dueAtMs, startAt: new Date(dueAtMs).toISOString(), delayMinutes: Math.floor((nowMs - dueAtMs) / 60000)
+    };
+  });
+  return [...scheduled, ...microtasks].filter((entry) => !entry.completed)
     .filter((entry) => !isActionsMissionMutedForDate(entry.goalId, windowState.dateKey))
     .filter((entry) => !availableOnly || nowMs >= entry.dueAtMs - (15 * 60000))
     .sort((left, right) => left.dueAtMs - right.dueAtMs || left.title.localeCompare(right.title, "pt-BR"));
@@ -2968,6 +2978,36 @@ function getActionsMissionProgress(goal) {
   };
 }
 
+function getPendingActionsMicrotasks(goal, nowMs = getServerNowMs()) {
+  const variants = Array.isArray(goal?.variants) ? goal.variants : [];
+  return sortMissionVariants(variants.filter((variant) => String(variant?.id || "")
+    && isMissionScheduledForToday(variant, nowMs)
+    && !getMissionVariantTiming(variant, nowMs).completedCycle), "priority");
+}
+
+function getActionsMissionEntries(nowMs = getServerNowMs()) {
+  return (Array.isArray(state.actionMissions) ? state.actionMissions : []).flatMap((goal) => {
+    if (isLimitGoal(goal)) return [];
+    if (isMissionFolder(goal)) {
+      return getPendingActionsMicrotasks(goal, nowMs).map((variant) => ({
+        goal, variant, key: `${goal.id}:${variant.id}`, title: String(variant.title || "Microtarefa")
+      }));
+    }
+    return isMissionScheduledForToday(goal, nowMs)
+      ? [{ goal, variant: null, key: String(goal.id || ""), title: String(goal.title || "Missão") }]
+      : [];
+  });
+}
+
+function openActionsMissionEntry(goalId, variantId = "") {
+  if (!variantId) { openMissionEntryModal(goalId); return; }
+  const goal = (state.actionMissions || []).find((item) => String(item.id) === String(goalId)) || getAvailableMissionById(goalId);
+  const variant = getPendingActionsMicrotasks(goal).find((item) => String(item.id) === String(variantId));
+  if (!goal || !variant) { renderActions(); return; }
+  state.missionRun.availableVariants = Array.isArray(goal.variants) ? goal.variants : [];
+  beginMissionRun(goal, variant);
+}
+
 function animateProgressFillWidth(element, nextPercent, fromPercent = null) {
   if (!element) return;
   const next = Math.max(0, Math.min(100, Number(nextPercent || 0)));
@@ -2998,44 +3038,39 @@ function renderActionsMissionsPanel() {
 
   const previousProgress = new Map(
     [...actionsMissionsList.querySelectorAll("[data-actions-mission-goal-id]")].map((card) => [
-      String(card.dataset.actionsMissionGoalId || ""),
+      String(card.dataset.actionsMissionEntryKey || card.dataset.actionsMissionGoalId || ""),
       Number(card.dataset.progressPercent)
     ])
   );
-  const goals = (Array.isArray(state.actionMissions) ? state.actionMissions : []).filter((goal) => {
-    if (isLimitGoal(goal)) return false;
-    if (isMissionFolder(goal)) return !goal?.variants?.length || goal.variants.some((variant) => isMissionScheduledForToday(variant));
-    return isMissionScheduledForToday(goal);
-  });
+  const entries = getActionsMissionEntries();
   actionsMissionsList.innerHTML = "";
-  if (!goals.length) {
+  if (!entries.length) {
     actionsMissionsList.innerHTML = '<div class="empty-state">Você não tem missões para hoje.</div>';
     return;
   }
 
-  goals.forEach((goal) => {
-    const progress = getActionsMissionProgress(goal);
+  entries.forEach(({ goal, variant, key, title }) => {
+    const progress = variant ? { progress: 0, target: 1, percent: 0 } : getActionsMissionProgress(goal);
     const goalId = String(goal?.id || "");
     const goalIcon = getMissionDisplayIcon(goal);
-    const priorPercent = previousProgress.get(goalId);
+    const priorPercent = previousProgress.get(key);
     const initialPercent = Number.isFinite(priorPercent) ? priorPercent : progress.percent;
     const card = document.createElement("article");
-    const folder = isMissionFolder(goal);
-    const expectation = folder ? { tone: "blue" } : getMissionExpectation(goal);
-    const variantCount = Math.max(0, Number(goal?.variantCount || goal?.variants?.length || 0));
-    card.className = `actions-mission-card mission-expectation-${expectation.tone}${folder ? " is-folder" : ""}`;
+    const expectation = variant ? { tone: "blue" } : getMissionExpectation(goal);
+    card.className = `actions-mission-card mission-expectation-${expectation.tone}`;
     card.dataset.actionsMissionGoalId = goalId;
+    card.dataset.actionsMissionEntryKey = key;
+    if (variant) card.dataset.missionVariantId = String(variant.id);
     card.dataset.progressPercent = String(progress.percent);
     card.setAttribute("role", "button");
     card.tabIndex = 0;
     card.innerHTML = `
       <img class="actions-mission-card-icon" src="${escapeHtml(String(goalIcon?.src || "/200/icons/target.svg"))}" alt="${escapeHtml(String(goalIcon?.alt || "Ícone da missão"))}" />
       <div class="actions-mission-card-copy">
-        <h3>${escapeHtml(String(goal?.title || "Missão"))}${folder ? `<span class="actions-mission-folder-summary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5h7l2 2h9v11H3v-13Zm2 4v7h14v-7H5Z" fill="currentColor"/></svg><small>${variantCount}</small></span>` : ""}</h3>
-        <p>${goal.financialGoal ? `${escapeHtml(formatMoney(goal.financialGoal.progressCents))} de ${escapeHtml(formatMoney(goal.financialGoal.targetAmountCents))}` : folder && variantCount === 0 ? "Clique para criar uma tarefa" : `${progress.progress} de ${progress.target}`}</p>
+        <h3>${escapeHtml(title)}</h3>
+        <p>${variant ? "Pendente" : goal.financialGoal ? `${escapeHtml(formatMoney(goal.financialGoal.progressCents))} de ${escapeHtml(formatMoney(goal.financialGoal.targetAmountCents))}` : `${progress.progress} de ${progress.target}`}</p>
       </div>
-      ${folder ? `<button class="actions-mission-card-edit" type="button" data-actions-mission-folder-edit="${escapeHtml(goalId)}" aria-label="Editar tarefas de ${escapeHtml(String(goal?.title || "Pasta"))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16.5V20h3.5L18 9.5 14.5 6 4 16.5Zm16.7-9.8a1 1 0 0 0 0-1.4l-2-2a1 1 0 0 0-1.4 0L15.5 5.1 19 8.6l1.7-1.9Z" fill="currentColor"/></svg></button>` : ""}
-      <div class="actions-mission-card-track" role="progressbar" aria-label="Progresso de ${escapeHtml(String(goal?.title || "missão"))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}">
+      <div class="actions-mission-card-track" role="progressbar" aria-label="Progresso de ${escapeHtml(title)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}">
         <div class="actions-mission-card-fill" style="width:${initialPercent}%"></div>
       </div>
     `;
@@ -8453,9 +8488,10 @@ function buildActionsDynamicMissionDeckEntries(entries = []) {
     if (!entry?.goal || isLimitGoal(entry.goal)) return;
     const goalId = String(entry.goalId || entry.goal?.id || '').trim();
     if (!goalId) return;
-    const current = byGoalId.get(goalId);
+    const entryKey = `${goalId}:${String(entry.variantId || "")}`;
+    const current = byGoalId.get(entryKey);
     if (!current || Number(entry.dueAtMs || 0) < Number(current.dueAtMs || 0)) {
-      byGoalId.set(goalId, entry);
+      byGoalId.set(entryKey, entry);
     }
   });
   return [...byGoalId.values()]
@@ -8475,6 +8511,17 @@ function createActionsDynamicMissionDeck(entries = []) {
     const visual = getMissionInstallmentVisual(entry.delayMinutes);
     card.classList.add('actions-dynamic-mission-card', visual.className);
     card.dataset.missionGoalId = String(entry.goalId || '');
+    if (entry.variantId) {
+      card.dataset.missionVariantId = String(entry.variantId);
+      const title = card.querySelector('.history-mission-card-title');
+      if (title) title.textContent = entry.title;
+      const progress = card.querySelector('.history-mission-card-progress');
+      if (progress) progress.textContent = 'Pendente';
+      const fill = card.querySelector('.history-mission-progress-fill');
+      if (fill) fill.style.width = '0%';
+      card.dataset.progressPercent = '0';
+      card.classList.remove('has-microtasks');
+    }
     card.dataset.missionInstallment = String(entry.installmentNumber || '');
     card.dataset.missionDeckIndex = String(index + 1);
     card.style.setProperty('--mission-delay-rgb', visual.rgb);
@@ -8552,6 +8599,7 @@ function renderActions() {
       const row = document.createElement("article");
       row.className = `task-row task-mission-dynamic ${visual.className}`;
       row.dataset.missionGoalId = action.goalId;
+      if (action.variantId) row.dataset.missionVariantId = String(action.variantId);
       row.dataset.missionInstallment = String(action.installmentNumber);
       row.style.setProperty("--mission-delay-rgb", visual.rgb);
       row.style.setProperty("--mission-delay-darkness", String(visual.darkness || 0));
@@ -8561,7 +8609,7 @@ function renderActions() {
         ${buildTaskAvatarMarkup(missionIcon.src, missionIcon.alt, { categoryIcon: missionIcon.categoryIcon })}
         <div class="task-main">
           <div class="task-title">${window.project200Projects?.isLinked("mission", action.goalId) ? '<span class="project-star">★</span>' : ""}${escapeHtml(action.title)}</div>
-          <div class="task-assignee task-duration">${action.installmentNumber} de ${action.target}</div>
+          <div class="task-assignee task-duration">${action.variantId ? "Pendente" : `${action.installmentNumber} de ${action.target}`}</div>
         </div>
         <div class="task-time">${formatActionPeriodTime(action.startAt)}</div>
       `;
@@ -8725,8 +8773,8 @@ function refreshActionsTimeSensitiveUi() {
   if (!dynamicMissionDeckActive) return;
   const expectedEntries = buildActionsDynamicMissionDeckEntries(buildMissionInstallments());
   const cards = [...actionsList.querySelectorAll(".actions-dynamic-mission-card")];
-  const expectedIds = expectedEntries.map((entry) => String(entry.goalId || ""));
-  const renderedIds = cards.map((card) => String(card.dataset.missionGoalId || ""));
+  const expectedIds = expectedEntries.map((entry) => `${entry.goalId || ""}:${entry.variantId || ""}`);
+  const renderedIds = cards.map((card) => `${card.dataset.missionGoalId || ""}:${card.dataset.missionVariantId || ""}`);
   if (expectedIds.join("|") !== renderedIds.join("|")) {
     suppressActionsAutoAnchorOnce = true;
     renderActions();
@@ -20558,7 +20606,7 @@ actionsList.addEventListener("click", async (event) => {
   const missionRow = event.target.closest("[data-mission-goal-id]");
   if (missionRow) {
     document.body.classList.add("actions-mission-editor-open");
-    openMissionEntryModal(String(missionRow.dataset.missionGoalId || ""));
+    openActionsMissionEntry(String(missionRow.dataset.missionGoalId || ""), String(missionRow.dataset.missionVariantId || ""));
     return;
   }
   const row = event.target.closest("[data-action-id]");
@@ -20656,7 +20704,7 @@ actionsList.addEventListener("keydown", async (event) => {
   if (missionRow && !event.target.closest("button")) {
     event.preventDefault();
     document.body.classList.add("actions-mission-editor-open");
-    openMissionEntryModal(String(missionRow.dataset.missionGoalId || ""));
+    openActionsMissionEntry(String(missionRow.dataset.missionGoalId || ""), String(missionRow.dataset.missionVariantId || ""));
     return;
   }
   const row = event.target.closest("[data-action-id]");
@@ -22146,7 +22194,7 @@ actionsMissionsList?.addEventListener("click", (event) => {
   const card = event.target.closest("[data-actions-mission-goal-id]");
   if (!card) return;
   document.body.classList.add("actions-mission-editor-open");
-  openMissionEntryModal(String(card.dataset.actionsMissionGoalId || ""));
+  openActionsMissionEntry(String(card.dataset.actionsMissionGoalId || ""), String(card.dataset.missionVariantId || ""));
 });
 
 actionsMissionsList?.addEventListener("keydown", (event) => {
@@ -22155,7 +22203,7 @@ actionsMissionsList?.addEventListener("keydown", (event) => {
   if (!card || event.target.closest("button")) return;
   event.preventDefault();
   document.body.classList.add("actions-mission-editor-open");
-  openMissionEntryModal(String(card.dataset.actionsMissionGoalId || ""));
+  openActionsMissionEntry(String(card.dataset.actionsMissionGoalId || ""), String(card.dataset.missionVariantId || ""));
 });
 toggleAppKeyboardOptionButton?.addEventListener("click", () => {
   state.options.useAppKeyboard = !state.options.useAppKeyboard;
