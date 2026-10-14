@@ -1,4 +1,5 @@
 import { db, query } from "./db.js";
+import { normalizeExerciseRir, mechanicalStrengthPoints, muscleGainMinutesForWorkout } from "../public/200/exercise-series-scoring.js";
 import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 import { ensureExtraGoalsSchema } from "./extra-goals.js";
 import { normalizeProject200MuscleSelections } from "../public/200/exercise-muscles.js";
@@ -106,6 +107,9 @@ function normalizeWorkoutRow(row) {
     equipment: String(row.equipment || ""), status: String(row.status || "active"),
     startedAt: new Date(row.started_at).toISOString(), completedAt: row.completed_at ? new Date(row.completed_at).toISOString() : null,
     durationMinutes: Math.max(0, Number(row.duration_minutes || 0)), steps: Math.max(0, Math.trunc(Number(row.steps || 0) || 0)),
+    restSeconds: Math.max(0, Number(row.rest_seconds || 0)),
+    restStartedAt: row.rest_started_at ? new Date(row.rest_started_at).toISOString() : null,
+    restRevision: Number(row.rest_revision || 0),
     distanceMeters: Math.max(0, Math.trunc(Number(row.distance_meters || 0) || 0)),
     targetSeries: Math.max(0, Math.trunc(Number(row.target_series || 0) || 0)),
     targetReps: Math.max(0, Math.trunc(Number(row.target_reps || 0) || 0)),
@@ -119,7 +123,9 @@ function normalizeWorkoutRow(row) {
     series: (Array.isArray(row.series_items) ? row.series_items : []).map((item) => ({
       seriesNumber: Math.max(1, Math.trunc(Number(item?.seriesNumber || item?.series_number || 1))),
       repetitions: Math.max(0, Math.trunc(Number(item?.repetitions || 0))),
-      targetRepetitions: Math.max(0, Math.trunc(Number(item?.targetRepetitions || item?.target_repetitions || 0)))
+      targetRepetitions: Math.max(0, Math.trunc(Number(item?.targetRepetitions || item?.target_repetitions || 0))),
+      rir: normalizeExerciseRir(item?.rir),
+      mechanicalPoints: mechanicalStrengthPoints(item?.rir)
     }))
   };
 }
@@ -276,6 +282,20 @@ async function prepareProject200WellnessSchema() {
   )`);
   await query(`create index if not exists idx_project200_exercise_series_session on project200_exercise_series(session_id, series_number)`);
   await query(`alter table project200_exercise_series add column if not exists target_repetitions integer not null default 0`);
+  await query(`alter table project200_exercise_series add column if not exists rir integer check (rir between 0 and 100)`);
+  await query(`alter table project200_exercise_sessions add column if not exists rest_seconds integer not null default 0`);
+  await query(`alter table project200_exercise_sessions add column if not exists rest_started_at timestamptz`);
+  await query(`alter table project200_exercise_sessions add column if not exists rest_revision bigint not null default 0`);
+  await query(`create table if not exists project200_mechanical_strength (
+    user_id uuid primary key references users(id) on delete cascade,
+    points bigint not null default 0 check (points >= 0), updated_at timestamptz not null default now()
+  )`);
+  await query(`create table if not exists project200_mechanical_strength_credits (
+    user_id uuid not null references users(id) on delete cascade,
+    session_id uuid not null, series_number integer not null, rir integer not null check (rir between 0 and 100),
+    points integer not null check (points between 0 and 3), credited_at timestamptz not null default now(),
+    primary key (user_id, session_id, series_number)
+  )`);
   await query(`create table if not exists project200_exercise_library (
     user_id uuid not null references users(id) on delete cascade, assigned_profile text not null default 'Usuario',
     exercise_id text not null, exercise_name text not null, category text not null default 'strength',
@@ -370,7 +390,7 @@ async function getActiveWorkoutRow(userId, profileName) {
      left join lateral (
        select count(*)::integer as series_count,
          jsonb_agg(jsonb_build_object('seriesNumber', item.series_number, 'repetitions', item.repetitions,
-           'targetRepetitions', item.target_repetitions) order by item.series_number) as series_items
+           'targetRepetitions', item.target_repetitions, 'rir', item.rir) order by item.series_number) as series_items
        from project200_exercise_series item where item.session_id = session.id
      ) series on true
      where session.user_id = $1 and session.assigned_profile = $2 and session.status = 'active'
@@ -535,6 +555,7 @@ async function syncProject200NutritionControlMissions(userId, profileName, meals
 export async function getProject200WellnessDashboard(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME) {
   await ensureProject200WellnessSchema();
   const profile = normalizeProfileName(profileName);
+  const mechanicalStrength = await getProject200MechanicalStrength(userId);
   const [mealResult, summaryResult, dailyExerciseMetricResult, workoutResult, recentWorkoutResult, preferencesResult, libraryResult, weightResult, assetResult, definitionResult, muscleProgressResult, muscleLifetimeResult] = await Promise.all([
     query(
       `select * from project200_nutrition_entries
@@ -563,10 +584,14 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
     ),
     getActiveWorkoutRow(userId, profile),
     query(
-      `select session.*, coalesce(series.series_count, 0)::integer as series_count
+      `select session.*, coalesce(series.series_count, 0)::integer as series_count,
+         coalesce(series.series_items,'[]'::jsonb) as series_items
        from project200_exercise_sessions session
        left join lateral (
-         select count(*)::integer as series_count from project200_exercise_series item where item.session_id = session.id
+         select count(*)::integer as series_count,
+           jsonb_agg(jsonb_build_object('seriesNumber',item.series_number,'repetitions',item.repetitions,
+             'targetRepetitions',item.target_repetitions,'rir',item.rir) order by item.series_number) as series_items
+         from project200_exercise_series item where item.session_id = session.id
        ) series on true
        where session.user_id = $1 and session.assigned_profile = $2 and session.status = 'completed'
        order by session.completed_at desc limit 8`,
@@ -629,6 +654,7 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
   const bmi = currentWeight && heightCm ? currentWeight.weightKg / ((heightCm / 100) ** 2) : null;
   return {
     profileName: profile,
+    mechanicalStrength,
     today: {
       calories: Math.round(Number(summary.total_calories || 0)),
       qualityScore: clampInteger(mealMissionQuality, 0, 100),
@@ -984,6 +1010,7 @@ export async function startProject200ExerciseSession(userId, payload = {}) {
 }
 export async function updateProject200ExerciseProgress(userId, sessionId, payload = {}) {
   await ensureProject200WellnessSchema();
+  await saveExerciseRestSnapshot(db, userId, sessionId, payload);
   const result = await query(
     `update project200_exercise_sessions
      set steps = greatest(steps, $3), duration_minutes = greatest(duration_minutes, $4),
@@ -999,68 +1026,103 @@ export function normalizeProject200WorkoutSeries(series = []) {
   return (Array.isArray(series) ? series : []).slice(0, 100).map((item, index) => ({
     seriesNumber: clampInteger(item?.seriesNumber ?? item?.series_number ?? index + 1, 1, 100),
     repetitions: clampInteger(item?.repetitions ?? item?.reps, 1, 10000),
-    targetRepetitions: clampInteger(item?.targetRepetitions ?? item?.target_repetitions, 0, 10000)
+    targetRepetitions: clampInteger(item?.targetRepetitions ?? item?.target_repetitions, 0, 10000),
+    rir: normalizeExerciseRir(item?.rir)
   })).filter((item, index, items) => items.findIndex((candidate) => candidate.seriesNumber === item.seriesNumber) === index);
+}
+
+export async function getProject200MechanicalStrength(userId) {
+  const result = await query(`select points from project200_mechanical_strength where user_id=$1`, [userId]);
+  return { points: Math.max(0, Number(result.rows[0]?.points || 0)) };
+}
+
+function normalizeExerciseRestSnapshot(payload = {}) {
+  const hasStart = Object.prototype.hasOwnProperty.call(payload, "restStartedAt");
+  const start = payload.restStartedAt ? new Date(payload.restStartedAt) : null;
+  if (start && Number.isNaN(start.getTime())) throw new Error("Horário de descanso inválido.");
+  return {
+    provided: hasStart || Object.prototype.hasOwnProperty.call(payload, "restSeconds"),
+    seconds: clampInteger(payload.restSeconds, 0, 604800), hasStart,
+    startedAt: start ? start.toISOString() : null,
+    revision: Math.max(0, Math.min(999999999999999, Math.trunc(Number(payload.restRevision || 0))))
+  };
+}
+
+async function saveExerciseRestSnapshot(client, userId, sessionId, payload = {}) {
+  const rest = normalizeExerciseRestSnapshot(payload);
+  if (!rest.provided) return;
+  await client.query(`update project200_exercise_sessions set
+    rest_seconds=greatest(rest_seconds,$3),
+    rest_started_at=case when $4 and rest_revision<=$6 then $5::timestamptz else rest_started_at end,
+    rest_revision=greatest(rest_revision,$6),updated_at=now()
+    where id=$1 and user_id=$2 and status='active'`, [sessionId,userId,rest.seconds,rest.hasStart,rest.startedAt,rest.revision]);
+}
+
+async function persistExerciseSeries(client, userId, sessionId, item) {
+  const result = await client.query(`insert into project200_exercise_series (session_id,user_id,series_number,repetitions,target_repetitions,rir)
+    values ($1,$2,$3,$4,$5,$6)
+    on conflict (session_id,series_number) do update set
+      repetitions=case when project200_exercise_series.rir is null then excluded.repetitions else project200_exercise_series.repetitions end,
+      target_repetitions=case when project200_exercise_series.rir is null then excluded.target_repetitions else project200_exercise_series.target_repetitions end,
+      rir=coalesce(project200_exercise_series.rir,excluded.rir)
+    returning series_number,repetitions,target_repetitions,rir`, [sessionId,userId,item.seriesNumber,item.repetitions,item.targetRepetitions,item.rir]);
+  const saved = result.rows[0];
+  if (saved.rir !== null) {
+    const points = mechanicalStrengthPoints(saved.rir);
+    await client.query(`with credit as (
+      insert into project200_mechanical_strength_credits (user_id,session_id,series_number,rir,points)
+      values ($1,$2,$3,$4,$5) on conflict (user_id,session_id,series_number) do nothing returning points
+    ) insert into project200_mechanical_strength (user_id,points)
+      select $1,points from credit
+      on conflict (user_id) do update set points=project200_mechanical_strength.points+excluded.points,updated_at=now()`,
+      [userId,sessionId,saved.series_number,saved.rir,points]);
+  }
+  return { seriesNumber: saved.series_number, repetitions: saved.repetitions, targetRepetitions: saved.target_repetitions,
+    rir: saved.rir, mechanicalPoints: mechanicalStrengthPoints(saved.rir) };
 }
 
 async function syncProject200ExerciseSeries(userId, sessionId, series = []) {
   const normalized = normalizeProject200WorkoutSeries(series);
   if (!normalized.length) return [];
-  const sessionResult = await query(
-    `select id from project200_exercise_sessions where id = $1 and user_id = $2 and status in ('active', 'completed') and tracking_type = 'series' limit 1`,
-    [sessionId, userId]
-  );
-  if (!sessionResult.rows[0]) throw new Error("Treino ativo nao encontrado.");
-  await query(
-    `insert into project200_exercise_series (session_id, user_id, series_number, repetitions, target_repetitions)
-     select $1, $2, item.series_number, item.repetitions, item.target_repetitions
-     from jsonb_to_recordset($3::jsonb) as item(series_number integer, repetitions integer, target_repetitions integer)
-     on conflict (session_id, series_number) do update set
-       repetitions = excluded.repetitions, target_repetitions = excluded.target_repetitions`,
-    [sessionId, userId, JSON.stringify(normalized.map((item) => ({
-      series_number: item.seriesNumber,
-      repetitions: item.repetitions,
-      target_repetitions: item.targetRepetitions
-    })))]
-  );
-  await query(
-    `update project200_exercise_sessions set
-       total_reps = coalesce((select sum(repetitions) from project200_exercise_series where session_id = $1), 0),
-       updated_at = now()
-     where id = $1 and user_id = $2 and status in ('active', 'completed')`,
-    [sessionId, userId]
-  );
-  return normalized;
+  const client = await db.connect();
+  try {
+    await client.query("begin");
+    const session = await client.query("select id from project200_exercise_sessions where id=$1 and user_id=$2 and status='active' and tracking_type='series' for update", [sessionId,userId]);
+    if (!session.rows[0]) throw new Error("Treino ativo nao encontrado.");
+    for (const item of normalized) await persistExerciseSeries(client,userId,sessionId,item);
+    await client.query("update project200_exercise_sessions set total_reps=(select coalesce(sum(repetitions),0) from project200_exercise_series where session_id=$1),updated_at=now() where id=$1 and user_id=$2",[sessionId,userId]);
+    await client.query("commit");
+    return normalized;
+  } catch (error) { await client.query("rollback"); throw error; }
+  finally { client.release(); }
 }
 
-export async function addProject200ExerciseSeries(userId, sessionId, repetitions, targetRepetitions = 0, requestedSeriesNumber = 0) {
+export async function addProject200ExerciseSeries(userId, sessionId, repetitions, targetRepetitions = 0, requestedSeriesNumber = 0, details = {}) {
   await ensureProject200WellnessSchema();
-  const reps = clampInteger(repetitions, 1, 10000);
-  const target = clampInteger(targetRepetitions, 0, 10000);
-  const sessionResult = await query(
-    `select * from project200_exercise_sessions where id = $1 and user_id = $2 and status = 'active' and tracking_type = 'series' limit 1`,
-    [sessionId, userId]
-  );
-  const session = sessionResult.rows[0];
-  if (!session) throw new Error("Serie ativa nao encontrada.");
-  const suppliedNumber = clampInteger(requestedSeriesNumber, 0, 100);
-  const numberResult = suppliedNumber ? null : await query(`select coalesce(max(series_number), 0) + 1 as next_number from project200_exercise_series where session_id = $1`, [sessionId]);
-  const seriesNumber = suppliedNumber || Math.max(1, Math.trunc(Number(numberResult?.rows[0]?.next_number || 1)));
-  await query(
-    `insert into project200_exercise_series (session_id, user_id, series_number, repetitions, target_repetitions)
-     values ($1, $2, $3, $4, $5)
-     on conflict (session_id, series_number) do update set
-       repetitions = excluded.repetitions, target_repetitions = excluded.target_repetitions`,
-    [sessionId, userId, seriesNumber, reps, target]
-  );
-  await query(
-    `update project200_exercise_sessions set
-       total_reps = coalesce((select sum(repetitions) from project200_exercise_series where session_id = $1), 0),
-       updated_at = now()
-     where id = $1 and user_id = $2 and status = 'active'`,
-    [sessionId, userId]
-  );
-  return { seriesNumber, repetitions: reps, targetRepetitions: target, workout: normalizeWorkoutRow(await getActiveWorkoutRow(userId, session.assigned_profile)) };
+  const rir = normalizeExerciseRir(details.rir);
+  const client = await db.connect();
+  let profile;
+  let saved;
+  try {
+    await client.query("begin");
+    const result = await client.query("select * from project200_exercise_sessions where id=$1 and user_id=$2 and status in ('active','completed') and tracking_type='series' for update", [sessionId,userId]);
+    const session = result.rows[0];
+    if (!session) throw new Error("Serie ativa nao encontrada.");
+    profile=session.assigned_profile;
+    const supplied=clampInteger(requestedSeriesNumber,0,100);
+    if (session.status === "completed") {
+      const existing = supplied ? await client.query("select series_number from project200_exercise_series where session_id=$1 and series_number=$2", [sessionId,supplied]) : null;
+      if (!existing?.rows[0]) throw new Error("Treino já concluído.");
+    }
+    const next=supplied?supplied:Number((await client.query("select coalesce(max(series_number),0)+1 as next_number from project200_exercise_series where session_id=$1",[sessionId])).rows[0].next_number);
+    if (next>100) throw new Error("Limite de séries atingido.");
+    saved=await persistExerciseSeries(client,userId,sessionId,{seriesNumber:next,repetitions:clampInteger(repetitions,1,10000),targetRepetitions:clampInteger(targetRepetitions,0,10000),rir});
+    await saveExerciseRestSnapshot(client,userId,sessionId,details);
+    await client.query("update project200_exercise_sessions set total_reps=(select coalesce(sum(repetitions),0) from project200_exercise_series where session_id=$1),updated_at=now() where id=$1 and user_id=$2",[sessionId,userId]);
+    await client.query("commit");
+  } catch (error) { await client.query("rollback"); throw error; }
+  finally { client.release(); }
+  return {...saved,mechanicalStrength:await getProject200MechanicalStrength(userId),workout:normalizeWorkoutRow(await getActiveWorkoutRow(userId,profile))};
 }
 
 async function creditProject200ExercisePerformance(userId, workoutRow) {
@@ -1095,7 +1157,7 @@ async function creditProject200ExercisePerformance(userId, workoutRow) {
     [workoutRow.id, userId, durationMinutes, metrics.energy, metrics.strength, metrics.resistance]
   );
   const fixedMuscleLoads = defaultProject200ExerciseMuscleLoads({ exerciseId: workoutRow.exercise_id });
-  const gains = calculateProject200TimedMuscleGains(durationMinutes, fixedMuscleLoads.length ? fixedMuscleLoads : definition.muscles);
+  const gains = calculateProject200TimedMuscleGains(muscleGainMinutesForWorkout(workout), fixedMuscleLoads.length ? fixedMuscleLoads : definition.muscles);
   const profile = normalizeProfileName(workoutRow.assigned_profile);
   for (const gain of gains) {
     await query(
@@ -1132,9 +1194,12 @@ export async function finishProject200ExerciseSession(userId, sessionId, payload
   if (currentStatus === "active" && Array.isArray(payload.series) && payload.series.length) {
     await syncProject200ExerciseSeries(userId, sessionId, payload.series);
   }
+  await saveExerciseRestSnapshot(db, userId, sessionId, payload);
   const result = await query(
     `update project200_exercise_sessions
      set status = 'completed', completed_at = now(), steps = greatest(steps, $3), distance_meters = greatest(distance_meters, $4),
+       rest_seconds=rest_seconds+case when rest_started_at is null then 0 else greatest(0,floor(extract(epoch from (now()-rest_started_at))))::integer end,
+       rest_started_at=null,
        duration_minutes = greatest(duration_minutes, case when tracking_type in ('minutes', 'steps', 'gps') then greatest(0, extract(epoch from (now() - started_at)) / 60) else duration_minutes end),
        updated_at = now()
      where id = $1 and user_id = $2 and status = 'active' returning *`,
@@ -1151,8 +1216,10 @@ export async function finishProject200ExerciseSession(userId, sessionId, payload
   if (!workoutRow) throw new Error("Treino ativo nao encontrado.");
   const alreadyCredited = currentStatus === "completed" && [currentResult.rows[0]?.energy_points, currentResult.rows[0]?.strength_points, currentResult.rows[0]?.resistance_points].some((value) => Number(value) > 0);
   if (!alreadyCredited) workoutRow = await creditProject200ExercisePerformance(userId, workoutRow);
-  const countResult = await query(`select count(*)::integer as series_count from project200_exercise_series where session_id = $1`, [sessionId]);
-  return normalizeWorkoutRow({ ...workoutRow, series_count: countResult.rows[0]?.series_count || 0 });
+  const countResult = await query(`select count(*)::integer as series_count,
+    coalesce(jsonb_agg(jsonb_build_object('seriesNumber',series_number,'repetitions',repetitions,'targetRepetitions',target_repetitions,'rir',rir) order by series_number),'[]'::jsonb) as series_items
+    from project200_exercise_series where session_id = $1`, [sessionId]);
+  return normalizeWorkoutRow({ ...workoutRow, ...countResult.rows[0] });
 }
 
 export async function discardProject200ExerciseSession(userId, sessionId) {

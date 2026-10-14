@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
   <link rel="stylesheet" href="/200/quality.css?v=20260906-1" />
   <link rel="stylesheet" href="/200/books.css?v=20260919-reading-rhythm-v2" />
-  <link rel="stylesheet" href="/200/wellness.css?v=20261008-muscle-lifetime-v1" />
+  <link rel="stylesheet" href="/200/wellness.css?v=20261014-rir-no-flash-v1" />
   <link rel="stylesheet" href="/200/wellness-pack.css?v=20260929-exercise-modal-black-v1" />
   <link rel="stylesheet" href="/200/performance.css?v=20260906-scroll-v1" />
   <link rel="stylesheet" href="/200/habit-store.css?v=20261008-v2" />
@@ -2117,6 +2117,10 @@
           <section class="wellness-list-section"><header><div><span>Hoje</span><h2>Suas refeições</h2></div></header><div class="wellness-meal-list" id="wellnessMealList"></div></section>
         </section>
         <section class="wellness-pane" data-wellness-pane="exercises">
+          <button class="wellness-mechanical-attribute" type="button" id="wellnessMechanicalStrength" aria-label="Ver Força Mecânica acumulada">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2c.5 4-3 5.2-3 8.1C8.7 9.3 8 7.7 8.1 6.2 5.7 8.6 4 11.3 4 14.5a8 8 0 0 0 16 0c0-4.6-2.8-8.3-6.5-12.5ZM12 20a3.5 3.5 0 0 1-3.5-3.5c0-1.8 1.4-3.2 2.9-4.7-.1 2 1.4 2.6 2.1 3.6.4-.5.7-1.2.7-2 1 1.1 1.3 2.1 1.3 3.1A3.5 3.5 0 0 1 12 20Z"/></svg>
+            <span>Força Mecânica<strong id="wellnessMechanicalStrengthPoints">0 Pontos</strong></span>
+          </button>
           <section class="wellness-exercise-daily-progress" id="wellnessExerciseDailyProgress" role="button" tabindex="0" aria-label="Ver exercícios do treino diário"><button class="wellness-exercise-daily-play" type="button" id="wellnessExerciseDailyPlay" aria-label="Iniciar o primeiro exercício de hoje"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"/></svg></button><div class="wellness-exercise-daily-copy"><span>Treino diário</span><strong id="wellnessExerciseDailyPercent">0%</strong><small>Toque para ver</small></div><div class="wellness-exercise-daily-track" aria-hidden="true"><i id="wellnessExerciseDailyProgressFill"></i></div></section>
           <section class="wellness-muscle-progress" aria-label="Acompanhamento visual dos músculos treinados">
             <div class="wellness-muscle-map-carousel wellness-muscle-progress-carousel" id="wellnessMuscleProgressMapTrack"></div>
@@ -2315,7 +2319,7 @@
         <article class="wellness-phase-screen wellness-workout-screen">
           <button class="wellness-workout-close" type="button" id="wellnessWorkoutClose" aria-label="Cancelar exercício"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
           <header class="wellness-workout-heading"><span class="wellness-phase-kicker" id="wellnessPhaseLabel">Série 1 de 3</span><h2 id="wellnessPhaseExerciseName">Agachamento</h2></header>
-          <div class="wellness-workout-image-zone"><div class="wellness-workout-image-ring" id="wellnessWorkoutProgressRing" data-fixed-exercise-video-shell><img id="wellnessWorkoutExerciseImage" src="/200/apps/exercicios.png" alt="" /><video id="wellnessWorkoutExerciseVideo" muted loop playsinline preload="metadata" hidden></video><i class="wellness-workout-active-lens" aria-hidden="true"></i><i class="wellness-exercise-video-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z"/></svg></i><i class="wellness-workout-image-flash" aria-hidden="true"></i><div class="wellness-workout-series-timer" id="wellnessWorkoutSeriesTimer" hidden><strong id="wellnessWorkoutSeriesTime">60s</strong><span id="wellnessWorkoutSeriesInstruction">Faça 12 repetições</span></div><div class="wellness-workout-rest" id="wellnessWorkoutRest" hidden><button type="button" id="wellnessWorkoutRestAdd" data-rest-adjust="15" aria-label="Adicionar 15 segundos ao descanso">+15</button><strong id="wellnessWorkoutRestTime">60s</strong><span>Descanse</span><button type="button" id="wellnessWorkoutRestRemove" data-rest-adjust="-15" aria-label="Retirar 15 segundos do descanso">−15</button></div><div class="wellness-workout-gps-readout" id="wellnessWorkoutGpsReadout" hidden aria-live="polite"><button type="button" id="wellnessWorkoutCurrentSpeed" aria-label="Mostrar velocidade atual por 2 segundos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17a8 8 0 1 1 14 0M12 13l4-4"/><circle cx="12" cy="13" r="1.4"/></svg><span>Atual</span></button><div><strong id="wellnessWorkoutGpsValue">0</strong><b id="wellnessWorkoutGpsUnit">m</b><small id="wellnessWorkoutGpsLabel">Distância percorrida</small></div><button type="button" id="wellnessWorkoutAverageSpeed" aria-label="Mostrar velocidade média por 2 segundos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17a8 8 0 1 1 14 0M8 14l2-2m4 0 2 2M12 13V8"/></svg><span>Média</span></button></div><button class="wellness-workout-image-action wellness-workout-add-button" type="button" id="wellnessWorkoutPrimary" aria-label="Registrar movimentos definidos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><button class="wellness-workout-image-action wellness-workout-advance-action" type="button" id="wellnessWorkoutAdvance" aria-label="Pular para o próximo exercício"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M8 25h6v14H8zM50 25h6v14h-6zM14 20h6v24h-6zM44 20h6v24h-6zM20 28h24v8H20z"/></svg></button></div></div><div class="wellness-workout-progress-zone"><div class="wellness-workout-series-status" id="wellnessWorkoutSeriesStatus" aria-label="Séries concluídas"><div class="wellness-workout-series-icons" id="wellnessWorkoutSeriesCount"></div></div><p id="wellnessPhaseUnit"></p></div>
+          <div class="wellness-workout-image-zone"><div class="wellness-workout-image-ring" id="wellnessWorkoutProgressRing" data-fixed-exercise-video-shell><img id="wellnessWorkoutExerciseImage" src="/200/apps/exercicios.png" alt="" /><video id="wellnessWorkoutExerciseVideo" muted loop playsinline preload="metadata" hidden></video><i class="wellness-workout-active-lens" aria-hidden="true"></i><i class="wellness-exercise-video-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z"/></svg></i><div class="wellness-workout-series-timer" id="wellnessWorkoutSeriesTimer" hidden><strong id="wellnessWorkoutSeriesTime">60s</strong><span id="wellnessWorkoutSeriesInstruction">Faça 12 repetições</span></div><div class="wellness-workout-rest" id="wellnessWorkoutRest" hidden><strong id="wellnessWorkoutRestTime">0:00</strong><span>Descansando</span></div><div class="wellness-workout-gps-readout" id="wellnessWorkoutGpsReadout" hidden aria-live="polite"><button type="button" id="wellnessWorkoutCurrentSpeed" aria-label="Mostrar velocidade atual por 2 segundos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17a8 8 0 1 1 14 0M12 13l4-4"/><circle cx="12" cy="13" r="1.4"/></svg><span>Atual</span></button><div><strong id="wellnessWorkoutGpsValue">0</strong><b id="wellnessWorkoutGpsUnit">m</b><small id="wellnessWorkoutGpsLabel">Distância percorrida</small></div><button type="button" id="wellnessWorkoutAverageSpeed" aria-label="Mostrar velocidade média por 2 segundos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17a8 8 0 1 1 14 0M8 14l2-2m4 0 2 2M12 13V8"/></svg><span>Média</span></button></div><button class="wellness-workout-image-action wellness-workout-add-button" type="button" id="wellnessWorkoutPrimary" aria-label="Registrar movimentos definidos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><button class="wellness-workout-image-action wellness-workout-advance-action" type="button" id="wellnessWorkoutAdvance" aria-label="Pular para o próximo exercício"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M8 25h6v14H8zM50 25h6v14h-6zM14 20h6v24h-6zM44 20h6v24h-6zM20 28h24v8H20z"/></svg></button></div></div><div class="wellness-workout-progress-zone"><div class="wellness-workout-series-status" id="wellnessWorkoutSeriesStatus" aria-label="Séries concluídas"><div class="wellness-workout-series-icons" id="wellnessWorkoutSeriesCount"></div></div><p id="wellnessPhaseUnit"></p></div>
           <div class="wellness-workout-finish-zone"><div class="wellness-workout-finish-panel"><button class="wellness-workout-finish-button" type="button" id="wellnessWorkoutFinish" data-workout-action="finish-exercise"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v4a4 4 0 0 1-8 0V4Zm0 2H5v1a4 4 0 0 0 4 4M16 6h3v1a4 4 0 0 1-4 4M12 12v5M8 20h8M9 17h6"/></svg><span>Finalizar exercício</span></button><div class="wellness-workout-next-preview"><button type="button" id="wellnessWorkoutPreviousExercise" aria-label="Ver exercício anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button><div><span>Próximo exercício</span><strong id="wellnessWorkoutNextName">—</strong></div><button type="button" id="wellnessWorkoutNextExercise" aria-label="Ver próximo exercício"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div></div></div>
           <div class="wellness-workout-player-slot" id="wellnessWorkoutPlayerSlot"></div>
         </article>
@@ -2332,6 +2336,27 @@
         </form>
       </div>
 
+      <div class="wellness-phase-layer wellness-rir-layer" id="wellnessRirLayer" hidden>
+        <form class="wellness-phase-screen wellness-rir-form" id="wellnessRirForm">
+          <h2>RIR</h2><p>Quantas repetições a mais poderia fazer?</p>
+          <div class="wellness-rir-selector">
+            <button type="button" id="wellnessRirDecrease" aria-label="Diminuir RIR"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+            <output id="wellnessRirValue" aria-live="polite">2</output>
+            <button type="button" id="wellnessRirIncrease" aria-label="Aumentar RIR"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+          </div>
+          <button class="wellness-phase-primary" type="submit">Confirmar RIR</button>
+          <button class="wellness-phase-secondary" type="button" id="wellnessRirBack">Voltar</button>
+        </form>
+      </div>
+      <div class="wellness-phase-layer wellness-mechanical-layer" id="wellnessMechanicalLayer" hidden>
+        <section class="wellness-phase-screen wellness-mechanical-screen">
+          <h2>Força Mecânica</h2>
+          <svg class="wellness-mechanical-fire" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2c.5 4-3 5.2-3 8.1C8.7 9.3 8 7.7 8.1 6.2 5.7 8.6 4 11.3 4 14.5a8 8 0 0 0 16 0c0-4.6-2.8-8.3-6.5-12.5ZM12 20a3.5 3.5 0 0 1-3.5-3.5c0-1.8 1.4-3.2 2.9-4.7-.1 2 1.4 2.6 2.1 3.6.4-.5.7-1.2.7-2 1 1.1 1.3 2.1 1.3 3.1A3.5 3.5 0 0 1 12 20Z"/></svg>
+          <strong id="wellnessMechanicalTotal" aria-live="polite">0 Pontos</strong>
+          <p id="wellnessMechanicalGain"></p>
+          <button class="wellness-phase-primary" type="button" id="wellnessMechanicalContinue">Continuar</button>
+        </section>
+      </div>
       <div class="wellness-phase-layer" id="wellnessFinishLayer" hidden>
         <form class="wellness-phase-screen wellness-confirm-screen" id="wellnessFinishForm">
           <button class="wellness-phase-close" type="button" id="wellnessFinishBack" aria-label="Voltar ao treino"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
@@ -2405,7 +2430,7 @@
   <script type="module" src="/200/project.js?v=20261013-actions-microtasks-v1"></script>
   <script type="module" src="/200/habit-store.js?v=20261008-v3"></script>
   <script type="module" src="/200/projects.js?v=20261009-continuous-task-voice-v1"></script>
-  <script type="module" src="/200/wellness.js?v=20261008-muscle-lifetime-v1"></script>
+  <script type="module" src="/200/wellness.js?v=20261014-rir-no-flash-v1"></script>
   <script src="/200/books.js?v=20260919-reading-rhythm-v2"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260908-readonly-v1"></script>
