@@ -332,3 +332,20 @@ body[data-background-theme="white"] .wellness-modal{--wellness-phase-bg:radial-g
 @media(max-height:720px){.wellness-workout-complete-3d-slide{height:min(72dvh,480px)}.wellness-workout-complete-model-3d{height:min(35dvh,260px);min-height:175px}}
 .wellness-muscle-progress-3d{height:min(70dvh,680px);min-height:360px}.wellness-muscle-progress-actions{display:flex;justify-content:center;min-height:0;margin-top:2px}.wellness-muscle-progress-actions button{min-height:30px;padding:4px 12px;border:0;border-radius:999px;background:rgba(45,212,191,.09);color:#5eead4;font:750 .72rem "Sora",sans-serif;letter-spacing:.01em;transition:background .2s ease,opacity .2s ease}.wellness-muscle-progress-actions button:active{background:rgba(45,212,191,.18)}.wellness-muscle-progress-actions button[hidden]{display:none}
 @media(max-width:540px){.wellness-muscle-progress-3d{height:min(68dvh,640px);min-height:330px}}
+
+/* Vista manual do corpo e exclusão no editor de treinos. */
+.wellness-muscle-view-controls{display:flex;justify-content:center;gap:8px;margin:8px auto}
+.wellness-muscle-view-controls button{min-height:40px;padding:8px 22px;border:1px solid rgba(94,234,212,.22);border-radius:999px;background:transparent;color:#94a3b8;font:800 .8rem "Sora",sans-serif}
+.wellness-muscle-view-controls button[aria-pressed="true"]{background:rgba(45,212,191,.16);border-color:#5eead4;color:#5eead4}
+.wellness-muscle-view-controls button:focus-visible{outline:2px solid #5eead4;outline-offset:3px}
+.wellness-workout-edit-delete{display:flex;align-items:center;justify-content:center;align-self:center;gap:8px;min-height:44px;margin:12px auto 0;padding:10px 18px;border:1px solid rgba(248,113,113,.3);border-radius:14px;background:rgba(248,113,113,.08);color:#f87171;font:750 .85rem "Sora",sans-serif}
+.wellness-workout-edit-delete svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.wellness-workout-edit-delete:disabled{opacity:.5;cursor:wait}
+/* Conclusão: nome 15%, modelo 70%, pontos 15% da altura visível. */
+#wellnessWorkoutCompleteLayer.is-muscle-stage .wellness-workout-complete-screen{padding:0;gap:0;overflow:hidden}
+#wellnessWorkoutCompleteLayer.is-muscle-stage .wellness-workout-complete-map{width:100%;max-width:none;height:100dvh;max-height:none;flex:none;margin:0}
+#wellnessWorkoutCompleteLayer.is-muscle-stage .wellness-workout-complete-3d-slide{width:100%;height:100%;min-height:0;grid-template-rows:15dvh 70dvh 15dvh;gap:0;align-content:stretch}
+#wellnessWorkoutCompleteLayer.is-muscle-stage .wellness-workout-complete-model-3d{grid-row:2;width:100%;height:100%;min-height:0;max-height:none;margin:0}
+#wellnessWorkoutCompleteLayer.is-muscle-stage .wellness-workout-complete-gain.is-active>span{grid-row:1;align-self:center;margin:0;padding:max(8px,env(safe-area-inset-top)) 64px 8px;white-space:normal;font-size:clamp(1rem,4.5vw,1.75rem)}
+#wellnessWorkoutCompleteLayer.is-muscle-stage .wellness-workout-complete-gain.is-active>strong{grid-row:3;align-self:center;margin:0;padding:0 16px max(18px,env(safe-area-inset-bottom));font-size:clamp(2rem,7dvh,4.25rem)}
+#wellnessWorkoutCompleteLayer.is-muscle-stage .wellness-workout-complete-dots{position:absolute;bottom:max(6px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);margin:0}

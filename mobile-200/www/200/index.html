@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
   <link rel="stylesheet" href="/200/quality.css?v=20260906-1" />
   <link rel="stylesheet" href="/200/books.css?v=20260919-reading-rhythm-v2" />
-  <link rel="stylesheet" href="/200/wellness.css?v=20261015-home-3d-presentation-v2" />
+  <link rel="stylesheet" href="/200/wellness.css?v=20261015-muscle-manual-views-v6" />
   <link rel="stylesheet" href="/200/wellness-pack.css?v=20260929-exercise-modal-black-v1" />
   <link rel="stylesheet" href="/200/performance.css?v=20260906-scroll-v1" />
   <link rel="stylesheet" href="/200/habit-store.css?v=20261008-v2" />
@@ -2123,6 +2123,7 @@
           </button>
           <section class="wellness-exercise-daily-progress" id="wellnessExerciseDailyProgress" role="button" tabindex="0" aria-label="Ver exercícios do treino diário"><button class="wellness-exercise-daily-play" type="button" id="wellnessExerciseDailyPlay" aria-label="Iniciar o primeiro exercício de hoje"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"/></svg></button><div class="wellness-exercise-daily-copy"><span>Treino diário</span><strong id="wellnessExerciseDailyPercent">0%</strong><small>Toque para ver</small></div><div class="wellness-exercise-daily-track" aria-hidden="true"><i id="wellnessExerciseDailyProgressFill"></i></div></section>
           <section class="wellness-muscle-progress" aria-label="Acompanhamento visual dos músculos treinados">
+            <div class="wellness-muscle-view-controls" role="group" aria-label="Lado do corpo"><button type="button" data-muscle-view="front" aria-pressed="true">Frente</button><button type="button" data-muscle-view="back" aria-pressed="false">Costas</button></div>
             <iframe class="wellness-muscle-progress-3d" id="wellnessMuscleProgressMapTrack" data-home-muscle-viewer title="Modelo 3D interativo dos músculos e seus pontos" loading="eager" scrolling="no"></iframe>
             <div class="wellness-muscle-progress-actions"><button type="button" id="wellnessMuscleProgressExercises" hidden>Ver exercícios</button></div>
           </section>
@@ -2364,6 +2365,7 @@
           <div class="wellness-workout-edit-fields" id="wellnessWorkoutEditFields"></div>
           <p class="wellness-workout-edit-status" id="wellnessWorkoutEditStatus" aria-live="polite"></p>
           <button class="wellness-phase-primary" type="submit" id="wellnessWorkoutEditSave">Salvar alterações</button>
+          <button class="wellness-workout-edit-delete" type="button" id="wellnessWorkoutEditDelete"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>Excluir treino</button>
         </form>
       </div>
       <div class="wellness-phase-layer" id="wellnessFinishLayer" hidden>
@@ -2439,7 +2441,7 @@
   <script type="module" src="/200/project.js?v=20261013-actions-microtasks-v1"></script>
   <script type="module" src="/200/habit-store.js?v=20261008-v3"></script>
   <script type="module" src="/200/projects.js?v=20261009-continuous-task-voice-v1"></script>
-  <script type="module" src="/200/wellness.js?v=20261015-muscle-game-points-v5"></script>
+  <script type="module" src="/200/wellness.js?v=20261015-muscle-manual-views-v6"></script>
   <script src="/200/books.js?v=20260919-reading-rhythm-v2"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260908-readonly-v1"></script>

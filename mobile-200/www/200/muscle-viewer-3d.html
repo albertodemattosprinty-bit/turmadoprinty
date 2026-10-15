@@ -102,7 +102,7 @@ const FOCUS_DISTANCE = BASE_DISTANCE / 2; // +100% em ampliação linear (aproxi
 const BASE_AIM = [0,2.06,0];
 let selected=null, angle=0, pitch=.025, distance=BASE_DISTANCE, autorotate=false;
 let focus = [...BASE_AIM], flight = null;
-let homePresentationView='front', homePresentationTimer=null, homePresentationResumeTimer=null;
+let homePresentationView='front', homePresentationResumeTimer=null;
 let musclePointLabels=[];
 let gl, fallbackCtx, shader, sphereIndexLength, posBuf, normBuf, idxBuf, pickFb, pickTexture, depthRb;
 let projectedShapes=[];
@@ -147,7 +147,7 @@ function select(id,move=true,clickedPart=null,side=null,view=null){
  if(move){
    const anchor=FOCUS_ANCHORS[id] || BASE_AIM;
    const center=HOME_PRESENTATION?[0,anchor[1],0]:[...anchor];
-   const targetView=view;
+   const targetView=view||(HOME_PRESENTATION?homePresentationView:null);
    let nextAngle=targetView==='back'?Math.PI:targetView==='side'?Math.PI/2:targetView==='front'?0:m.view;
    let sideX=0;
    if(HOME_PRESENTATION&&SIDE_FOCUS.has(id)){
@@ -177,7 +177,7 @@ function select(id,move=true,clickedPart=null,side=null,view=null){
    flyTo(nextAngle,center,FOCUS_DISTANCE,.025);
  }
  stage.dispatchEvent(new CustomEvent('ilife:muscle-select',{
-   bubbles:true,detail:{id:m.id,name:m.name,view:view||(m.view===Math.PI?'back':'front'),side:clickedPart && SIDE_FOCUS.has(id)
+   bubbles:true,detail:{id:m.id,name:m.name,view:view||(HOME_PRESENTATION?homePresentationView:m.view===Math.PI?'back':'front'),side:clickedPart && SIDE_FOCUS.has(id)
      ?(clickedPart.mat[12]>0?'right':'left'):side||null}
  }));
  draw();
@@ -197,21 +197,17 @@ function flyTo(nextAngle,nextFocus=focus,nextDistance=distance,nextPitch=pitch){
    angle=flight.to.angle;pitch=nextPitch;distance=nextDistance;focus=[...nextFocus];flight=null;draw();
  }
 }
-function startHomePresentation(){
- if(!HOME_PRESENTATION||homePresentationTimer)return;
- homePresentationTimer=window.setInterval(()=>{
-   homePresentationView=homePresentationView==='front'?'back':'front';
-   flyTo(homePresentationView==='back'?Math.PI:0,BASE_AIM,BASE_DISTANCE,.025);
- },1500);
+function setHomeView(view){
+ if(view!=='front'&&view!=='back')return false;
+ if(homePresentationResumeTimer)window.clearTimeout(homePresentationResumeTimer);
+ homePresentationResumeTimer=null;homePresentationView=view;selected=null;
+ flyTo(view==='back'?Math.PI:0,BASE_AIM,BASE_DISTANCE,.025);
+ draw();return true;
 }
 function pauseHomePresentationForFocus(){
- if(homePresentationTimer){window.clearInterval(homePresentationTimer);homePresentationTimer=null;}
  if(homePresentationResumeTimer)window.clearTimeout(homePresentationResumeTimer);
  homePresentationResumeTimer=window.setTimeout(()=>{
-   selected=null;
-   homePresentationView=Math.abs(normalizeAngle(angle))<Math.PI/2?'front':'back';
-   flyTo(homePresentationView==='back'?Math.PI:0,BASE_AIM,BASE_DISTANCE,.025);
-   homePresentationResumeTimer=window.setTimeout(()=>{homePresentationResumeTimer=null;startHomePresentation();},1050);
+   setHomeView(homePresentationView);
  },4000);
 }
 function normalizeAngle(a){return ((a+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI}
@@ -223,6 +219,7 @@ function viewLabel(){
  for(const label of musclePointLabels){
    const node=label.node,anchor=label.anchor;
    if(!anchor){node.hidden=true;continue;}
+   if(HOME_PRESENTATION&&label.view!==homePresentationView){node.hidden=true;continue;}
    const facing=(label.view==='back'?-1:1)*Math.cos(angle);
    if(facing<.10){node.hidden=true;continue;}
    const x=root[0]*anchor[0]+root[4]*anchor[1]+root[8]*anchor[2]+root[12];
@@ -251,7 +248,7 @@ function setMuscleLabels(labels){
  });
  draw();return true;
 }
-function resetView(){selected=null;if(homePresentationResumeTimer){window.clearTimeout(homePresentationResumeTimer);homePresentationResumeTimer=null;}if(HOME_PRESENTATION){homePresentationView='front';flyTo(0,BASE_AIM,BASE_DISTANCE,.025);if(homePresentationTimer)window.clearInterval(homePresentationTimer);homePresentationTimer=null;startHomePresentation();return;}flyTo(0,BASE_AIM,BASE_DISTANCE,.025)}
+function resetView(){selected=null;if(HOME_PRESENTATION){setHomeView(homePresentationView);return;}flyTo(0,BASE_AIM,BASE_DISTANCE,.025)}
 // API pública para o Codex/iLife usar de forma imperativa SEM renderizar controles:
 // window.iLifeMuscle3D.focusMuscle('abs');
 // window.iLifeMuscle3D.focusMuscle('biceps', 'right');
@@ -260,7 +257,7 @@ function resetView(){selected=null;if(homePresentationResumeTimer){window.clearT
 window.iLifeMuscle3D=Object.freeze({
  focusMuscle:(id,side=null,view=null)=>select(id,true,null,side,view),
  reset:resetView,
- setView:(view)=>{if(HOME_PRESENTATION)return false;const a=view==='front'?0:view==='back'?Math.PI:view==='side'?Math.PI/2:null;if(a===null)return false;flyTo(a);return true},
+ setView:(view)=>{if(HOME_PRESENTATION)return setHomeView(view);const a=view==='front'?0:view==='back'?Math.PI:view==='side'?Math.PI/2:null;if(a===null)return false;flyTo(a);return true},
  zoomBy:(delta)=>{if(HOME_PRESENTATION)return false;flight=null;distance=clamp(distance+delta,2.4,14);draw()},
  getSelected:()=>selected,
  getMuscles:()=>muscles.map(({id,name,latin,color,group})=>({id,name,latin,color,group})),
@@ -487,7 +484,7 @@ function animate(t){
  else if(colorAnimating)draw();
  animID=requestAnimationFrame(animate);
 }
-try{initGL();draw();animID=requestAnimationFrame(animate);startHomePresentation()}catch(ex){error.hidden=false;error.textContent=ex.message||'Não foi possível carregar o modelo 3D.';console.error(ex);}
+try{initGL();draw();animID=requestAnimationFrame(animate)}catch(ex){error.hidden=false;error.textContent=ex.message||'Não foi possível carregar o modelo 3D.';console.error(ex);}
 })();
 
 </script>
