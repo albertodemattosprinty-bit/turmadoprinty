@@ -359,6 +359,13 @@ body[data-background-theme="white"] .wellness-modal{--wellness-phase-bg:radial-g
 .wellness-rir-selector output{min-width:140px;color:#fff;text-shadow:0 7px 24px rgba(249,115,22,.22)}
 .wellness-rir-selector button{width:58px;height:66px;border:1px solid rgba(251,146,60,.34);border-radius:50%;background:rgba(249,115,22,.1);color:#fdba74}
 .wellness-rir-selector button:active{transform:scale(.94);background:rgba(249,115,22,.22)}
+.wellness-rir-form>.wellness-phase-primary{width:min(100%,360px);min-height:56px;margin-top:16px;background:#f97316;color:#fff;box-shadow:0 12px 28px rgba(249,115,22,.25)}
 .wellness-rir-footer{width:min(100%,360px);margin-top:auto;display:grid;gap:16px}
 .wellness-rir-footer p{margin:0;color:#fff;font:800 clamp(1.2rem,5vw,1.65rem)/1.18 "Sora",sans-serif}
-.wellness-rir-footer .wellness-phase-primary{width:100%;min-height:56px;background:#f97316;color:#fff;box-shadow:0 12px 28px rgba(249,115,22,.25)}
+@keyframes wellness-rir-enter{from{opacity:0;transform:translateY(16px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+.wellness-rir-mechanical-mark{animation:wellness-rir-enter .32s cubic-bezier(.2,.9,.3,1) both}
+.wellness-rir-kicker,.wellness-rir-form h2{animation:wellness-rir-enter .34s .08s cubic-bezier(.2,.9,.3,1) both}
+.wellness-rir-selector{animation:wellness-rir-enter .38s .16s cubic-bezier(.2,.9,.3,1) both}
+.wellness-rir-form>.wellness-phase-primary{animation:wellness-rir-enter .38s .24s cubic-bezier(.2,.9,.3,1) both}
+.wellness-rir-footer{animation:wellness-rir-enter .4s .32s cubic-bezier(.2,.9,.3,1) both}
+@media (prefers-reduced-motion:reduce){.wellness-rir-mechanical-mark,.wellness-rir-kicker,.wellness-rir-form h2,.wellness-rir-selector,.wellness-rir-form>.wellness-phase-primary,.wellness-rir-footer{animation:none}}
