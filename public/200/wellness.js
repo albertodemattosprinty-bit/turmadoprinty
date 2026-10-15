@@ -511,7 +511,7 @@ function refreshMuscleProgressMap(){
 }
 function renderMuscleProgressMap(){
   if(!elements.muscleProgressMapTrack)return;
-  if(!elements.muscleProgressMapTrack.getAttribute("src"))elements.muscleProgressMapTrack.src="/200/muscle-viewer-3d.html?mode=home&v=20261015-muscle-manual-views-v6";
+  if(!elements.muscleProgressMapTrack.getAttribute("src"))elements.muscleProgressMapTrack.src="/200/muscle-viewer-3d.html?mode=home&v=20261015-muscle-scroll-v7";
   bindHomeMuscleViewer(elements.muscleProgressMapTrack);
   refreshMuscleProgressMap();
 }
@@ -1347,11 +1347,11 @@ async function animateWorkoutMuscles(snapshot,runId){
     for(const gain of mapGains){
       if(state.completionRunId!==runId)return;setActiveCompletionMuscle(gain);
       const viewerId=gain.dataset.viewerMuscleId,view=gain.dataset.viewerView||null,focused=viewer&&viewerId?viewer.focusMuscle(viewerId,null,view):false;
-      if(focused){await waitForCompletionTime(1000);if(state.completionRunId!==runId)return;viewer.animateMuscleColor(viewerId,gain.dataset.heatColor,1200);}
-      await Promise.all([animateCompletionMuscleNumber(gain.querySelector("[data-muscle-gain-number]"),1200,runId),focused?waitForCompletionTime(1200):Promise.resolve()]);
+      if(focused){await waitForCompletionTime(1000);if(state.completionRunId!==runId)return;viewer.animateMuscleColor(viewerId,gain.dataset.heatColor,750);}
+      await Promise.all([animateCompletionMuscleNumber(gain.querySelector("[data-muscle-gain-number]"),750,runId),focused?waitForCompletionTime(750):Promise.resolve()]);
       if(state.completionRunId!==runId)return;
     }
-    await waitForCompletionTime(220);
+    await waitForCompletionTime(80);
   }
   await waitForCompletionTime(420);
 }
@@ -1427,7 +1427,6 @@ async function submitFood(event){ event.preventDefault(); const description=Stri
 byId("wellnessRirForm")?.addEventListener("submit",confirmRir);
 byId("wellnessRirDecrease")?.addEventListener("click",()=>changeRir(-1));
 byId("wellnessRirIncrease")?.addEventListener("click",()=>changeRir(1));
-byId("wellnessRirBack")?.addEventListener("click",()=>{state.rirPending=false;showLayer(elements.workoutLayer);renderWorkout();});
 byId("wellnessMechanicalContinue")?.addEventListener("click",()=>{if(state.workout){showLayer(elements.workoutLayer);renderWorkout();}else hideLayers();});
 byId("wellnessMechanicalStrength")?.addEventListener("click",()=>{renderMechanicalSummary(0);showLayer(elements.mechanicalLayer);});
 window.addEventListener("project200:offline-mutation-synced",(event)=>{const detail=event.detail||{},match=String(detail.path||"").match(/\/exercises\/([^/]+)\/series/);if(match)confirmMechanicalStrength(detail.payload,decodeURIComponent(match[1]),detail.payload?.seriesNumber);});
@@ -1487,6 +1486,11 @@ document.querySelectorAll("[data-muscle-view]").forEach((button)=>button.addEven
   homeSelectedMuscleIds=[];homeSelectedMuscleName="";
   if(elements.muscleProgressExercisesButton)elements.muscleProgressExercisesButton.hidden=true;
 }));
+window.addEventListener("message",(event)=>{
+  if(event.origin!==location.origin||event.data?.type!=="ilife:home-muscle-scroll"||event.source!==elements.muscleProgressMapTrack?.contentWindow)return;
+  const deltaY=Number(event.data.deltaY||0);if(!Number.isFinite(deltaY)||!deltaY)return;
+  elements.muscleProgressMapTrack.closest(".wellness-pane")?.scrollBy({top:deltaY,behavior:"instant"});
+});
 elements.muscleProgressExercisesButton?.addEventListener("click",()=>{if(homeSelectedMuscleIds.length)renderMuscleExercises(homeSelectedMuscleIds,"dashboard",homeSelectedMuscleName);});
 elements.muscleMapTrack?.addEventListener("scroll",()=>{ const width=Math.max(1,elements.muscleMapTrack.clientWidth),index=Math.max(0,Math.min(PROJECT200_MUSCLE_MAPS.length-1,Math.round(elements.muscleMapTrack.scrollLeft/width))); [...elements.muscleMapDots.children].forEach((dot,dotIndex)=>dot.classList.toggle("is-active",dotIndex===index)); },{passive:true});
 byId("wellnessMuscleExercisesClose")?.addEventListener("click",()=>{ if(state.muscleReturnView==="dashboard")hideLayers(); else openExerciseDetail(state.selectedExercise,state.detailMode); });

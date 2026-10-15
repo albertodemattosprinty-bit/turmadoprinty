@@ -36,7 +36,7 @@
     display:block; width:100%; height:100%; cursor:grab; touch-action:none;
     outline:none;
   }
-  #ilife-muscle-viewer[data-home-presentation="true"] canvas {cursor:pointer;}
+  #ilife-muscle-viewer[data-home-presentation="true"] canvas {cursor:pointer;touch-action:none;}
   #ilife-muscle-viewer canvas:active {cursor:grabbing;}
   #ilife-muscle-viewer canvas:focus-visible {outline:2px solid #88eadc;outline-offset:-2px;}
   #musclePointLabels {position:absolute;inset:0;overflow:hidden;pointer-events:none;}
@@ -414,16 +414,25 @@ function pick(evt){
  if(group)select(group,true,partMap.get(id)||null);
  draw();
 }
-const pointers=new Map();let gestureMoved=false,lastTap=0;
+const pointers=new Map();let gestureMoved=false,lastTap=0,homeVerticalScroll=false;
 canvas.addEventListener('pointerdown',evt=>{
  pointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY,startX:evt.clientX,startY:evt.clientY});
  canvas.setPointerCapture(evt.pointerId);if(!HOME_PRESENTATION)flight=null;
  if(pointers.size>=2)gestureMoved=true;
+ if(pointers.size===1)homeVerticalScroll=false;
 });
 canvas.addEventListener('pointermove',evt=>{
  let p=pointers.get(evt.pointerId);if(!p)return;
  const dx=evt.clientX-p.x,dy=evt.clientY-p.y;
- if(Math.hypot(evt.clientX-p.startX,evt.clientY-p.startY)>5)gestureMoved=true;
+ const totalX=evt.clientX-p.startX,totalY=evt.clientY-p.startY;
+ if(Math.hypot(totalX,totalY)>5)gestureMoved=true;
+ if(HOME_PRESENTATION&&pointers.size===1){
+   if(!homeVerticalScroll&&Math.abs(totalY)>8&&Math.abs(totalY)>Math.abs(totalX))homeVerticalScroll=true;
+   if(homeVerticalScroll){
+     window.parent.postMessage({type:'ilife:home-muscle-scroll',deltaY:-dy},location.origin);
+     p.x=evt.clientX;p.y=evt.clientY;return;
+   }
+ }
  if(pointers.size===1){
    if(gestureMoved&&!HOME_PRESENTATION){angle+=dx*.011;pitch=clamp(pitch+dy*.006,-.50,.50);stopAuto();draw()}
  } else if(pointers.size===2){
@@ -442,9 +451,9 @@ canvas.addEventListener('pointerup',evt=>{
    else {lastTap=now;pick(evt)}
  }
  pointers.delete(evt.pointerId);
- if(pointers.size===0)gestureMoved=false;
+ if(pointers.size===0){gestureMoved=false;homeVerticalScroll=false;}
 });
-canvas.addEventListener('pointercancel',evt=>{pointers.delete(evt.pointerId);if(!pointers.size)gestureMoved=false});
+canvas.addEventListener('pointercancel',evt=>{pointers.delete(evt.pointerId);if(!pointers.size){gestureMoved=false;homeVerticalScroll=false;}});
 canvas.addEventListener('wheel',evt=>{evt.preventDefault();if(HOME_PRESENTATION)return;flight=null;distance=clamp(distance+Math.sign(evt.deltaY)*.45,2.4,14);draw()},{passive:false});
 canvas.addEventListener('keydown',evt=>{
  if(HOME_PRESENTATION){evt.preventDefault();return;}
