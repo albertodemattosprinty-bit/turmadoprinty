@@ -41,7 +41,7 @@
   #ilife-muscle-viewer canvas:focus-visible {outline:2px solid #88eadc;outline-offset:-2px;}
   #musclePointLabels {position:absolute;inset:0;overflow:hidden;pointer-events:none;user-select:none;-webkit-user-select:none;}
   #musclePointLabels span {
-    position:absolute;transform:translate(-50%,-50%);color:#f8ffff;
+    position:absolute;left:0;top:0;transform:translate3d(-50%,-50%,0);color:#f8ffff;
     font:800 15.6px/1 "Exo 2","Sora",system-ui,sans-serif;
     font-variant-numeric:tabular-nums;letter-spacing:-.035em;
     -webkit-text-stroke:.025em #c5e6ed;
@@ -50,7 +50,7 @@
       .065em .08em 0 #547787,.095em .12em 0 #304957,
       .12em .16em 0 #172c38,.14em .20em .09em #000,
       0 0 .22em #000,0 0 .45em rgba(34,211,238,.38);
-    white-space:nowrap;will-change:left,top,font-size;
+    white-space:nowrap;contain:layout style paint;will-change:transform,opacity,font-size;
   }
   .ilife-viewer-error {position:absolute;inset:20% 10% auto;padding:14px;
     font:14px/1.5 sans-serif;text-align:center;color:#fff;background:#29354b;
@@ -229,7 +229,12 @@ function viewLabel(){
    const clipX=vp[0]*x+vp[4]*y+vp[8]*z+vp[12],clipY=vp[1]*x+vp[5]*y+vp[9]*z+vp[13],clipW=vp[3]*x+vp[7]*y+vp[11]*z+vp[15];
    if(clipW<=0){node.hidden=true;continue;}
    const nx=clipX/clipW,ny=clipY/clipW;node.hidden=nx< -1||nx>1||ny< -1||ny>1;
-   if(!node.hidden){node.style.left=`${(nx+1)*50}%`;node.style.top=`${(1-ny)*50}%`;node.style.opacity=String(clamp((facing-.10)/.35,.25,1));node.style.fontSize=`${15.6*clamp(BASE_DISTANCE/clipW,.72,3.25)}px`;}
+   if(!node.hidden){
+     const pointX=(nx+1)*width*.5,pointY=(1-ny)*height*.5;
+     node.style.transform=`translate3d(${pointX}px,${pointY}px,0) translate(-50%,-50%)`;
+     node.style.opacity=String(clamp((facing-.10)/.35,.25,1));
+     node.style.fontSize=`${15.6*clamp(BASE_DISTANCE/clipW,.72,3.25)}px`;
+   }
  }
 }
 function setMuscleLabels(labels){

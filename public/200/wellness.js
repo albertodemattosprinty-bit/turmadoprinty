@@ -518,7 +518,7 @@ function refreshMuscleProgressMap(){
 }
 function renderMuscleProgressMap(){
   if(!elements.muscleProgressMapTrack)return;
-  if(!elements.muscleProgressMapTrack.getAttribute("src"))elements.muscleProgressMapTrack.src="/200/muscle-viewer-3d.html?mode=home&v=20261015-muscle-touch-clean-v8";
+  if(!elements.muscleProgressMapTrack.getAttribute("src"))elements.muscleProgressMapTrack.src="/200/muscle-viewer-3d.html?mode=home&v=20261015-muscle-labels-gpu-v9";
   bindHomeMuscleViewer(elements.muscleProgressMapTrack);
   refreshMuscleProgressMap();
 }
@@ -1285,7 +1285,7 @@ function workoutCompletionMapMarkup(snapshot){
     const muscle=PROJECT200_MUSCLE_BY_ID[muscleId],progress=snapshot.progress.get(muscleId),target=WORKOUT_COMPLETION_3D_MUSCLE_BY_ID[muscleId]||{},from=completionDisplayPoints(snapshot.beforeProgress.get(muscleId)),to=completionDisplayPoints(progress?.points);
     return `<button class="wellness-workout-complete-gain" type="button" aria-pressed="false" data-completion-muscle-id="${escapeHtml(muscleId)}" data-completion-map-index="${index}" data-viewer-muscle-id="${escapeHtml(target.id||"")}" data-viewer-view="${escapeHtml(target.view||"")}" data-heat-color="${completionMuscleHeatHex(progress)}"><span>${escapeHtml(muscle?.name||muscleId)}</span><strong><em class="wellness-workout-complete-prefix">+</em><b data-muscle-gain-number data-from="${from}" data-to="${to}">${from}</b><em>PTS</em></strong></button>`;
   }).join("");
-  return `<section class="wellness-muscle-map-slide wellness-workout-complete-3d-slide" aria-label="Músculos treinados"><div class="wellness-workout-complete-gains">${gainsMarkup}</div><iframe class="wellness-workout-complete-model-3d" data-workout-completion-3d title="Modelo 3D dos músculos treinados" src="/200/muscle-viewer-3d.html?v=20261015-muscle-manual-views-v6" loading="eager" scrolling="no"></iframe></section>`;
+  return `<section class="wellness-muscle-map-slide wellness-workout-complete-3d-slide" aria-label="Músculos treinados"><div class="wellness-workout-complete-gains">${gainsMarkup}</div><iframe class="wellness-workout-complete-model-3d" data-workout-completion-3d title="Modelo 3D dos músculos treinados" src="/200/muscle-viewer-3d.html?v=20261015-muscle-labels-gpu-v9" loading="eager" scrolling="no"></iframe></section>`;
 }
 function prepareWorkoutCompletion(snapshot){
   const runId=++state.completionRunId; elements.completeName.textContent=snapshot.name;elements.completeName.classList.toggle("is-long",snapshot.name.length>10||snapshot.name.trim().includes(" ")); configureFixedExerciseMedia(elements.completePortrait,elements.completeImage,elements.completeVideo,snapshot.exercise,{movementOnly:true}); elements.completeImage.alt=`${snapshot.name} concluído`; elements.completeProgressFill.style.width=`${Math.min(100,(snapshot.progressFrom/Math.max(1,snapshot.progressMax))*100)}%`;elements.completeProgressFill.dataset.level=String(snapshot.progressFrom);elements.completeProgressText.textContent=`${snapshot.progressLabel} ${snapshot.progressFrom}%`; elements.completeDots.innerHTML=snapshot.maps.map((_,index)=>`<i class="${index===0?"is-active":""}"></i>`).join(""); elements.completeMap.classList.remove("is-revealed"); elements.completeMap.innerHTML=snapshot.maps[0]?workoutCompletionMapMarkup(snapshot,snapshot.maps[0]):"";if(elements.completeMetricStage)elements.completeMetricStage.hidden=true; elements.completeLayer.classList.remove("is-muscle-stage","is-metric-stage","is-portrait-exiting","is-approved"); elements.completeLayer.classList.add("is-portrait-stage"); showLayer(elements.completeLayer); if(!elements.completeVideo?.hidden){elements.completeVideo.currentTime=0;void elements.completeVideo.play().catch(()=>{});} return runId;
@@ -1345,8 +1345,13 @@ async function animateWorkoutMuscles(snapshot,runId){
   elements.completeLayer.classList.remove("is-metric-stage");elements.completeLayer.classList.add("is-muscle-stage");
   if(!snapshot.maps.length){await waitForCompletionTime(420);return;}
   await waitForCompletionFrame();if(state.completionRunId!==runId)return;elements.completeMap.classList.add("is-revealed");
-  const viewer=await waitForCompletionMuscleViewer();if(state.completionRunId!==runId)return;viewer?.resetColors();viewer?.reset();
   const gains=[...elements.completeMap.querySelectorAll("[data-completion-muscle-id]")];
+  const viewer=await waitForCompletionMuscleViewer();if(state.completionRunId!==runId)return;
+  const labelsByMuscle=new Map();gains.forEach((gain)=>{
+    const id=gain.dataset.viewerMuscleId,view=gain.dataset.viewerView||"front",counter=gain.querySelector("[data-muscle-gain-number]");
+    const value=String(counter?.dataset.to??"").trim();if(id&&value)labelsByMuscle.set(`${id}:${view}`,{id,view,value});
+  });
+  viewer?.setMuscleLabels([...labelsByMuscle.values()]);viewer?.resetColors();viewer?.reset();
   for(let index=0;index<snapshot.maps.length;index+=1){
     if(state.completionRunId!==runId)return;
     [...elements.completeDots.children].forEach((dot,dotIndex)=>dot.classList.toggle("is-active",dotIndex===index));
