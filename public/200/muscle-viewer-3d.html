@@ -112,16 +112,18 @@ const FOCUS_ANCHORS = {
  hamstrings:[0,1.67,-.24], adductors:[0,1.67,.15],
  calves:    [0,.76,-.17], shins:     [0,.73,.18]
 };
+// Pontos na superfície dos músculos de buildBody(), independentes do eixo da câmera.
+// Cada grupo mantém um único total; os lados alternados evitam sobreposição.
 const LABEL_ANCHORS = {
- chest:{front:[0,3.55,.53]}, delts:{front:[0,3.58,.28],back:[0,3.58,-.29]},
- biceps:{front:[0,3.11,.31]}, triceps:{back:[0,3.11,-.31]},
- forearms:{front:[0,2.50,.27],back:[0,2.50,-.25]}, traps:{back:[0,3.82,-.32]},
- lats:{back:[0,3.19,-.42]}, rhomboids:{back:[0,3.59,-.43]},
- abs:{front:[0,3.01,.49]}, obliques:{front:[0,2.93,.37]},
- serratus:{front:[0,3.30,.36]}, lowerback:{back:[0,2.93,-.46]},
- glutes:{back:[0,2.20,-.43]}, quads:{front:[0,1.63,.43]},
- hamstrings:{back:[0,1.67,-.38]}, adductors:{front:[0,1.67,.29]},
- calves:{back:[0,.76,-.30]}, shins:{front:[0,.73,.31]}
+ chest:{front:[.394,3.547,.537]}, delts:{front:[-.884,3.58,.292],back:[-.884,3.58,-.268]},
+ biceps:{front:[1.106,3.113,.307]}, triceps:{back:[1.118,3.112,-.286]},
+ forearms:{front:[-1.217,2.514,.281],back:[-1.215,2.481,-.208]}, traps:{back:[.412,3.825,-.380]},
+ lats:{back:[.505,3.190,-.463]}, rhomboids:{back:[-.246,3.585,-.447]},
+ abs:{front:[.174,3.010,.480]}, obliques:{front:[.532,2.930,.393]},
+ serratus:{front:[-.615,3.303,.356]}, lowerback:{back:[-.164,2.932,-.452]},
+ glutes:{back:[.343,2.197,-.488]}, quads:{front:[.438,1.628,.444]},
+ hamstrings:{back:[.418,1.672,-.403]}, adductors:{front:[-.257,1.670,.282]},
+ calves:{back:[.444,.726,-.327]}, shins:{front:[.451,.730,.301]}
 };
 // Apenas grupos laterais são focados por lado quando tocados.
 // Reto abdominal usa sempre a âncora CENTRAL, mesmo se um gomo for tocado.
@@ -137,6 +139,12 @@ function select(id,move=true,clickedPart=null,side=null,view=null){
    const targetView=view;
    let nextAngle=targetView==='back'?Math.PI:targetView==='side'?Math.PI/2:targetView==='front'?0:m.view;
    let sideX=0;
+   if(HOME_PRESENTATION&&SIDE_FOCUS.has(id)){
+     const selectedSide=clickedPart?Math.sign(clickedPart.mat[12]):side==='right'?1:side==='left'?-1:0;
+     // Gira 30° para expor o lado tocado, mantendo o pivô no tronco.
+     const facingDirection=Math.cos(nextAngle)>=0?1:-1;
+     nextAngle-=selectedSide*facingDirection*30*rad;
+   }
    if(SIDE_FOCUS.has(id)&&!HOME_PRESENTATION){
      if(clickedPart){ sideX=clickedPart.mat[12]; center[0]=sideX; }
      else if(side==='left'||side==='right'){
