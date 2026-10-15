@@ -64,7 +64,7 @@ import { createFreeTimeUserAction, createQuickUserAction, createUserAction, dele
 import { clearProject200CurrentTaskState, getProject200CurrentTaskState, saveProject200CurrentTaskState } from "./src/project200-current-task-state.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
-import { addProject200ExerciseSeries, addProject200ExerciseToLibrary, approveProject200ExercisePlan, createProject200NutritionEntry, createProject200WeightEntry, deleteProject200CompletedExerciseSession, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, listProject200ExerciseLoadHistory, normalizeProject200ExerciseDefinition, removeProject200ExerciseFromLibrary, reorderProject200ExerciseLibrary, saveProject200ExerciseAssets, saveProject200ExerciseDefinitions, saveProject200ExerciseThumbnailAsset, saveProject200ExerciseVideoAsset, setProject200ExerciseLoad, startProject200ExerciseSession, syncProject200ExerciseMission, updateProject200ExerciseProgress, updateProject200MealSlots, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
+import { addProject200ExerciseSeries, addProject200ExerciseToLibrary, approveProject200ExercisePlan, createProject200NutritionEntry, createProject200WeightEntry, deleteProject200CompletedExerciseSession, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, listProject200ExerciseLoadHistory, normalizeProject200ExerciseDefinition, removeProject200ExerciseFromLibrary, reorderProject200ExerciseLibrary, saveProject200ExerciseAssets, saveProject200ExerciseDefinitions, saveProject200ExerciseThumbnailAsset, saveProject200ExerciseVideoAsset, setProject200ExerciseLoad, startProject200ExerciseSession, syncProject200ExerciseMission, updateProject200CompletedExerciseSession, updateProject200ExerciseProgress, updateProject200MealSlots, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
 import { PROJECT200_MUSCLES, PROJECT200_MUSCLE_IDS } from "./public/200/exercise-muscles.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
@@ -17138,6 +17138,21 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 200, { ok: true, deleted, dashboard });
     } catch (error) {
       sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel excluir o treino concluido." });
+    }
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname.match(/^\/api\/200\/exercises\/[^/]+\/history$/)) {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const sessionId = decodeURIComponent(pathname.replace(/^\/api\/200\/exercises\/([^/]+)\/history$/, "$1"));
+      const updated = await updateProject200CompletedExerciseSession(user.id, sessionId, body || {}, requestUrl.searchParams.get("profile"));
+      const dashboard = await getProject200WellnessDashboard(user.id, updated.profileName);
+      sendJson(response, 200, { ok: true, updated, dashboard });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel atualizar o treino concluido." });
     }
     return;
   }

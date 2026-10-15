@@ -15,7 +15,7 @@
   2. Para focar via interface do iLife: iLifeMuscle3D.focusMuscle('abs')
   3. Para voltar à visão geral: iLifeMuscle3D.reset()
   4. Para detectar o toque no 3D: ouça 'ilife:muscle-select'
-     event.detail = { id, name, side }; o iLife decide o que exibir.
+     event.detail = { id, name, side, view }; o iLife decide o que exibir.
   5. Cores: iLifeMuscle3D.setMuscleColor('chest','#ff6600')
   6. Dimensione o contêiner via CSS (--ilife-muscle-background opcional).
   7. Arrastar gira 360°; pinça/rodinha controla zoom; dois toques resetam.
@@ -35,6 +35,8 @@
   }
   #ilife-muscle-viewer canvas:active {cursor:grabbing;}
   #ilife-muscle-viewer canvas:focus-visible {outline:2px solid #88eadc;outline-offset:-2px;}
+  #musclePointLabels {position:absolute;inset:0;overflow:hidden;pointer-events:none;}
+  #musclePointLabels span {position:absolute;transform:translate(-50%,-50%);color:#fff;font:900 12px/1 "Sora",Arial,sans-serif;letter-spacing:-.02em;text-shadow:0 1px 3px #000,0 0 7px rgba(0,0,0,.95);white-space:nowrap;will-change:left,top;}
   .ilife-viewer-error {position:absolute;inset:20% 10% auto;padding:14px;
     font:14px/1.5 sans-serif;text-align:center;color:#fff;background:#29354b;
     border-radius:10px;border:1px solid #b86a7f;}
@@ -45,6 +47,7 @@
 <body>
 <div id="ilife-muscle-viewer" role="group" aria-label="Modelo muscular tridimensional interativo">
   <canvas id="anatomyCanvas" tabindex="0" aria-label="Corpo muscular 3D sem cabeça. Arraste ou use as setas para girar, toque no músculo para dar zoom; pressione R para voltar."></canvas>
+  <div id="musclePointLabels" aria-hidden="true"></div>
   <div id="stageError" class="ilife-viewer-error" role="alert" hidden></div>
 </div>
 <script>
@@ -75,12 +78,14 @@ const byId = Object.fromEntries(muscles.map(m=>[m.id,m]));
 const NEUTRAL_MUSCLE_COLOR = '#7d8794';
 const stage = document.getElementById('ilife-muscle-viewer');
 const canvas = document.getElementById('anatomyCanvas');
+const pointLabels = document.getElementById('musclePointLabels');
 const error = document.getElementById('stageError');
 const BASE_DISTANCE = 8.75;
 const FOCUS_DISTANCE = BASE_DISTANCE / 2; // +100% em ampliação linear (aproximadamente 2×)
 const BASE_AIM = [0,2.06,0];
 let selected=null, angle=0, pitch=.025, distance=BASE_DISTANCE, autorotate=false;
 let focus = [...BASE_AIM], flight = null;
+let musclePointLabels=[];
 let gl, fallbackCtx, shader, sphereIndexLength, posBuf, normBuf, idxBuf, pickFb, pickTexture, depthRb;
 let projectedShapes=[];
 const geometry=[];const colorFlights=new Map();let lastFrame=0;let animID=0;let animationRunning=true;
@@ -99,6 +104,17 @@ const FOCUS_ANCHORS = {
  glutes:    [0,2.20,-.28], quads:     [0,1.63,.23],
  hamstrings:[0,1.67,-.24], adductors:[0,1.67,.15],
  calves:    [0,.76,-.17], shins:     [0,.73,.18]
+};
+const LABEL_ANCHORS = {
+ chest:{front:[0,3.55,.53]}, delts:{front:[0,3.58,.28],back:[0,3.58,-.29]},
+ biceps:{front:[0,3.11,.31]}, triceps:{back:[0,3.11,-.31]},
+ forearms:{front:[0,2.50,.27],back:[0,2.50,-.25]}, traps:{back:[0,3.82,-.32]},
+ lats:{back:[0,3.19,-.42]}, rhomboids:{back:[0,3.59,-.43]},
+ abs:{front:[0,3.01,.49]}, obliques:{front:[0,2.93,.37]},
+ serratus:{front:[0,3.30,.36]}, lowerback:{back:[0,2.93,-.46]},
+ glutes:{back:[0,2.20,-.43]}, quads:{front:[0,1.63,.43]},
+ hamstrings:{back:[0,1.67,-.38]}, adductors:{front:[0,1.67,.29]},
+ calves:{back:[0,.76,-.30]}, shins:{front:[0,.73,.31]}
 };
 // Apenas grupos laterais são focados por lado quando tocados.
 // Reto abdominal usa sempre a âncora CENTRAL, mesmo se um gomo for tocado.
@@ -133,7 +149,7 @@ function select(id,move=true,clickedPart=null,side=null,view=null){
    flyTo(nextAngle,center,FOCUS_DISTANCE,.025);
  }
  stage.dispatchEvent(new CustomEvent('ilife:muscle-select',{
-   bubbles:true,detail:{id:m.id,name:m.name,side:clickedPart && SIDE_FOCUS.has(id)
+   bubbles:true,detail:{id:m.id,name:m.name,view:view||(m.view===Math.PI?'back':'front'),side:clickedPart && SIDE_FOCUS.has(id)
      ?(clickedPart.mat[12]>0?'right':'left'):side||null}
  }));
  draw();
@@ -154,7 +170,34 @@ function flyTo(nextAngle,nextFocus=focus,nextDistance=distance,nextPitch=pitch){
  }
 }
 function normalizeAngle(a){return ((a+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI}
-function viewLabel(){} // Sem rótulos: viewport só mostra o modelo 3D.
+function viewLabel(){
+ if(!pointLabels||!musclePointLabels.length)return;
+ const width=stage.clientWidth,height=stage.clientHeight;if(!width||!height)return;
+ const aim=worldAim(),eye=[aim[0],aim[1]+Math.sin(pitch)*distance,aim[2]+distance*Math.cos(pitch)];
+ const vp=mul(perspective(38*rad,width/height,.1,40),lookAt(eye,aim)),root=ry(angle);
+ for(const label of musclePointLabels){
+   const node=label.node,anchor=LABEL_ANCHORS[label.id]?.[label.view]||FOCUS_ANCHORS[label.id];
+   if(!anchor){node.hidden=true;continue;}
+   const facing=(label.view==='back'?-1:1)*Math.cos(angle);
+   if(facing<.10){node.hidden=true;continue;}
+   const x=root[0]*anchor[0]+root[4]*anchor[1]+root[8]*anchor[2]+root[12];
+   const y=root[1]*anchor[0]+root[5]*anchor[1]+root[9]*anchor[2]+root[13];
+   const z=root[2]*anchor[0]+root[6]*anchor[1]+root[10]*anchor[2]+root[14];
+   const clipX=vp[0]*x+vp[4]*y+vp[8]*z+vp[12],clipY=vp[1]*x+vp[5]*y+vp[9]*z+vp[13],clipW=vp[3]*x+vp[7]*y+vp[11]*z+vp[15];
+   if(clipW<=0){node.hidden=true;continue;}
+   const nx=clipX/clipW,ny=clipY/clipW;node.hidden=nx< -1||nx>1||ny< -1||ny>1;
+   if(!node.hidden){node.style.left=`${(nx+1)*50}%`;node.style.top=`${(1-ny)*50}%`;node.style.opacity=String(clamp((facing-.10)/.35,.25,1));}
+ }
+}
+function setMuscleLabels(labels){
+ pointLabels.replaceChildren();
+ musclePointLabels=(Array.isArray(labels)?labels:[]).flatMap((item)=>{
+   const id=String(item?.id||''),view=item?.view==='back'?'back':'front',value=String(item?.value??'').trim();
+   if(!byId[id]||!value)return[];
+   const node=document.createElement('span');node.textContent=value;pointLabels.append(node);return[{id,view,node}];
+ });
+ draw();return true;
+}
 function resetView(){selected=null;flyTo(0,BASE_AIM,BASE_DISTANCE,.025)}
 // API pública para o Codex/iLife usar de forma imperativa SEM renderizar controles:
 // window.iLifeMuscle3D.focusMuscle('abs');
@@ -170,6 +213,7 @@ window.iLifeMuscle3D=Object.freeze({
  getMuscles:()=>muscles.map(({id,name,latin,color,group})=>({id,name,latin,color,group})),
  setMuscleColor:(id,color)=>setMuscleColor(id,color),
  animateMuscleColor:(id,color,duration=1200)=>animateMuscleColor(id,color,duration),
+ setMuscleLabels:(labels)=>setMuscleLabels(labels),
  resetColors:()=>resetMuscleColors(),
  pause:()=>{if(!animationRunning)return false;animationRunning=false;if(animID)cancelAnimationFrame(animID);animID=0;return true},
  resume:()=>{if(animationRunning)return false;animationRunning=true;lastFrame=0;animID=requestAnimationFrame(animate);return true}

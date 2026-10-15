@@ -1356,6 +1356,55 @@ export async function deleteProject200CompletedExerciseSession(userId, sessionId
     client.release();
   }
 }
+
+export async function updateProject200CompletedExerciseSession(userId, sessionId, payload = {}, fallbackProfileName = PROJECT200_DEFAULT_PROFILE_NAME) {
+  await ensureProject200WellnessSchema();
+  if (!db) throw new Error("DATABASE_URL nao configurada.");
+  const client = await db.connect();
+  try {
+    await client.query("begin");
+    const result = await client.query(
+      `select id, tracking_type, assigned_profile from project200_exercise_sessions
+       where id=$1 and user_id=$2 and status='completed' for update`,
+      [sessionId, userId]
+    );
+    const workout = result.rows[0];
+    if (!workout) throw new Error("Treino concluido nao encontrado.");
+    const restSeconds = clampInteger(payload.restSeconds, 0, 86400);
+    if (workout.tracking_type === "series") {
+      const seriesCount = clampInteger(payload.seriesCount, 1, 300);
+      const totalReps = clampInteger(payload.totalReps, 0, 200000);
+      const removedCredits = await client.query(`delete from project200_mechanical_strength_credits where user_id=$1 and session_id=$2 and series_number>$3 returning points`, [userId, sessionId, seriesCount]);
+      const removedPoints = removedCredits.rows.reduce((sum, row) => sum + Math.max(0, Number(row.points || 0)), 0);
+      if (removedPoints) await client.query(`update project200_mechanical_strength set points=greatest(0,points-$2),updated_at=now() where user_id=$1`, [userId, removedPoints]);
+      await client.query(`delete from project200_exercise_series where user_id=$1 and session_id=$2 and series_number>$3`, [userId, sessionId, seriesCount]);
+      const existing = await client.query(`select series_number from project200_exercise_series where user_id=$1 and session_id=$2 order by series_number`, [userId, sessionId]);
+      const existingNumbers = new Set(existing.rows.map((row) => Number(row.series_number)));
+      for (let number = 1; number <= seriesCount; number += 1) {
+        if (!existingNumbers.has(number)) await client.query(`insert into project200_exercise_series (session_id,user_id,series_number,repetitions,target_repetitions,rir) values ($1,$2,$3,0,0,null)`, [sessionId, userId, number]);
+      }
+      const baseReps = Math.floor(totalReps / seriesCount), remainder = totalReps % seriesCount;
+      await client.query(`update project200_exercise_series set repetitions=$3+case when series_number<=$4 then 1 else 0 end where user_id=$1 and session_id=$2`, [userId, sessionId, baseReps, remainder]);
+      await client.query(`update project200_exercise_sessions set total_reps=$3,rest_seconds=$4,updated_at=now() where id=$1 and user_id=$2`, [sessionId, userId, totalReps, restSeconds]);
+    } else {
+      const duration = Number(payload.durationMinutes);
+      if (!Number.isFinite(duration) || duration < 0 || duration > 1440) throw new Error("Informe um tempo total entre 0 e 1440 minutos.");
+      if (workout.tracking_type === "gps") {
+        const distanceMeters = clampInteger(payload.distanceMeters, 0, 10000000);
+        await client.query(`update project200_exercise_sessions set duration_minutes=$3,distance_meters=$4,rest_seconds=$5,updated_at=now() where id=$1 and user_id=$2`, [sessionId, userId, Math.round(duration * 100) / 100, distanceMeters, restSeconds]);
+      } else {
+        await client.query(`update project200_exercise_sessions set duration_minutes=$3,rest_seconds=$4,updated_at=now() where id=$1 and user_id=$2`, [sessionId, userId, Math.round(duration * 100) / 100, restSeconds]);
+      }
+    }
+    await client.query("commit");
+    return { id: String(workout.id), profileName: normalizeProfileName(workout.assigned_profile) };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 export async function updateProject200WellnessPreferences(userId, payload = {}) {
   await ensureProject200WellnessSchema();
   const profile = normalizeProfileName(payload.profileName);
