@@ -327,7 +327,14 @@ function confirmMechanicalStrength(payload,sessionId,seriesNumber){if(!payload?.
 function renderMechanicalSummary(gain=state.lastMechanicalGain||0){state.lastMechanicalGain=gain;const total=byId("wellnessMechanicalTotal"),label=byId("wellnessMechanicalGain");if(total)total.textContent=mechanicalTotal().toLocaleString("pt-BR")+" Pontos";if(label)label.textContent=gain?"+"+gain+" "+(gain===1?"ponto":"pontos")+" nesta série":"Série registrada";}
 function openRirPrompt(repetitions){if(!state.workout||state.rirPending||workoutRestRemainingMs())return;state.rirPending=true;state.rirValue=2;state.rirRepetitions=Math.max(1,Math.trunc(Number(repetitions)||1));state.rirFinishedAt=Date.now();stopSeriesWorkTimer();if(byId("wellnessRirValue"))byId("wellnessRirValue").textContent="2";showLayer(elements.rirLayer);}
 function changeRir(direction){state.rirValue=Math.max(0,Math.min(5,state.rirValue+direction));byId("wellnessRirValue").textContent=String(state.rirValue);}
-function confirmRir(event){event.preventDefault();if(!state.rirPending||!state.workout)return;state.rirPending=false;const gain=mechanicalStrengthPoints(state.rirValue);void addSeries(state.rirRepetitions,state.rirValue);renderMechanicalSummary(gain);showLayer(elements.workoutLayer);renderWorkout();}
+function confirmRir(event){
+  event.preventDefault();if(!state.rirPending||!state.workout)return;
+  const repetitions=state.rirRepetitions,rir=state.rirValue,gain=mechanicalStrengthPoints(rir);
+  state.rirPending=false;
+  // Fecha a decisão imediatamente; o registro da série segue sem prender o timer.
+  elements.rirLayer.hidden=true;showLayer(elements.workoutLayer);renderWorkout();renderMechanicalSummary(gain);
+  void Promise.resolve().then(()=>addSeries(repetitions,rir)).catch(()=>{});
+}
 function reconcileMechanicalDashboard(dashboard){
   if(!dashboard?.mechanicalStrength)return;const value=readMechanicalState();value.points=Math.max(value.points,Number(dashboard.mechanicalStrength.points||0));
   [dashboard.activeWorkout,...(dashboard.recentWorkouts||[])].filter(Boolean).forEach((workout)=>(workout.series||[]).forEach((series)=>{if(series.rir!==null&&series.rir!==undefined)delete value.pending[String(workout.id)+":"+series.seriesNumber];}));writeMechanicalState(value);
@@ -511,7 +518,7 @@ function refreshMuscleProgressMap(){
 }
 function renderMuscleProgressMap(){
   if(!elements.muscleProgressMapTrack)return;
-  if(!elements.muscleProgressMapTrack.getAttribute("src"))elements.muscleProgressMapTrack.src="/200/muscle-viewer-3d.html?mode=home&v=20261015-muscle-scroll-v7";
+  if(!elements.muscleProgressMapTrack.getAttribute("src"))elements.muscleProgressMapTrack.src="/200/muscle-viewer-3d.html?mode=home&v=20261015-muscle-touch-clean-v8";
   bindHomeMuscleViewer(elements.muscleProgressMapTrack);
   refreshMuscleProgressMap();
 }
