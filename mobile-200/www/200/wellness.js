@@ -518,7 +518,7 @@ function refreshMuscleProgressMap(){
 }
 function renderMuscleProgressMap(){
   if(!elements.muscleProgressMapTrack)return;
-  if(!elements.muscleProgressMapTrack.getAttribute("src"))elements.muscleProgressMapTrack.src="/200/muscle-viewer-3d.html?mode=home&v=20261015-muscle-labels-gpu-v9";
+  if(!elements.muscleProgressMapTrack.getAttribute("src"))elements.muscleProgressMapTrack.src="/200/muscle-viewer-3d.html?mode=home&v=20261015-muscle-touch-v10";
   bindHomeMuscleViewer(elements.muscleProgressMapTrack);
   refreshMuscleProgressMap();
 }
@@ -656,7 +656,7 @@ function openExerciseDetail(exercise,mode="selected"){
   if(elements.detailGenerate)elements.detailGenerate.hidden=true;
   if(elements.detailMediaLoaderText)elements.detailMediaLoaderText.textContent=state.uploadingExerciseVideoId===exercise.id?"Otimizando vídeo...":"Criando imagens...";
   if(elements.detailGenerateStatus&&!isGenerating)elements.detailGenerateStatus.textContent="";
-  const item=libraryItem(exercise.id),hasGoal=hasExerciseGoal(item,exercise),selectedTracking=String(item?.trackingType||exercise.tracking),startLabel=mode==="catalog"?"Iniciar exercício":!hasGoal?"Definir nova meta":selectedTracking==="series"?"Iniciar série":selectedTracking==="gps"?"Iniciar percurso":"Iniciar exercício"; elements.detailStart.setAttribute("aria-label",startLabel);elements.detailStart.title=startLabel; if(elements.detailGoal)elements.detailGoal.hidden=mode!=="selected"||!hasGoal; if(elements.detailDelete)elements.detailDelete.hidden=mode!=="selected"||!item;
+  const item=libraryItem(exercise.id),hasGoal=hasExerciseGoal(item,exercise),selectedTracking=String(item?.trackingType||exercise.tracking),startLabel=mode==="catalog"?"Iniciar exercício":selectedTracking==="series"?"Iniciar série":selectedTracking==="gps"?"Iniciar percurso":"Iniciar exercício"; elements.detailStart.setAttribute("aria-label",startLabel);elements.detailStart.title=startLabel; if(elements.detailGoal)elements.detailGoal.hidden=mode!=="selected"||!hasGoal; if(elements.detailDelete)elements.detailDelete.hidden=mode!=="selected"||!item;
   updateExerciseProgressDetail(); renderExerciseMuscleMaps(exercise); showLayer(elements.detail);startDetailMovementTicker(); elements.detail?.querySelector(".wellness-phase-screen")?.scrollTo({top:0});
 }
 function openExerciseInfo(){ const exercise=state.selectedExercise;if(!exercise)return; elements.infoCategory.textContent=EXERCISE_CATEGORIES.find((item)=>item.id===exercise.category)?.label||"INFORMAÇÕES"; elements.infoName.textContent=exercise.name; const aliases=Array.isArray(exercise.alternativeNames)?exercise.alternativeNames:[];if(elements.infoAliases){elements.infoAliases.hidden=!aliases.length;const value=elements.infoAliases.querySelector("strong");if(value)value.textContent=aliases.join(" · ");} elements.infoEquipment.textContent=exercise.category==="calisthenics"?"Sem equipamento":exercise.equipment||"Sem equipamento"; const metrics=normalizeProject200ExerciseMetrics(exercise,exercise),metricRows=[["Energia",metrics.energyPerMinute,"energy"],["Força",metrics.strengthPerMinute,"strength"],["Resistência",metrics.resistancePerMinute,"resistance"]];if(elements.infoPerformance)elements.infoPerformance.innerHTML=metricRows.map(([label,value,key])=>`<div style="--metric-color:${project200MetricColor(key,value*16)}"><span>${label}</span><strong>${Number(value).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}x</strong><small>por minuto</small></div>`).join(""); const loads=exerciseMuscleLoads(exercise); if(elements.infoMuscles)elements.infoMuscles.innerHTML=`<header><span>Carga muscular relativa</span><small>0,25 mínimo · 1,00 principal</small></header>${loads.map((item)=>`<div><strong>${escapeHtml(item.name)}</strong><span>${formatMuscleLoad(item.load)||"A definir"}</span><i><b style="width:${isMuscleLoadDefined(item.load)?Math.round(Number(item.load)*100):0}%"></b></i></div>`).join("")}`; elements.detailInstructions.innerHTML=""; exerciseInstructions(exercise).forEach((instruction)=>{ const li=document.createElement("li"); li.textContent=instruction; elements.detailInstructions.appendChild(li); }); showLayer(elements.infoLayer); }
@@ -849,7 +849,7 @@ function openGoal({editing=false}={}){
   fillExerciseGoalFields(exercise,item); setExerciseGoalWeekdays(item);
   showLayer(elements.goalLayer);
 }
-function startSelectedExercise(){ const exercise=state.selectedExercise,item=libraryItem(exercise?.id); if(!exercise)return; if(!hasExerciseGoal(item,exercise)||isStrengthExercise(exercise)){ openGoal({editing:false}); return; } fillExerciseGoalFields(exercise,item); void startExercise({preventDefault(){},currentTarget:elements.detailStart}); }
+function startSelectedExercise(){ const exercise=state.selectedExercise,item=libraryItem(exercise?.id); if(!exercise)return; fillExerciseGoalFields(exercise,item); void startExercise({preventDefault(){},currentTarget:elements.detailStart}); }
 function renderNutrientBars(meal){ const nutrients=Array.isArray(meal?.nutrients||meal?.components)?(meal.nutrients||meal.components):[]; return nutrients.map((item,index)=>`<div class="wellness-nutrient"><span><b>${escapeHtml(item.label||item.name||"")}</b><em>${Number(item.value??item.calories??0).toLocaleString("pt-BR",{maximumFractionDigits:1})} ${escapeHtml(item.unit||"")}</em></span><i><u style="width:${Math.max(0,Math.min(100,Number(item.percent||0)))}%;--nutrient-index:${index}"></u></i></div>`).join(""); }
 function renderMealConfig(){ if(!elements.mealConfigList)return; const slots=Array.isArray(state.dashboard?.mealSlots)?state.dashboard.mealSlots:[]; elements.mealConfigList.innerHTML=slots.map((slot)=>`<label><input type="checkbox" value="${slot.key}" ${slot.enabled?"checked":""}/><span>${slot.label}</span></label>`).join(""); }
 function openMealConfig(){ renderMealConfig(); if(elements.mealConfigStatus)elements.mealConfigStatus.textContent=""; showLayer(elements.mealConfigLayer); }
@@ -1054,12 +1054,6 @@ function setWorkoutStarting(active){
   [elements.workoutPrimary,elements.workoutAdvance,elements.workoutFinish,elements.workoutClose,elements.workoutPreviousExercise,elements.workoutNextExercise].forEach((button)=>{if(button)button.disabled=state.workoutStarting;});
   if(!state.workoutStarting&&elements.workoutRest){elements.workoutRest.hidden=true;elements.workoutRest.classList.remove("is-starting");}
 }
-function waitForWorkoutStartTick(milliseconds){return new Promise((resolve)=>window.setTimeout(resolve,milliseconds));}
-async function runWorkoutStartCountdown(){
-  setWorkoutStarting(true);if(elements.workoutRest)elements.workoutRest.hidden=false;
-  for(const label of ["3","2","1"]){if(elements.workoutRestTime)elements.workoutRestTime.textContent=label;await waitForWorkoutStartTick(650);}
-  if(elements.workoutRestTime)elements.workoutRestTime.textContent="Vai";await waitForWorkoutStartTick(450);
-}
 function renderWorkout({syncMedia=true}={}){
   const workout=state.workout; elements.activeWorkout.hidden=!workout; if(!workout){ clearSeriesWork();clearSeriesRest();setWorkoutRestAppearance(false);elements.phaseProgress?.classList.remove("is-gps-workout");if(elements.workoutGpsReadout)elements.workoutGpsReadout.hidden=true;elements.activeWorkoutVideo?.pause(); elements.workoutVideo?.pause();state.workoutNavigationWorkoutId="";state.workoutNavigationExerciseId="";if(elements.workoutNextName)elements.workoutNextName.textContent="—";if(elements.workoutAdvance)elements.workoutAdvance.disabled=true;if(elements.workoutPreviousExercise)elements.workoutPreviousExercise.disabled=true;if(elements.workoutNextExercise)elements.workoutNextExercise.disabled=true; return; }
   if(state.seriesWorkWorkoutId&&String(workout.id||"")!==state.seriesWorkWorkoutId)clearSeriesWork();
@@ -1141,7 +1135,7 @@ async function startExercise(event){
   const requestStart=async()=>{if(navigator.onLine===false)return {workout:createOfflineWorkout(exercise,startPayload),offline:true};try{const payload=await apiRequest("/api/200/exercises/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(startPayload)});return {workout:payload.workout,dashboard:payload.dashboard,offline:false};}catch(error){if(error?.httpResponse)throw error;return {workout:createOfflineWorkout(exercise,startPayload),offline:true};}};
   try{
     state.workout=preview;state.seriesRepsDraft=null;state.steps=0;state.gpsDistanceMeters=0;resetGpsDistanceDisplay(0);renderWorkout();showLayer(elements.workoutLayer);
-    const [started]=await Promise.all([requestStart(),runWorkoutStartCountdown()]);
+    const started=await requestStart();
     if(started.offline)activateOfflineWorkout(started.workout,startPayload);else{state.dashboard=started.dashboard||state.dashboard;state.workout=started.workout;}
     state.seriesSaveChain=Promise.resolve();rebuildProvisionalMuscleProgress(state.workout);state.seriesRepsDraft=null;state.steps=Number(state.workout?.steps||0);state.gpsDistanceMeters=Number(state.workout?.distanceMeters||0);resetGpsDistanceDisplay(state.gpsDistanceMeters);
     if(trackingType==="steps")await startStepCounter(true);if(trackingType==="gps")await startGpsTracking(true);
@@ -1285,7 +1279,7 @@ function workoutCompletionMapMarkup(snapshot){
     const muscle=PROJECT200_MUSCLE_BY_ID[muscleId],progress=snapshot.progress.get(muscleId),target=WORKOUT_COMPLETION_3D_MUSCLE_BY_ID[muscleId]||{},from=completionDisplayPoints(snapshot.beforeProgress.get(muscleId)),to=completionDisplayPoints(progress?.points);
     return `<button class="wellness-workout-complete-gain" type="button" aria-pressed="false" data-completion-muscle-id="${escapeHtml(muscleId)}" data-completion-map-index="${index}" data-viewer-muscle-id="${escapeHtml(target.id||"")}" data-viewer-view="${escapeHtml(target.view||"")}" data-heat-color="${completionMuscleHeatHex(progress)}"><span>${escapeHtml(muscle?.name||muscleId)}</span><strong><em class="wellness-workout-complete-prefix">+</em><b data-muscle-gain-number data-from="${from}" data-to="${to}">${from}</b><em>PTS</em></strong></button>`;
   }).join("");
-  return `<section class="wellness-muscle-map-slide wellness-workout-complete-3d-slide" aria-label="Músculos treinados"><div class="wellness-workout-complete-gains">${gainsMarkup}</div><iframe class="wellness-workout-complete-model-3d" data-workout-completion-3d title="Modelo 3D dos músculos treinados" src="/200/muscle-viewer-3d.html?v=20261015-muscle-labels-gpu-v9" loading="eager" scrolling="no"></iframe></section>`;
+  return `<section class="wellness-muscle-map-slide wellness-workout-complete-3d-slide" aria-label="Músculos treinados"><div class="wellness-workout-complete-gains">${gainsMarkup}</div><iframe class="wellness-workout-complete-model-3d" data-workout-completion-3d title="Modelo 3D dos músculos treinados" src="/200/muscle-viewer-3d.html?v=20261015-muscle-touch-v10" loading="eager" scrolling="no"></iframe></section>`;
 }
 function prepareWorkoutCompletion(snapshot){
   const runId=++state.completionRunId; elements.completeName.textContent=snapshot.name;elements.completeName.classList.toggle("is-long",snapshot.name.length>10||snapshot.name.trim().includes(" ")); configureFixedExerciseMedia(elements.completePortrait,elements.completeImage,elements.completeVideo,snapshot.exercise,{movementOnly:true}); elements.completeImage.alt=`${snapshot.name} concluído`; elements.completeProgressFill.style.width=`${Math.min(100,(snapshot.progressFrom/Math.max(1,snapshot.progressMax))*100)}%`;elements.completeProgressFill.dataset.level=String(snapshot.progressFrom);elements.completeProgressText.textContent=`${snapshot.progressLabel} ${snapshot.progressFrom}%`; elements.completeDots.innerHTML=snapshot.maps.map((_,index)=>`<i class="${index===0?"is-active":""}"></i>`).join(""); elements.completeMap.classList.remove("is-revealed"); elements.completeMap.innerHTML=snapshot.maps[0]?workoutCompletionMapMarkup(snapshot,snapshot.maps[0]):"";if(elements.completeMetricStage)elements.completeMetricStage.hidden=true; elements.completeLayer.classList.remove("is-muscle-stage","is-metric-stage","is-portrait-exiting","is-approved"); elements.completeLayer.classList.add("is-portrait-stage"); showLayer(elements.completeLayer); if(!elements.completeVideo?.hidden){elements.completeVideo.currentTime=0;void elements.completeVideo.play().catch(()=>{});} return runId;
@@ -1375,7 +1369,6 @@ async function animateWorkoutCompletion(snapshot,runId,{autoClose=true}={}){
 function openCancelWorkout(){if(!state.workout)return;elements.finishQuestion.textContent=`Cancelar ${String(state.workout.exerciseName||"este exercício").toLowerCase()}? O progresso deste treino não será contabilizado.`;showLayer(elements.finishLayer);}
 async function startExerciseAfterCompletion(exercise){
   if(!exercise)return false;state.selectedExercise=exercise;state.detailMode="selected";const item=libraryItem(exercise.id);
-  if(!hasExerciseGoal(item,exercise)){openGoal({editing:false});return false;}
   fillExerciseGoalFields(exercise,item);await startExercise({preventDefault(){},currentTarget:elements.detailStart});return Boolean(state.workout);
 }
 function openAdvanceWorkout(){
@@ -1501,7 +1494,7 @@ document.querySelectorAll("[data-muscle-view]").forEach((button)=>button.addEven
 window.addEventListener("message",(event)=>{
   if(event.origin!==location.origin||event.data?.type!=="ilife:home-muscle-scroll"||event.source!==elements.muscleProgressMapTrack?.contentWindow)return;
   const deltaY=Number(event.data.deltaY||0);if(!Number.isFinite(deltaY)||!deltaY)return;
-  elements.muscleProgressMapTrack.closest(".wellness-pane")?.scrollBy({top:deltaY,behavior:"instant"});
+  const surface=elements.muscleProgressMapTrack.closest(".wellness-pane");if(surface)surface.scrollTop+=deltaY;
 });
 elements.muscleProgressExercisesButton?.addEventListener("click",()=>{if(homeSelectedMuscleIds.length)renderMuscleExercises(homeSelectedMuscleIds,"dashboard",homeSelectedMuscleName);});
 elements.muscleMapTrack?.addEventListener("scroll",()=>{ const width=Math.max(1,elements.muscleMapTrack.clientWidth),index=Math.max(0,Math.min(PROJECT200_MUSCLE_MAPS.length-1,Math.round(elements.muscleMapTrack.scrollLeft/width))); [...elements.muscleMapDots.children].forEach((dot,dotIndex)=>dot.classList.toggle("is-active",dotIndex===index)); },{passive:true});
