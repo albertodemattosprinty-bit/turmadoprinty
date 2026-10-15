@@ -510,7 +510,7 @@ function refreshMuscleProgressMap(){
 }
 function renderMuscleProgressMap(){
   if(!elements.muscleProgressMapTrack)return;
-  if(!elements.muscleProgressMapTrack.getAttribute("src"))elements.muscleProgressMapTrack.src="/200/muscle-viewer-3d.html?mode=home&v=20261015-muscle-side-focus-v4";
+  if(!elements.muscleProgressMapTrack.getAttribute("src"))elements.muscleProgressMapTrack.src="/200/muscle-viewer-3d.html?mode=home&v=20261015-muscle-game-points-v5";
   bindHomeMuscleViewer(elements.muscleProgressMapTrack);
   refreshMuscleProgressMap();
 }
