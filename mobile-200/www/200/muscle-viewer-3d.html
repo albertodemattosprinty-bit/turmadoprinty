@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>iLife · Componente Muscular 3D</title>
+<!--
+  iLife — COMPONENTE VISUAL AUTÔNOMO PARA O CODEX
+  EXIBIR: SOMENTE O CANVAS 3D (nenhuma lista, painel, título ou exercício).
+  DADOS/LÓGICA: Encapsulados neste arquivo, dentro do JS.
+  NÃO é um backend HTTP. Não criar endpoints nem componentes extras.
+
+  INTEGRAÇÃO:
+  1. Embuta o arquivo em iframe ou reutilize seu canvas/JS na tela existente.
+  2. Para focar via interface do iLife: iLifeMuscle3D.focusMuscle('abs')
+  3. Para voltar à visão geral: iLifeMuscle3D.reset()
+  4. Para detectar o toque no 3D: ouça 'ilife:muscle-select'
+     event.detail = { id, name, side }; o iLife decide o que exibir.
+  5. Cores: iLifeMuscle3D.setMuscleColor('chest','#ff6600')
+  6. Dimensione o contêiner via CSS (--ilife-muscle-background opcional).
+  7. Arrastar gira 360°; pinça/rodinha controla zoom; dois toques resetam.
+-->
+<style>
+  * { box-sizing:border-box; }
+  html,body { margin:0; width:100%; min-height:100%; height:100%; }
+  body { overflow:hidden; }
+  #ilife-muscle-viewer {
+    position:relative; width:100%; height:100%; min-height:100%;
+    background:var(--ilife-muscle-background,transparent);
+    overflow:hidden; isolation:isolate;
+  }
+  #ilife-muscle-viewer canvas {
+    display:block; width:100%; height:100%; cursor:grab; touch-action:none;
+    outline:none;
+  }
+  #ilife-muscle-viewer canvas:active {cursor:grabbing;}
+  #ilife-muscle-viewer canvas:focus-visible {outline:2px solid #88eadc;outline-offset:-2px;}
+  .ilife-viewer-error {position:absolute;inset:20% 10% auto;padding:14px;
+    font:14px/1.5 sans-serif;text-align:center;color:#fff;background:#29354b;
+    border-radius:10px;border:1px solid #b86a7f;}
+  .ilife-viewer-error[hidden] {display:none;}
+  @media (prefers-reduced-motion:reduce) {#ilife-muscle-viewer canvas{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div id="ilife-muscle-viewer" role="group" aria-label="Modelo muscular tridimensional interativo">
+  <canvas id="anatomyCanvas" tabindex="0" aria-label="Corpo muscular 3D sem cabeça. Arraste ou use as setas para girar, toque no músculo para dar zoom; pressione R para voltar."></canvas>
+  <div id="stageError" class="ilife-viewer-error" role="alert" hidden></div>
+</div>
+<script>
+
+(function(){
+'use strict';
+const muscles = [
+ {id:'chest',name:'Peitoral',latin:'Peitoral maior',color:'#7d8794',group:'upper',view:0,desc:'Movimenta os braços à frente do tronco e participa dos movimentos de empurrar.',ex:['Supino reto','Supino inclinado','Crucifixo']},
+ {id:'delts',name:'Deltoides',latin:'Deltoide anterior, lateral e posterior',color:'#7d8794',group:'upper',view:0,desc:'Músculos que envolvem os ombros e ajudam a elevar e movimentar os braços.',ex:['Desenvolvimento','Elevação lateral','Crucifixo inverso']},
+ {id:'biceps',name:'Bíceps',latin:'Bíceps braquial',color:'#7d8794',group:'upper',view:0,desc:'Atua principalmente na flexão do cotovelo e na rotação do antebraço.',ex:['Rosca direta','Rosca alternada','Rosca inclinada']},
+ {id:'triceps',name:'Tríceps',latin:'Tríceps braquial',color:'#7d8794',group:'upper',view:Math.PI,desc:'Fica na parte posterior do braço e estende o cotovelo.',ex:['Tríceps na polia','Tríceps francês','Supino fechado']},
+ {id:'forearms',name:'Antebraços',latin:'Flexores e extensores do antebraço',color:'#7d8794',group:'upper',view:0,desc:'Participam da força de pegada e da movimentação dos punhos.',ex:['Rosca de punho','Rosca inversa','Farmer’s walk']},
+ {id:'traps',name:'Trapézio',latin:'Trapézio',color:'#7d8794',group:'upper',view:Math.PI,desc:'Estabiliza e movimenta as escápulas e participa do controle do pescoço e ombros.',ex:['Encolhimento','Remada alta leve','Face pull']},
+ {id:'lats',name:'Dorsal',latin:'Latíssimo do dorso',color:'#7d8794',group:'upper',view:Math.PI,desc:'Importante nos movimentos de puxar os braços em direção ao corpo.',ex:['Puxada alta','Barra fixa','Remada curvada']},
+ {id:'rhomboids',name:'Romboides',latin:'Romboides maior e menor',color:'#7d8794',group:'upper',view:Math.PI,desc:'Contribuem para aproximar as escápulas na parte superior das costas.',ex:['Remada baixa','Face pull','Crucifixo inverso']},
+ {id:'abs',name:'Abdômen',latin:'Reto abdominal',color:'#7d8794',group:'core',view:0,desc:'Estabiliza o tronco e participa da flexão da coluna.',ex:['Crunch','Elevação de pernas','Prancha']},
+ {id:'obliques',name:'Oblíquos',latin:'Oblíquos interno e externo',color:'#7d8794',group:'core',view:0,desc:'Ajudam a estabilizar e girar o tronco, resistindo à rotação.',ex:['Prancha lateral','Pallof press','Abdominal bicicleta']},
+ {id:'serratus',name:'Serrátil',latin:'Serrátil anterior',color:'#7d8794',group:'core',view:0,desc:'Auxilia o movimento e a estabilidade das escápulas sobre a caixa torácica.',ex:['Flexão escapular','Soco com elástico','Wall slide']},
+ {id:'lowerback',name:'Lombar',latin:'Eretores da espinha',color:'#7d8794',group:'core',view:Math.PI,desc:'Musculatura posterior que ajuda a sustentar a coluna e estender o tronco.',ex:['Extensão lombar','Levantamento terra','Bird dog']},
+ {id:'glutes',name:'Glúteos',latin:'Glúteo máximo e médio',color:'#7d8794',group:'lower',view:Math.PI,desc:'Responsáveis por movimentos de extensão e estabilização do quadril.',ex:['Elevação pélvica','Agachamento','Afundo']},
+ {id:'quads',name:'Quadríceps',latin:'Reto femoral e vastos',color:'#7d8794',group:'lower',view:0,desc:'Conjunto muscular anterior da coxa que atua principalmente na extensão dos joelhos.',ex:['Agachamento','Leg press','Cadeira extensora']},
+ {id:'hamstrings',name:'Posteriores',latin:'Isquiotibiais',color:'#7d8794',group:'lower',view:Math.PI,desc:'Na parte de trás da coxa, auxiliam na flexão dos joelhos e extensão do quadril.',ex:['Mesa flexora','Stiff','Terra romeno']},
+ {id:'adductors',name:'Adutores',latin:'Grupo adutor da coxa',color:'#7d8794',group:'lower',view:0,desc:'Musculatura da região interna da coxa que aproxima as pernas.',ex:['Cadeira adutora','Afundo lateral','Agachamento sumô']},
+ {id:'calves',name:'Panturrilhas',latin:'Gastrocnêmio e sóleo',color:'#7d8794',group:'lower',view:Math.PI,desc:'Promovem a flexão plantar do tornozelo, como ao ficar na ponta dos pés.',ex:['Gêmeos em pé','Gêmeos sentado','Elevação unilateral']},
+ {id:'shins',name:'Tibial anterior',latin:'Tibial anterior',color:'#7d8794',group:'lower',view:0,desc:'Ajuda a levantar a ponta do pé e estabilizar o tornozelo.',ex:['Elevação da ponta dos pés','Dorsiflexão com elástico','Caminhada nos calcanhares']}
+];
+const byId = Object.fromEntries(muscles.map(m=>[m.id,m]));
+const NEUTRAL_MUSCLE_COLOR = '#7d8794';
+const stage = document.getElementById('ilife-muscle-viewer');
+const canvas = document.getElementById('anatomyCanvas');
+const error = document.getElementById('stageError');
+const BASE_DISTANCE = 8.75;
+const FOCUS_DISTANCE = BASE_DISTANCE / 2; // +100% em ampliação linear (aproximadamente 2×)
+const BASE_AIM = [0,2.06,0];
+let selected=null, angle=0, pitch=.025, distance=BASE_DISTANCE, autorotate=false;
+let focus = [...BASE_AIM], flight = null;
+let gl, fallbackCtx, shader, sphereIndexLength, posBuf, normBuf, idxBuf, pickFb, pickTexture, depthRb;
+let projectedShapes=[];
+const geometry=[];const colorFlights=new Map();let lastFrame=0;let animID=0;let animationRunning=true;
+const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+const rad = Math.PI/180;
+// Dados dos músculos, geometria e estado permanecem encapsulados no código.
+// Foco central configurado por músculo: evita alvos no centro de um segmento incorreto.
+// Os valores são coordenadas LOCAIS do boneco (sem rotação aplicada).
+const FOCUS_ANCHORS = {
+ chest:     [0,3.55,.34], delts:     [0,3.58,.04],
+ biceps:    [0,3.11,.16], triceps:    [0,3.11,-.15],
+ forearms:  [0,2.49,.05], traps:     [0,3.82,-.23],
+ lats:      [0,3.19,-.29], rhomboids: [0,3.59,-.35],
+ abs:       [0,3.01,.38], obliques:  [0,2.93,.27],
+ serratus:  [0,3.30,.25], lowerback: [0,2.93,-.35],
+ glutes:    [0,2.20,-.28], quads:     [0,1.63,.23],
+ hamstrings:[0,1.67,-.24], adductors:[0,1.67,.15],
+ calves:    [0,.76,-.17], shins:     [0,.73,.18]
+};
+// Apenas grupos laterais são focados por lado quando tocados.
+// Reto abdominal usa sempre a âncora CENTRAL, mesmo se um gomo for tocado.
+const SIDE_FOCUS = new Set(['delts','biceps','triceps','forearms','obliques','serratus',
+                           'quads','hamstrings','adductors','calves','shins','glutes']);
+function select(id,move=true,clickedPart=null,side=null,view=null){
+ const m=byId[id];if(!m)return false;
+ selected=id;
+ if(move){
+   const anchor=FOCUS_ANCHORS[id] || BASE_AIM;
+   const center=[...anchor];
+   let nextAngle=view==='back'?Math.PI:view==='side'?Math.PI/2:view==='front'?0:m.view;
+   let sideX=0;
+   if(SIDE_FOCUS.has(id)){
+     if(clickedPart){ sideX=clickedPart.mat[12]; center[0]=sideX; }
+     else if(side==='left'||side==='right'){
+       sideX=(side==='right'?1:-1)*(id==='delts'?.88:id==='forearms'?1.21:id==='biceps'||id==='triceps'?1.11:.43);
+       center[0]=sideX;
+     }
+     else if(canvas.clientWidth/canvas.clientHeight<.90 && ['delts','biceps','triceps','forearms'].includes(id)){
+       sideX=id==='delts'?.88:id==='forearms'?1.21:1.11;
+       center[0]=sideX;
+     }
+   }
+   if(Math.abs(sideX)>.05){
+     let surfaceAngle=-Math.atan2(sideX,anchor[2]);
+     const maxTurn=['delts','biceps','triceps','forearms','serratus','obliques'].includes(id)?1.32:1.05;
+     nextAngle=m.view+clamp(normalizeAngle(surfaceAngle-m.view),-maxTurn,maxTurn);
+   }
+   // Abdômen, peitoral e regiões centrais: frontal/posterior exato, sem desvio
+   // provocado pela posição do pedaço da malha atingido no clique.
+   flyTo(nextAngle,center,FOCUS_DISTANCE,.025);
+ }
+ stage.dispatchEvent(new CustomEvent('ilife:muscle-select',{
+   bubbles:true,detail:{id:m.id,name:m.name,side:clickedPart && SIDE_FOCUS.has(id)
+     ?(clickedPart.mat[12]>0?'right':'left'):side||null}
+ }));
+ draw();
+ return true;
+}
+function worldAim(){
+ const c=Math.cos(angle),s=Math.sin(angle);
+ return [focus[0]*c+focus[2]*s,focus[1],-focus[0]*s+focus[2]*c];
+}
+function stopAuto(){autorotate=false}
+function flyTo(nextAngle,nextFocus=focus,nextDistance=distance,nextPitch=pitch){
+ stopAuto();
+ flight={begin:performance.now(),duration:1000,
+   from:{angle,pitch,distance,focus:[...focus]},
+   to:{angle:angle+normalizeAngle(nextAngle-angle),pitch:nextPitch,distance:nextDistance,focus:[...nextFocus]}};
+ if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+   angle=flight.to.angle;pitch=nextPitch;distance=nextDistance;focus=[...nextFocus];flight=null;draw();
+ }
+}
+function normalizeAngle(a){return ((a+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI}
+function viewLabel(){} // Sem rótulos: viewport só mostra o modelo 3D.
+function resetView(){selected=null;flyTo(0,BASE_AIM,BASE_DISTANCE,.025)}
+// API pública para o Codex/iLife usar de forma imperativa SEM renderizar controles:
+// window.iLifeMuscle3D.focusMuscle('abs');
+// window.iLifeMuscle3D.focusMuscle('biceps', 'right');
+// window.iLifeMuscle3D.reset();
+// window.addEventListener('ilife:muscle-select', e => console.log(e.detail.id));
+window.iLifeMuscle3D=Object.freeze({
+ focusMuscle:(id,side=null,view=null)=>select(id,true,null,side,view),
+ reset:resetView,
+ setView:(view)=>{const a=view==='front'?0:view==='back'?Math.PI:view==='side'?Math.PI/2:null;if(a===null)return false;flyTo(a);return true},
+ zoomBy:(delta)=>{flight=null;distance=clamp(distance+delta,2.4,14);draw()},
+ getSelected:()=>selected,
+ getMuscles:()=>muscles.map(({id,name,latin,color,group})=>({id,name,latin,color,group})),
+ setMuscleColor:(id,color)=>setMuscleColor(id,color),
+ animateMuscleColor:(id,color,duration=1200)=>animateMuscleColor(id,color,duration),
+ resetColors:()=>resetMuscleColors(),
+ pause:()=>{if(!animationRunning)return false;animationRunning=false;if(animID)cancelAnimationFrame(animID);animID=0;return true},
+ resume:()=>{if(animationRunning)return false;animationRunning=true;lastFrame=0;animID=requestAnimationFrame(animate);return true}
+});
+function setMuscleRgb(id,color){for(const object of geometry)if(object.group===id)object.color=[...color]}
+function setMuscleColor(id,color){if(!byId[id]||!/^#[0-9a-fA-F]{6}$/.test(color))return false;colorFlights.delete(id);byId[id].color=color;setMuscleRgb(id,rgb(color));draw();return true}
+function animateMuscleColor(id,color,duration=1200){if(!byId[id]||!/^#[0-9a-fA-F]{6}$/.test(color))return false;const first=geometry.find(object=>object.group===id),from=first?[...first.color]:rgb(byId[id].color);colorFlights.set(id,{from,to:rgb(color),target:color,started:performance.now(),duration:clamp(Number(duration)||1200,100,5000)});return true}
+function resetMuscleColors(){colorFlights.clear();for(const muscle of muscles){muscle.color=NEUTRAL_MUSCLE_COLOR;setMuscleRgb(muscle.id,rgb(NEUTRAL_MUSCLE_COLOR))}draw()}
+function matIdentity(){return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1])}
+function mul(a,b){let r=new Float32Array(16);for(let c=0;c<4;c++)for(let row=0;row<4;row++){let sum=0;for(let k=0;k<4;k++)sum+=a[k*4+row]*b[c*4+k];r[c*4+row]=sum}return r}
+function translate(x,y,z){let m=matIdentity();m[12]=x;m[13]=y;m[14]=z;return m}
+function scale(x,y,z){let m=matIdentity();m[0]=x;m[5]=y;m[10]=z;return m}
+function rz(a){let m=matIdentity(),c=Math.cos(a),s=Math.sin(a);m[0]=c;m[4]=-s;m[1]=s;m[5]=c;return m}
+function ry(a){let m=matIdentity(),c=Math.cos(a),s=Math.sin(a);m[0]=c;m[8]=s;m[2]=-s;m[10]=c;return m}
+function rx(a){let m=matIdentity(),c=Math.cos(a),s=Math.sin(a);m[5]=c;m[9]=-s;m[6]=s;m[10]=c;return m}
+function perspective(fov,aspect,near,far){let f=1/Math.tan(fov/2),m=new Float32Array(16);m[0]=f/aspect;m[5]=f;m[10]=(far+near)/(near-far);m[11]=-1;m[14]=(2*far*near)/(near-far);return m}
+function lookAt(eye,target){let f=[target[0]-eye[0],target[1]-eye[1],target[2]-eye[2]];let fl=Math.hypot(...f);f=f.map(x=>x/fl);let s=[-f[2],0,f[0]],sl=Math.hypot(...s);s=s.map(x=>x/sl);let u=[s[1]*f[2]-s[2]*f[1],s[2]*f[0]-s[0]*f[2],s[0]*f[1]-s[1]*f[0]];let m=matIdentity();m[0]=s[0];m[1]=u[0];m[2]=-f[0];m[4]=s[1];m[5]=u[1];m[6]=-f[1];m[8]=s[2];m[9]=u[2];m[10]=-f[2];m[12]=-s[0]*eye[0]-s[1]*eye[1]-s[2]*eye[2];m[13]=-u[0]*eye[0]-u[1]*eye[1]-u[2]*eye[2];m[14]=f[0]*eye[0]+f[1]*eye[1]+f[2]*eye[2];return m}
+function rgb(hex){const n=parseInt(hex.slice(1),16);return [(n>>16)/255,((n>>8)&255)/255,(n&255)/255]}
+let nextId=1;const idMap=new Map(),partMap=new Map();
+function part(group,col,x,y,z,sx,sy,sz,rot=0,axis=0){let m=mul(mul(mul(translate(x,y,z),rz(rot)),ry(axis)),scale(sx,sy,sz));const id=group?nextId++:0;let ob={group,id,color:rgb(col),mat:m};geometry.push(ob);if(id){idMap.set(id,group);partMap.set(id,ob)}return ob}
+function buildBody(){
+ const base='#3c4c61',bone='#526276',darker='#344357';
+ // Structural mannequin, neutral toned. Muscle ellipsoids sit over its surface.
+ part(null,base,0,3.15,0,.68,.89,.36);part(null,base,0,3.55,0,.80,.47,.38);part(null,base,0,2.28,0,.68,.44,.38);
+ // Sem cabeça e sem pescoço: foco visual inteiro na musculatura treinável.
+ for(let s of [-1,1]){
+  part(null,base,s*.96,3.46,0,.24,.36,.23,-s*.14);
+  part(null,base,s*1.105,3.04,0,.205,.405,.197,-s*.18);
+  part(null,bone,s*1.22,2.52,.02,.16,.37,.154,s*.09);part(null,bone,s*1.21,2.04,.04,.125,.22,.13);
+  part(null,'#697c8d',s*1.21,1.87,.065,.138,.22,.13);
+  part(null,base,s*.40,1.70,0,.310,.70,.31,s*.055);
+  part(null,bone,s*.425,1.12,0,.215,.235,.21);
+  part(null,base,s*.44,.69,.0,.207,.48,.216,s*.025);
+  part(null,'#67788c',s*.44,.17,.015,.135,.185,.145);
+  part(null,'#67788c',s*.44,.09,.20,.19,.12,.39);
+ }
+ // Upper torso anterior
+ for(let s of [-1,1]){
+  part('chest',byId.chest.color,s*.394,3.547,.336,.384,.265,.201,s*.12,-s*.08);
+  part('delts',byId.delts.color,s*.884,3.58,.012,.282,.324,.28,-s*.13);
+  part('biceps',byId.biceps.color,s*1.106,3.113,.167,.16,.35,.14,-s*.19);
+  part('triceps',byId.triceps.color,s*1.118,3.112,-.151,.16,.366,.135,-s*.20);
+  part('forearms',byId.forearms.color,s*1.217,2.514,.145,.148,.335,.136,s*.12);
+  part('forearms',byId.forearms.color,s*1.215,2.481,-.095,.127,.29,.113,s*.10);
+  part('traps',byId.traps.color,s*.412,3.825,-.227,.325,.202,.153,-s*.47);
+  part('rhomboids',byId.rhomboids.color,s*.246,3.585,-.35,.24,.26,.097,s*.20);
+  part('lats',byId.lats.color,s*.505,3.190,-.285,.30,.52,.178,-s*.17);
+  part('lowerback',byId.lowerback.color,s*.164,2.932,-.347,.123,.384,.105,-s*.035);
+  part('obliques',byId.obliques.color,s*.532,2.930,.253,.174,.425,.14,s*.105);
+  part('serratus',byId.serratus.color,s*.615,3.303,.247,.117,.208,.109,-s*.29);
+  part('glutes',byId.glutes.color,s*.343,2.197,-.278,.350,.360,.21,s*.06);
+  part('quads',byId.quads.color,s*.438,1.628,.249,.257,.567,.195,s*.07);
+  part('quads',byId.quads.color,s*.597,1.607,.09,.110,.42,.13,-s*.07);
+  part('hamstrings',byId.hamstrings.color,s*.418,1.672,-.235,.258,.571,.168,-s*.05);
+  part('adductors',byId.adductors.color,s*.257,1.67,.14,.114,.448,.142,-s*.13);
+  part('calves',byId.calves.color,s*.444,.726,-.171,.213,.368,.156,s*.02);
+  part('calves',byId.calves.color,s*.325,.81,-.094,.110,.27,.108,s*.1);
+  part('shins',byId.shins.color,s*.451,.730,.183,.135,.380,.118,-s*.035);
+ }
+ // Rectus abdominis: 6 plates and subcostal regions.
+ for(let s of [-1,1])for(let n=0;n<3;n++)part('abs',byId.abs.color,s*.174,3.265-n*.255,.366+n*.008,.150,.121,.106,s*.025);
+}
+function compile(type,src){let s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s}
+function initGL(){gl=canvas.getContext('webgl2',{alpha:true,antialias:true,depth:true,premultipliedAlpha:false,powerPreference:'high-performance'});if(!gl){fallbackCtx=canvas.getContext('2d');if(!fallbackCtx)throw new Error('Não foi possível iniciar o renderizador neste navegador.');buildBody();resize();return;}
+ let vs=`#version 300 es\nprecision highp float;\nin vec3 aPosition;in vec3 aNormal;uniform mat4 uMVP;uniform mat4 uModel;out vec3 vNorm;out vec3 vWorld;void main(){vec4 p=uModel*vec4(aPosition,1.);vWorld=p.xyz;vNorm=mat3(transpose(inverse(uModel)))*aNormal;gl_Position=uMVP*vec4(aPosition,1.);}`;
+ let fs=`#version 300 es\nprecision highp float;in vec3 vNorm;in vec3 vWorld;uniform vec3 uColor;uniform vec3 uIdColor;uniform vec3 uEye;uniform float uSelected;uniform float uMuted;uniform int uPicking;out vec4 outColor;void main(){if(uPicking==1){outColor=vec4(uIdColor,1.);return;}vec3 n=normalize(vNorm);vec3 l=normalize(vec3(-.45,.72,.75));float diffuse=max(dot(n,l),0.);float fill=max(dot(n,normalize(vec3(.55,.25,-.80))),0.);float light=.34+.53*diffuse+.26*fill;vec3 view=normalize(uEye-vWorld);float edge=pow(1.-max(dot(view,n),0.),2.6);float gloss=pow(max(dot(reflect(-l,n),view),0.),27.);vec3 result=uColor*light+vec3(.93,.98,1.)*gloss*.16+vec3(.26,.56,.72)*edge*.12;result=mix(result, mix(uColor,vec3(1.),.27)*(.83+diffuse*.52)+vec3(.09,.07,.04)*edge, uSelected*.80);result*=1.-uMuted*.52;outColor=vec4(result,1.);}`;
+ let program=gl.createProgram();gl.attachShader(program,compile(gl.VERTEX_SHADER,vs));gl.attachShader(program,compile(gl.FRAGMENT_SHADER,fs));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(program));
+ shader={program,position:gl.getAttribLocation(program,'aPosition'),normal:gl.getAttribLocation(program,'aNormal'),mvp:gl.getUniformLocation(program,'uMVP'),model:gl.getUniformLocation(program,'uModel'),col:gl.getUniformLocation(program,'uColor'),id:gl.getUniformLocation(program,'uIdColor'),eye:gl.getUniformLocation(program,'uEye'),sel:gl.getUniformLocation(program,'uSelected'),muted:gl.getUniformLocation(program,'uMuted'),picking:gl.getUniformLocation(program,'uPicking')};
+ let vertices=[],normals=[],indices=[],rings=25,slices=36;
+ for(let i=0;i<=rings;i++){let theta=i/rings*Math.PI;for(let j=0;j<=slices;j++){let phi=j/slices*Math.PI*2;let x=Math.sin(theta)*Math.cos(phi),y=Math.cos(theta),z=Math.sin(theta)*Math.sin(phi);vertices.push(x,y,z);normals.push(x,y,z)}}
+ for(let i=0;i<rings;i++)for(let j=0;j<slices;j++){let a=i*(slices+1)+j,b=a+slices+1;indices.push(a,a+1,b,a+1,b+1,b)}
+ sphereIndexLength=indices.length;
+ let vao=gl.createVertexArray();gl.bindVertexArray(vao);
+ posBuf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,posBuf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.STATIC_DRAW);gl.vertexAttribPointer(shader.position,3,gl.FLOAT,false,0,0);gl.enableVertexAttribArray(shader.position);
+ normBuf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,normBuf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(normals),gl.STATIC_DRAW);gl.vertexAttribPointer(shader.normal,3,gl.FLOAT,false,0,0);gl.enableVertexAttribArray(shader.normal);
+ idxBuf=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,idxBuf);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(indices),gl.STATIC_DRAW);gl.bindVertexArray(null);shader.vao=vao;
+ gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.clearColor(0,0,0,0);buildBody();resize();
+}
+function resize(){if(!gl&&!fallbackCtx)return;let box=canvas.getBoundingClientRect();let dpr=Math.min(2,window.devicePixelRatio||1),w=Math.max(1,Math.floor(box.width*dpr)),h=Math.max(1,Math.floor(box.height*dpr));if(canvas.width===w&&canvas.height===h)return;canvas.width=w;canvas.height=h;if(!gl)return;if(pickTexture){gl.deleteTexture(pickTexture);gl.deleteRenderbuffer(depthRb);gl.deleteFramebuffer(pickFb)}
+ pickFb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,pickFb);
+ pickTexture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,pickTexture);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,pickTexture,0);
+ depthRb=gl.createRenderbuffer();gl.bindRenderbuffer(gl.RENDERBUFFER,depthRb);gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,w,h);gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,depthRb);
+ gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+}
+function draw(picking=false){if(!gl){if(fallbackCtx){drawSoftware();viewLabel()}return;}resize();gl.bindFramebuffer(gl.FRAMEBUFFER,picking?pickFb:null);gl.viewport(0,0,canvas.width,canvas.height);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(shader.program);gl.bindVertexArray(shader.vao);
+ let aim=worldAim(),eye=[aim[0],aim[1]+Math.sin(pitch)*distance,aim[2]+distance*Math.cos(pitch)];let proj=perspective(38*rad,canvas.width/canvas.height,.1,40),v=lookAt(eye,aim),vp=mul(proj,v),root=ry(angle);
+ gl.uniform3fv(shader.eye,eye);gl.uniform1i(shader.picking,picking?1:0);
+ for(let o of geometry){const model=mul(root,o.mat),mvp=mul(vp,model);gl.uniformMatrix4fv(shader.mvp,false,mvp);gl.uniformMatrix4fv(shader.model,false,model);gl.uniform3fv(shader.col,o.color);let id=o.id;gl.uniform3f(shader.id,(id&255)/255,((id>>8)&255)/255,((id>>16)&255)/255);gl.uniform1f(shader.sel,o.group===selected?1:0);gl.uniform1f(shader.muted,0);gl.drawElements(gl.TRIANGLES,sphereIndexLength,gl.UNSIGNED_SHORT,0)}
+ gl.bindVertexArray(null);viewLabel();
+}
+function drawSoftware(){
+  resize();const ctx=fallbackCtx,W=canvas.width,H=canvas.height;ctx.clearRect(0,0,W,H);
+  let aim=worldAim(),zoom=H/(2*Math.tan(38*rad/2));
+  function project(x,y,z){
+    let c=Math.cos(angle),s=Math.sin(angle),X=x*c+z*s-aim[0],Z=-x*s+z*c-aim[2];
+    let cp=Math.cos(pitch),sp=Math.sin(pitch),Y=(y-aim[1])*cp-Z*sp,D=(y-aim[1])*sp+Z*cp;
+    let k=zoom/Math.max(1,distance-D);return {x:W/2+X*k,y:H/2-Y*k,d:D,k};
+  }
+  projectedShapes=[];
+  for(let o of geometry){
+    let m=o.mat,x=m[12],y=m[13],z=m[14],p=project(x,y,z);
+    let vectors=[[m[0],m[1],m[2]],[m[4],m[5],m[6]],[m[8],m[9],m[10]]].map(v=>{let q=project(x+v[0],y+v[1],z+v[2]);return [q.x-p.x,q.y-p.y]});
+    let Cxx=0,Cyy=0,Cxy=0;for(let v of vectors){Cxx+=v[0]*v[0];Cyy+=v[1]*v[1];Cxy+=v[0]*v[1]}
+    let root=Math.sqrt((Cxx-Cyy)**2+4*Cxy*Cxy),L1=Math.max(.01,(Cxx+Cyy+root)/2),L2=Math.max(.01,(Cxx+Cyy-root)/2);
+    let theta=.5*Math.atan2(2*Cxy,Cxx-Cyy),rx=Math.sqrt(L1),ry=Math.sqrt(L2);
+    projectedShapes.push({x:p.x,y:p.y,d:p.d,rx,ry,theta,o,group:o.group});
+  }
+  projectedShapes.sort((a,b)=>a.d-b.d);
+  for(let q of projectedShapes){
+    let m=q.o,active=q.group===selected,muted=false;
+    let base=m.color.map(c=>Math.round(c*255)),light=base.map(v=>Math.round(v+(255-v)*(active?.40:.28))),dark=base.map(v=>Math.round(v*.48));
+    if(muted){base=base.map(v=>Math.round(v*.55));light=light.map(v=>Math.round(v*.57));dark=dark.map(v=>Math.round(v*.53));}
+    function css(a){return 'rgb('+a.map(v=>clamp(v,0,255)).join(',')+')'}
+    ctx.save();ctx.translate(q.x,q.y);ctx.rotate(q.theta);ctx.scale(Math.max(.01,q.rx),Math.max(.01,q.ry));
+    const grad=ctx.createRadialGradient(-.37,-.40,.05,-.18,-.22,1.38);
+    grad.addColorStop(0,css(light));grad.addColorStop(.55,css(base));grad.addColorStop(1,css(dark));
+    ctx.beginPath();ctx.arc(0,0,1,0,Math.PI*2);ctx.fillStyle=grad;ctx.fill();
+    if(active){ctx.lineWidth=2/Math.max(q.rx,q.ry);ctx.strokeStyle='rgba(255,255,255,.58)';ctx.stroke()}
+    ctx.restore();
+  }
+}
+function pick(evt){
+ if(!gl&&!fallbackCtx)return;
+ let rect=canvas.getBoundingClientRect();
+ let x=Math.floor((evt.clientX-rect.left)/rect.width*canvas.width);
+ let yTop=Math.floor((evt.clientY-rect.top)/rect.height*canvas.height);
+ if(x<0||yTop<0||x>=canvas.width||yTop>=canvas.height)return;
+ if(fallbackCtx){
+   // Canvas 2D usa origem no canto superior esquerdo.
+   for(let i=projectedShapes.length-1;i>=0;i--){
+     const q=projectedShapes[i];if(!q.group)continue;
+     let dx=x-q.x,dy=yTop-q.y,c=Math.cos(q.theta),s=Math.sin(q.theta);
+     let X=dx*c+dy*s,Y=-dx*s+dy*c;
+     if(X*X/(q.rx*q.rx)+Y*Y/(q.ry*q.ry)<1){select(q.group,true,q.o);break}
+   }
+   return;
+ }
+ // Correção: readPixels do WebGL usa origem INFERIOR esquerda.
+ // Sem inverter o Y, o clique do abdômen podia atingir outra região ou fundo.
+ let y=canvas.height-1-yTop;
+ draw(true);
+ gl.bindFramebuffer(gl.FRAMEBUFFER,pickFb);
+ const pixels=new Uint8Array(4);
+ gl.readPixels(x,y,1,1,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+ gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+ let id=pixels[0]|pixels[1]<<8|pixels[2]<<16;
+ const group=idMap.get(id);
+ if(group)select(group,true,partMap.get(id)||null);
+ draw();
+}
+const pointers=new Map();let gestureMoved=false,lastTap=0;
+canvas.addEventListener('pointerdown',evt=>{
+ pointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY,startX:evt.clientX,startY:evt.clientY});
+ canvas.setPointerCapture(evt.pointerId);flight=null;
+ if(pointers.size>=2)gestureMoved=true;
+});
+canvas.addEventListener('pointermove',evt=>{
+ let p=pointers.get(evt.pointerId);if(!p)return;
+ const dx=evt.clientX-p.x,dy=evt.clientY-p.y;
+ if(Math.hypot(evt.clientX-p.startX,evt.clientY-p.startY)>5)gestureMoved=true;
+ if(pointers.size===1){
+   if(gestureMoved){angle+=dx*.011;pitch=clamp(pitch+dy*.006,-.50,.50);stopAuto();draw()}
+ } else if(pointers.size===2){
+   const arr=[...pointers.entries()];const other=arr.find(([id])=>id!==evt.pointerId)?.[1];
+   if(other){const before=Math.hypot(p.x-other.x,p.y-other.y);
+     const after=Math.hypot(evt.clientX-other.x,evt.clientY-other.y);
+     if(before>1){distance=clamp(distance*before/Math.max(after,1),2.4,14);stopAuto();draw()}}
+ }
+ p.x=evt.clientX;p.y=evt.clientY;
+});
+canvas.addEventListener('pointerup',evt=>{
+ const p=pointers.get(evt.pointerId);
+ if(p&&pointers.size===1&&!gestureMoved){
+   const now=performance.now();
+   if(now-lastTap<300){lastTap=0;resetView()}
+   else {lastTap=now;pick(evt)}
+ }
+ pointers.delete(evt.pointerId);
+ if(pointers.size===0)gestureMoved=false;
+});
+canvas.addEventListener('pointercancel',evt=>{pointers.delete(evt.pointerId);if(!pointers.size)gestureMoved=false});
+canvas.addEventListener('wheel',evt=>{evt.preventDefault();flight=null;distance=clamp(distance+Math.sign(evt.deltaY)*.45,2.4,14);draw()},{passive:false});
+canvas.addEventListener('keydown',evt=>{
+ let changed=true;
+ if(evt.key==='ArrowLeft')angle-=.17;
+ else if(evt.key==='ArrowRight')angle+=.17;
+ else if(evt.key==='ArrowUp')pitch=clamp(pitch-.12,-.5,.5);
+ else if(evt.key==='ArrowDown')pitch=clamp(pitch+.12,-.5,.5);
+ else if(evt.key==='+'||evt.key==='=')distance=clamp(distance-.45,2.4,14);
+ else if(evt.key==='-')distance=clamp(distance+.45,2.4,14);
+ else if(evt.key==='r'||evt.key==='R'||evt.key==='Escape'){resetView();}
+ else changed=false;
+ if(changed){evt.preventDefault();if(!['r','R','Escape'].includes(evt.key))flight=null;draw()}
+});
+window.addEventListener('resize',()=>draw());
+if('ResizeObserver' in window){new ResizeObserver(()=>draw()).observe(stage)}
+function animate(t){
+ if(!animationRunning)return;
+ let dt=Math.min((t-lastFrame)/1000||0,.05);lastFrame=t;
+ let colorAnimating=false;
+ for(const [id,colorFlight] of colorFlights){
+   const ratio=clamp((t-colorFlight.started)/colorFlight.duration,0,1),eased=1-((1-ratio)**3);
+   setMuscleRgb(id,colorFlight.from.map((value,index)=>value+((colorFlight.to[index]-value)*eased)));
+   colorAnimating=true;
+   if(ratio>=1){byId[id].color=colorFlight.target;colorFlights.delete(id)}
+ }
+ if(flight){
+   let f=flight,u=clamp((t-f.begin)/f.duration,0,1);
+   let e=u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;
+   const mix=(a,b)=>a+(b-a)*e;
+   angle=mix(f.from.angle,f.to.angle);pitch=mix(f.from.pitch,f.to.pitch);
+   distance=mix(f.from.distance,f.to.distance);
+   focus=f.from.focus.map((v,i)=>mix(v,f.to.focus[i]));
+   if(u>=1)flight=null;
+   draw();
+ }else if(autorotate){angle+=dt*.38;draw()}
+ else if(colorAnimating)draw();
+ animID=requestAnimationFrame(animate);
+}
+try{initGL();draw();animID=requestAnimationFrame(animate)}catch(ex){error.hidden=false;error.textContent=ex.message||'Não foi possível carregar o modelo 3D.';console.error(ex);}
+})();
+
+</script>
+</body>
+</html>

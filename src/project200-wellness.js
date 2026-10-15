@@ -293,9 +293,10 @@ async function prepareProject200WellnessSchema() {
   await query(`create table if not exists project200_mechanical_strength_credits (
     user_id uuid not null references users(id) on delete cascade,
     session_id uuid not null, series_number integer not null, rir integer not null check (rir between 0 and 100),
-    points integer not null check (points between 0 and 3), credited_at timestamptz not null default now(),
+    points integer not null constraint project200_mechanical_strength_credits_points_check check (points between 0 and 7), credited_at timestamptz not null default now(),
     primary key (user_id, session_id, series_number)
   )`);
+  await migrateProject200MechanicalStrengthScoring();
   await query(`create table if not exists project200_exercise_library (
     user_id uuid not null references users(id) on delete cascade, assigned_profile text not null default 'Usuario',
     exercise_id text not null, exercise_name text not null, category text not null default 'strength',
@@ -369,6 +370,45 @@ async function prepareProject200WellnessSchema() {
   await query(`create index if not exists idx_project200_weight_user_profile_date on project200_weight_entries(user_id, assigned_profile, measured_at desc)`);
   await migrateProject200ExerciseMuscles();
   await migrateProject200ExercisePerformanceMetrics();
+}
+
+async function migrateProject200MechanicalStrengthScoring() {
+  const client = await db.connect();
+  try {
+    await client.query("begin");
+    await client.query("select pg_advisory_xact_lock(hashtext('project200-mechanical-strength-rir-points-v2'))");
+    await client.query(`create table if not exists project200_mechanical_strength_migrations (
+      migration_key text primary key, applied_at timestamptz not null default now()
+    )`);
+    const applied = await client.query(
+      "select 1 from project200_mechanical_strength_migrations where migration_key=$1",
+      ["rir-points-0-5-v2"]
+    );
+    if (!applied.rowCount) {
+      await client.query("alter table project200_mechanical_strength_credits drop constraint if exists project200_mechanical_strength_credits_points_check");
+      await client.query(`alter table project200_mechanical_strength_credits
+        add constraint project200_mechanical_strength_credits_points_check check (points between 0 and 7)`);
+      await client.query(`update project200_mechanical_strength_credits set points = case
+        when rir = 0 then 7 when rir = 1 then 5 when rir between 2 and 5 then 6 - rir else 0 end`);
+      await client.query(`update project200_mechanical_strength strength set points = coalesce((
+        select sum(credits.points)::bigint from project200_mechanical_strength_credits credits
+        where credits.user_id = strength.user_id
+      ), 0), updated_at = now()`);
+      await client.query(`insert into project200_mechanical_strength (user_id, points)
+        select user_id, sum(points)::bigint from project200_mechanical_strength_credits group by user_id
+        on conflict (user_id) do nothing`);
+      await client.query(
+        "insert into project200_mechanical_strength_migrations (migration_key) values ($1) on conflict do nothing",
+        ["rir-points-0-5-v2"]
+      );
+    }
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 let project200WellnessSchemaPromise = null;

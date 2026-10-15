@@ -1,5 +1,5 @@
 import { getApiUrl } from "../api.js";
-import { normalizeExerciseRir, mechanicalStrengthPoints, muscleGainMinutesForWorkout, workoutRestSeconds } from "./exercise-series-scoring.js?v=20261014-rir-v1";
+import { normalizeExerciseRir, mechanicalStrengthPoints, muscleGainMinutesForWorkout, workoutRestSeconds } from "./exercise-series-scoring.js?v=20261015-mechanical-rir-0-5-v2";
 import { PROJECT200_MUSCLE_BY_ID, normalizeProject200MuscleSelections, project200MuscleIdsFor } from "./exercise-muscles.js";
 import { PROJECT200_MUSCLE_MAPS } from "./exercise-muscle-maps.js";
 import { calculateProject200TimedMuscleGains, project200CurrentMuscleProgress, project200DecayedMusclePoints } from "./exercise-muscle-progress.js?v=20260915-performance-v1";
@@ -344,11 +344,11 @@ function restSnapshot(workout=state.workout){return {restSeconds:Math.max(0,Numb
 function pauseHiddenExerciseVideos(){ document.querySelectorAll("video[data-exercise-video]").forEach((video)=>{ if(video.closest("[hidden]")){ const shell=video.closest("[data-exercise-video-shell],[data-fixed-exercise-video-shell]");if(shell)showExerciseVideoCover(shell,{reset:true});else video.pause(); } }); }
 function mountWorkoutPlayer(){if(!runningMiniPlayer||!elements.workoutPlayerSlot)return;elements.workoutPlayerSlot.appendChild(runningMiniPlayer);runningMiniPlayer.classList.add("is-in-wellness-workout");}
 function restoreWorkoutPlayer(){if(!runningMiniPlayer||!runningMiniPlayerHomeParent)return;if(runningMiniPlayer.parentNode===runningMiniPlayerHomeParent){runningMiniPlayer.classList.remove("is-in-wellness-workout");return;}if(runningMiniPlayerHomeNext?.parentNode===runningMiniPlayerHomeParent)runningMiniPlayerHomeParent.insertBefore(runningMiniPlayer,runningMiniPlayerHomeNext);else runningMiniPlayerHomeParent.appendChild(runningMiniPlayer);runningMiniPlayer.classList.remove("is-in-wellness-workout");}
-function showLayer(layer){ phaseLayers.forEach((item)=>{ item.hidden=item!==layer; });modal?.classList.toggle("is-workout-phase",layer===elements.workoutLayer);if(layer===elements.workoutLayer)mountWorkoutPlayer();else restoreWorkoutPlayer();pauseHiddenExerciseVideos(); if(layer!==elements.detail){if(state.detailImageTimer)window.clearInterval(state.detailImageTimer);if(state.detailMuscleTimer)window.clearInterval(state.detailMuscleTimer);state.detailImageTimer=null;state.detailMuscleTimer=null;} }
+function showLayer(layer){ phaseLayers.forEach((item)=>{ item.hidden=item!==layer; });if(layer===elements.completeLayer)completionMuscleViewer()?.resume();else completionMuscleViewer()?.pause();modal?.classList.toggle("is-workout-phase",layer===elements.workoutLayer);if(layer===elements.workoutLayer)mountWorkoutPlayer();else restoreWorkoutPlayer();pauseHiddenExerciseVideos(); if(layer!==elements.detail){if(state.detailImageTimer)window.clearInterval(state.detailImageTimer);if(state.detailMuscleTimer)window.clearInterval(state.detailMuscleTimer);state.detailImageTimer=null;state.detailMuscleTimer=null;} }
 function stopWellnessVoice(){
   if(state.voiceRecorder&&state.voiceRecorder.state!=="inactive")state.voiceRecorder.stop();
 }
-function hideLayers(){ state.rirPending=false;stopWellnessVoice(); if(state.dailyReorderTimer)window.clearTimeout(state.dailyReorderTimer);state.dailyReorderTimer=null;state.dailyReorderActive=false;state.dailyReorderItem=null;phaseLayers.forEach((item)=>{ item.hidden=true; });modal?.classList.remove("is-workout-phase");restoreWorkoutPlayer();pauseHiddenExerciseVideos(); if(state.detailImageTimer)window.clearInterval(state.detailImageTimer);if(state.detailMuscleTimer)window.clearInterval(state.detailMuscleTimer); state.detailImageTimer=null;state.detailMuscleTimer=null; }
+function hideLayers(){ state.rirPending=false;stopWellnessVoice();completionMuscleViewer()?.pause(); if(state.dailyReorderTimer)window.clearTimeout(state.dailyReorderTimer);state.dailyReorderTimer=null;state.dailyReorderActive=false;state.dailyReorderItem=null;phaseLayers.forEach((item)=>{ item.hidden=true; });modal?.classList.remove("is-workout-phase");restoreWorkoutPlayer();pauseHiddenExerciseVideos(); if(state.detailImageTimer)window.clearInterval(state.detailImageTimer);if(state.detailMuscleTimer)window.clearInterval(state.detailMuscleTimer); state.detailImageTimer=null;state.detailMuscleTimer=null; }
 function setTab(tab){ state.tab=tab==="exercises"?"exercises":"nutrition";if(modal)modal.dataset.wellnessTab=state.tab; document.querySelectorAll("[data-wellness-tab]").forEach((button)=>button.classList.toggle("active",button.dataset.wellnessTab===state.tab)); document.querySelectorAll("[data-wellness-pane]").forEach((pane)=>pane.classList.toggle("active",pane.dataset.wellnessPane===state.tab)); const exercising=state.tab==="exercises"; elements.title.textContent=exercising?"Exercícios":"Nutrição"; elements.headerIcon.src=exercising?"/200/apps/exercicios.png":"/200/apps/nutricao.png"; }
 function openWellness(tab){ setTab(tab); modal?.setAttribute("aria-label",state.tab==="nutrition"?"Nutrição":"Exercícios"); modal?.classList.add("active"); modal?.setAttribute("aria-hidden","false"); document.body.classList.add("modal-open"); hideLayers(); startExerciseImageTicker(); if(state.tab==="exercises")warmExerciseProgressSound(); renderExerciseGrid(); void refreshAdminAccess(); void loadDashboard(); }
 function closeWellness(){ hideLayers(); modal?.classList.remove("active"); modal?.setAttribute("aria-hidden","true"); if(!document.querySelector(".workspace-modal.active"))document.body.classList.remove("modal-open"); }
@@ -1210,17 +1210,68 @@ function workoutCompletionSnapshot(workout){
   const dailyMetrics=state.dashboard?.today?.exerciseMetrics||{},dailyMetricTotals={energy:Math.max(0,Number(dailyMetrics.energy||0))+Number(metricGains.energy||0),strength:Math.max(0,Number(dailyMetrics.strength||0))+Number(metricGains.strength||0),resistance:Math.max(0,Number(dailyMetrics.resistance||0))+Number(metricGains.resistance||0)},dailyMetricBefore={energy:Math.max(0,Number(dailyMetrics.energy||0)),strength:Math.max(0,Number(dailyMetrics.strength||0)),resistance:Math.max(0,Number(dailyMetrics.resistance||0))};
   const media=exerciseImageSources(exercise); return {name:workout?.exerciseName||exercise?.name||"Exercício",exercise,image:media.poster||media.start,maps,progress,beforeProgress,gainByMuscle,metrics,metricGains,dailyMetricBefore,dailyMetricTotals,metricsBeforeMuscles:workout?.trackingType!=="series",progressFrom,progressTo,progressLabel:planned?"Progresso Total":"Progresso do Exercício",progressMax:planned?100:200};
 }
-function workoutCompletionMapMarkup(snapshot,mapEntry){
-  const {map,index,gainIds}=mapEntry,gradientId=`wellness-complete-overload-${state.completionRunId}-${index}`;
-  const muscleIds=[...new Set(map.regions.map((region)=>region.muscleId).filter((muscleId)=>gainIds.has(muscleId)))];
-  const gainsMarkup=muscleIds.map((muscleId)=>{const muscle=PROJECT200_MUSCLE_BY_ID[muscleId],from=completionDisplayPoints(snapshot.beforeProgress.get(muscleId)),to=completionDisplayPoints(snapshot.progress.get(muscleId)?.points);return `<div class="wellness-workout-complete-gain" data-completion-muscle-id="${escapeHtml(muscleId)}"><span>${escapeHtml(muscle?.name||muscleId)}</span><strong><em class="wellness-workout-complete-prefix">+</em><b data-muscle-gain-number data-from="${from}" data-to="${to}">${from}</b><em>PTS</em></strong></div>`;}).join("");
-  return `<section class="wellness-muscle-map-slide" aria-label="${escapeHtml(map.title)}"><div class="wellness-workout-complete-gains">${gainsMarkup}</div><svg viewBox="${escapeHtml(map.viewBox)}" role="img" aria-label="${escapeHtml(map.title)}"><defs>${muscleOverloadGradientMarkup(gradientId)}</defs><path class="wellness-muscle-map-skin" d="${escapeHtml(map.skinPath)}"></path>${map.regions.map((region)=>{ const gained=gainIds.has(region.muscleId),item=snapshot.progress.get(region.muscleId),percent=Number(item?.percent||0),opacity=Math.min(1,.42+(Math.min(percent,110)/110)*.58),overload=gained&&percent>=110; return `<path class="wellness-muscle-map-region${gained?" is-gained":""}${overload?" is-overload":""}"${gained?` data-completion-muscle-region="${escapeHtml(region.muscleId)}"`:""} d="${escapeHtml(region.path)}"${gained?` style="--muscle-color:${escapeHtml(item?.color||"rgb(148 163 184)")};--muscle-opacity:${opacity};${overload?`--muscle-fill:url(#${gradientId});`:""}"`:""}></path>`; }).join("")}</svg></section>`;
+const WORKOUT_COMPLETION_3D_MUSCLE_BY_ID = Object.freeze({
+  pescoco:{id:"traps",view:"back"}, deltoide:{id:"delts",view:"front"}, "deltoide-posterior":{id:"delts",view:"back"},
+  "peitoral-maior":{id:"chest",view:"front"}, "serratil-anterior":{id:"serratus",view:"front"},
+  "reto-abdominal-superior":{id:"abs",view:"front"}, "reto-abdominal-medio":{id:"abs",view:"front"}, "reto-abdominal-inferior":{id:"abs",view:"front"},
+  "obliquo-externo":{id:"obliques",view:"front"}, biceps:{id:"biceps",view:"front"}, antebraco:{id:"forearms",view:"front"},
+  "antebraco-posterior":{id:"forearms",view:"back"}, "flexores-quadril":{id:"quads",view:"front"}, "vasto-lateral":{id:"quads",view:"front"},
+  "reto-femoral":{id:"quads",view:"front"}, "vasto-medial":{id:"quads",view:"front"}, adutores:{id:"adductors",view:"front"},
+  "regiao-patelar":{id:"quads",view:"front"}, "tibial-anterior":{id:"shins",view:"front"}, panturrilha:{id:"calves",view:"back"}, pe:{id:"shins",view:"front"},
+  trapezio:{id:"traps",view:"back"}, romboide:{id:"rhomboids",view:"back"}, "latissimo-dorso":{id:"lats",view:"back"},
+  triceps:{id:"triceps",view:"back"}, lombar:{id:"lowerback",view:"back"}, "gluteo-medio":{id:"glutes",view:"back"},
+  "gluteo-maximo":{id:"glutes",view:"back"}, "posterior-coxa":{id:"hamstrings",view:"back"}, "panturrilha-posterior":{id:"calves",view:"back"}
+});
+function completionMuscleHeatHex(progress){
+  const channels=String(progress?.color||"rgb(125 135 148)").match(/\d+/g)?.slice(0,3).map(Number);
+  if(!channels||channels.length<3)return "#7d8794";
+  return `#${channels.map((value)=>Math.max(0,Math.min(255,value)).toString(16).padStart(2,"0")).join("")}`;
+}
+function workoutCompletionMapMarkup(snapshot){
+  const mapped=[];
+  snapshot.maps.forEach(({map,gainIds},index)=>map.regions.forEach(({muscleId})=>{
+    if(gainIds.has(muscleId)&&!mapped.some((item)=>item.muscleId===muscleId))mapped.push({muscleId,index});
+  }));
+  const gainsMarkup=mapped.map(({muscleId,index})=>{
+    const muscle=PROJECT200_MUSCLE_BY_ID[muscleId],progress=snapshot.progress.get(muscleId),target=WORKOUT_COMPLETION_3D_MUSCLE_BY_ID[muscleId]||{},from=completionDisplayPoints(snapshot.beforeProgress.get(muscleId)),to=completionDisplayPoints(progress?.points);
+    return `<button class="wellness-workout-complete-gain" type="button" aria-pressed="false" data-completion-muscle-id="${escapeHtml(muscleId)}" data-completion-map-index="${index}" data-viewer-muscle-id="${escapeHtml(target.id||"")}" data-viewer-view="${escapeHtml(target.view||"")}" data-heat-color="${completionMuscleHeatHex(progress)}"><span>${escapeHtml(muscle?.name||muscleId)}</span><strong><em class="wellness-workout-complete-prefix">+</em><b data-muscle-gain-number data-from="${from}" data-to="${to}">${from}</b><em>PTS</em></strong></button>`;
+  }).join("");
+  return `<section class="wellness-muscle-map-slide wellness-workout-complete-3d-slide" aria-label="Músculos treinados"><div class="wellness-workout-complete-gains">${gainsMarkup}</div><iframe class="wellness-workout-complete-model-3d" data-workout-completion-3d title="Modelo 3D dos músculos treinados" src="/200/muscle-viewer-3d.html?v=20261015-muscle-model-3d-v1" loading="eager" scrolling="no"></iframe></section>`;
 }
 function prepareWorkoutCompletion(snapshot){
   const runId=++state.completionRunId; elements.completeName.textContent=snapshot.name;elements.completeName.classList.toggle("is-long",snapshot.name.length>10||snapshot.name.trim().includes(" ")); configureFixedExerciseMedia(elements.completePortrait,elements.completeImage,elements.completeVideo,snapshot.exercise,{movementOnly:true}); elements.completeImage.alt=`${snapshot.name} concluído`; elements.completeProgressFill.style.width=`${Math.min(100,(snapshot.progressFrom/Math.max(1,snapshot.progressMax))*100)}%`;elements.completeProgressFill.dataset.level=String(snapshot.progressFrom);elements.completeProgressText.textContent=`${snapshot.progressLabel} ${snapshot.progressFrom}%`; elements.completeDots.innerHTML=snapshot.maps.map((_,index)=>`<i class="${index===0?"is-active":""}"></i>`).join(""); elements.completeMap.classList.remove("is-revealed"); elements.completeMap.innerHTML=snapshot.maps[0]?workoutCompletionMapMarkup(snapshot,snapshot.maps[0]):"";if(elements.completeMetricStage)elements.completeMetricStage.hidden=true; elements.completeLayer.classList.remove("is-muscle-stage","is-metric-stage","is-portrait-exiting","is-approved"); elements.completeLayer.classList.add("is-portrait-stage"); showLayer(elements.completeLayer); if(!elements.completeVideo?.hidden){elements.completeVideo.currentTime=0;void elements.completeVideo.play().catch(()=>{});} return runId;
 }
 function waitForCompletionFrame(){ return new Promise((resolve)=>window.requestAnimationFrame(()=>window.requestAnimationFrame(resolve))); }
 function waitForCompletionTime(milliseconds){ return new Promise((resolve)=>window.setTimeout(resolve,milliseconds)); }
+function completionMuscleViewer(frame=elements.completeMap?.querySelector("[data-workout-completion-3d]")){
+  try{return frame?.contentWindow?.iLifeMuscle3D||null;}catch{return null;}
+}
+function setActiveCompletionMuscle(row){
+  elements.completeMap?.querySelectorAll("[data-completion-muscle-id]").forEach((item)=>{const active=item===row;item.classList.toggle("is-active",active);item.setAttribute("aria-pressed",String(active));});
+}
+function bindCompletionMuscleViewer(frame,viewer){
+  if(!frame||frame.dataset.viewerSelectionBound==="true")return;
+  frame.dataset.viewerSelectionBound="true";
+  try{frame.contentWindow.addEventListener("ilife:muscle-select",(event)=>{
+    const row=[...elements.completeMap.querySelectorAll("[data-completion-muscle-id]")].find((item)=>item.dataset.viewerMuscleId===event.detail?.id);
+    if(row)setActiveCompletionMuscle(row);
+  });}catch{}
+  if(elements.completeMap.dataset.viewerGainClickBound!=="true"){
+    elements.completeMap.dataset.viewerGainClickBound="true";
+    elements.completeMap.addEventListener("click",(event)=>{
+      const row=event.target.closest("[data-completion-muscle-id]");if(!row)return;setActiveCompletionMuscle(row);
+      completionMuscleViewer()?.focusMuscle(row.dataset.viewerMuscleId,null,row.dataset.viewerView||null);
+    });
+  }
+}
+function waitForCompletionMuscleViewer(){
+  const frame=elements.completeMap?.querySelector("[data-workout-completion-3d]");if(!frame)return Promise.resolve(null);
+  const ready=completionMuscleViewer(frame);if(ready){bindCompletionMuscleViewer(frame,ready);return Promise.resolve(ready);}
+  return new Promise((resolve)=>{
+    let settled=false;const finish=()=>{if(settled)return;settled=true;window.clearTimeout(timer);const viewer=completionMuscleViewer(frame);if(viewer)bindCompletionMuscleViewer(frame,viewer);resolve(viewer);};
+    const timer=window.setTimeout(finish,2400);frame.addEventListener("load",finish,{once:true});
+  });
+}
 function completionDisplayPoints(points){ return Math.max(0,Math.round(Number(points||0)*5)); }
 function completionProgressColors(value){const percent=Number(value||0);if(percent>=200)return ["#ef4444","#b91c1c"];if(percent>=150)return ["#f97316","#ea580c"];if(percent>=120)return ["#22c55e","#facc15"];return ["#16a34a","#4ade80"];}
 function animateCompletionProgress(snapshot,duration,runId){
@@ -1244,13 +1295,21 @@ async function animateWorkoutMetrics(snapshot,runId){for(const descriptor of WOR
 async function animateWorkoutMuscles(snapshot,runId){
   elements.completeLayer.classList.remove("is-metric-stage");elements.completeLayer.classList.add("is-muscle-stage");
   if(!snapshot.maps.length){await waitForCompletionTime(420);return;}
+  await waitForCompletionFrame();if(state.completionRunId!==runId)return;elements.completeMap.classList.add("is-revealed");
+  const viewer=await waitForCompletionMuscleViewer();if(state.completionRunId!==runId)return;viewer?.resetColors();viewer?.reset();
+  const gains=[...elements.completeMap.querySelectorAll("[data-completion-muscle-id]")];
   for(let index=0;index<snapshot.maps.length;index+=1){
     if(state.completionRunId!==runId)return;
-    if(index){ elements.completeMap.classList.remove("is-revealed"); elements.completeMap.innerHTML=workoutCompletionMapMarkup(snapshot,snapshot.maps[index]); }
     [...elements.completeDots.children].forEach((dot,dotIndex)=>dot.classList.toggle("is-active",dotIndex===index));
-    await waitForCompletionFrame();if(state.completionRunId!==runId)return;elements.completeMap.classList.add("is-revealed");const gains=[...elements.completeMap.querySelectorAll("[data-completion-muscle-id]")],regions=[...elements.completeMap.querySelectorAll("[data-completion-muscle-region]")];
-    for(const gain of gains){if(state.completionRunId!==runId)return;const muscleId=gain.dataset.completionMuscleId,muscleRegions=regions.filter((item)=>item.dataset.completionMuscleRegion===muscleId);gains.forEach((item)=>item.classList.toggle("is-active",item===gain));regions.forEach((region)=>region.classList.toggle("is-current-gain",muscleRegions.includes(region)));muscleRegions.forEach((region)=>region.classList.add("is-revealed-gain"));await waitForCompletionFrame();if(state.completionRunId!==runId)return;await animateCompletionMuscleNumber(gain.querySelector("[data-muscle-gain-number]"),1200,runId);if(state.completionRunId!==runId)return;}
-    regions.forEach((region)=>region.classList.remove("is-current-gain"));await waitForCompletionTime(220);
+    const mapGains=gains.filter((gain)=>Number(gain.dataset.completionMapIndex)===index);
+    for(const gain of mapGains){
+      if(state.completionRunId!==runId)return;setActiveCompletionMuscle(gain);
+      const viewerId=gain.dataset.viewerMuscleId,view=gain.dataset.viewerView||null,focused=viewer&&viewerId?viewer.focusMuscle(viewerId,null,view):false;
+      if(focused){await waitForCompletionTime(1000);if(state.completionRunId!==runId)return;viewer.animateMuscleColor(viewerId,gain.dataset.heatColor,1200);}
+      await Promise.all([animateCompletionMuscleNumber(gain.querySelector("[data-muscle-gain-number]"),1200,runId),focused?waitForCompletionTime(1200):Promise.resolve()]);
+      if(state.completionRunId!==runId)return;
+    }
+    await waitForCompletionTime(220);
   }
   await waitForCompletionTime(420);
 }

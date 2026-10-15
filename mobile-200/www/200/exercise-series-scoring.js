@@ -9,7 +9,8 @@ export function normalizeExerciseRir(value) {
 
 export function mechanicalStrengthPoints(value) {
   const rir = normalizeExerciseRir(value);
-  return rir === 0 ? 3 : rir === 1 ? 1 : 0;
+  if (rir === null || rir > 5) return 0;
+  return [7, 5, 4, 3, 2, 1][rir];
 }
 
 export function muscleGainMinutesForWorkout(workout = {}) {
