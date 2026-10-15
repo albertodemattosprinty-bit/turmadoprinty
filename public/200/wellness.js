@@ -172,7 +172,7 @@ const elements = {
   qualityFill:byId("wellnessQualityFill"), mealCount:byId("wellnessMealCount"), lunaMessage:byId("wellnessLunaMessage"), foodForm:byId("wellnessFoodForm"),
   foodInput:byId("wellnessFoodInput"), timeQuestion:byId("wellnessTimeQuestion"), foodTime:byId("wellnessFoodTime"), foodSend:byId("wellnessFoodSend"),
   nutritionStatus:byId("wellnessNutritionStatus"), mealList:byId("wellnessMealList"), exerciseGrid:byId("wellnessExerciseGrid"), exerciseCategoryName:byId("wellnessExerciseCategoryName"), workoutHistory:byId("wellnessWorkoutHistory"), exerciseDailyCard:byId("wellnessExerciseDailyProgress"), exerciseDailyPlay:byId("wellnessExerciseDailyPlay"), exerciseDailyPercent:byId("wellnessExerciseDailyPercent"), exerciseDailyProgressFill:byId("wellnessExerciseDailyProgressFill"), dailyPlanLayer:byId("wellnessDailyPlanLayer"), dailyPlanList:byId("wellnessDailyPlanList"), dailyPlanStatus:byId("wellnessDailyPlanStatus"),
-  muscleProgressMapTrack:byId("wellnessMuscleProgressMapTrack"), muscleProgressSummary:byId("wellnessMuscleProgressSummary"),
+  muscleProgressMapTrack:byId("wellnessMuscleProgressMapTrack"), muscleProgressExercisesButton:byId("wellnessMuscleProgressExercises"), muscleProgressSummary:byId("wellnessMuscleProgressSummary"),
   catalogLayer:byId("wellnessCatalogLayer"), catalogGrid:byId("wellnessCatalogGrid"), openCatalog:byId("wellnessOpenCatalog"), catalogSearch:byId("wellnessCatalogSearch"), catalogSearchClear:byId("wellnessCatalogSearchClear"), catalogFilterToggle:byId("wellnessCatalogFilterToggle"), catalogFilterCount:byId("wellnessCatalogFilterCount"), catalogFilterPanel:byId("wellnessCatalogFilterPanel"), catalogDifficultyFilter:byId("wellnessCatalogDifficultyFilter"), catalogMuscleOpen:byId("wellnessCatalogMuscleOpen"), catalogMuscleName:byId("wellnessCatalogMuscleName"), catalogFilterClear:byId("wellnessCatalogFilterClear"), catalogSort:byId("wellnessCatalogSort"), catalogResults:byId("wellnessCatalogResults"), catalogMuscleLayer:byId("wellnessCatalogMuscleLayer"), catalogMuscleTitle:byId("wellnessCatalogMuscleTitle"), catalogMuscleTrack:byId("wellnessCatalogMuscleTrack"), catalogMuscleDots:byId("wellnessCatalogMuscleDots"), catalogMuscleClear:byId("wellnessCatalogMuscleClear"),
   catalogAddLayer:byId("wellnessCatalogAddLayer"), catalogAddName:byId("wellnessCatalogAddName"), catalogAddFrame:byId("wellnessCatalogAddFrame"), catalogAddImage:byId("wellnessCatalogAddImage"), catalogAddVideo:byId("wellnessCatalogAddVideo"), catalogAddConfirm:byId("wellnessCatalogAddConfirm"), catalogAddStatus:byId("wellnessCatalogAddStatus"),
   activeWorkout:byId("wellnessActiveWorkout"), activeWorkoutImage:byId("wellnessActiveWorkoutImage"), activeWorkoutVideo:byId("wellnessActiveWorkoutVideo"), workoutName:byId("wellnessWorkoutName"), workoutCounter:byId("wellnessWorkoutCounter"), workoutDetail:byId("wellnessWorkoutDetail"),
@@ -200,6 +200,7 @@ const phaseLayers = [elements.dailyPlanLayer,elements.catalogLayer,elements.cata
 function hasVisibleWellnessPhase(){return phaseLayers.some((layer)=>!layer.hidden);}
 const EXERCISE_IMAGE_PHASES = ["start","finish","muscle"];
 const state = { tab:"nutrition", filter:"all", catalogQuery:"", catalogType:"", catalogDifficulty:0, catalogMuscleId:"", catalogSort:"popular", catalogSearchTimer:null, dashboard:null, isAdmin:false, selectedExercise:null, selectedMuscleId:"", muscleReturnView:"detail", detailMode:"selected", goalEditMode:false, goalTrackingType:"", goalWeekDays:[1,2,3,4,5,6], goalFlowId:0, loadDraftKg:10, loadRepeatTimer:null, loadRepeatDelayTimer:null, loadHoldTimer:null, loadHoldTriggered:false, loadPointerUsedUntil:0, workout:null, workoutStarting:false, workoutFinishHoldTimer:null, workoutFinishHoldTriggered:false, workoutFinishPointerUntil:0, workoutNavigationWorkoutId:"", workoutNavigationExerciseId:"", steps:0, lastStepAt:0, motionListening:false, saveTimer:null, ticker:null, exerciseImageTimer:null, detailImageTimer:null, detailMuscleTimer:null, muscleProgressTimer:null, workoutMetaTimer:null, provisionalMuscleProgress:new Map(), deletedWorkoutIds:new Set(), completionRunId:0, exerciseImagePhase:"start", detailImagePhase:"start", muscleNameIndex:0, pendingMeal:"", selectedMealSlot:"", gpsWatchId:null, gpsProvider:"", gpsLastPoint:null, gpsDistanceMeters:0, gpsDisplayDistanceMeters:null, gpsDisplayAnimationFrame:null, gpsCurrentSpeedKmh:0, gpsReadoutMode:"distance", gpsReadoutTimer:null, gpsAccuracy:null, gpsStatus:"GPS aguardando localização", gpsPlugin:null, seriesRepsDraft:null, seriesSaveChain:Promise.resolve(), seriesWorkUntil:0, seriesWorkWorkoutId:"", seriesWorkNumber:0, seriesWorkDurationMs:0, seriesWorkTimer:null, seriesRestUntil:0, seriesRestWorkoutId:"", seriesRestTimer:null, seriesRestDelayTimer:null, seriesRestRevealTimer:null, seriesRestPending:false, dailyReorderTimer:null, dailyReorderActive:false, dailyReorderPointerId:null, dailyReorderItem:null, dailyReorderStartX:0, dailyReorderStartY:0, adminImageHoldTimer:null, adminImageHoldTriggered:false, adminImageHoldX:0, adminImageHoldY:0, adminVideoHoldTimer:null, adminVideoHoldTriggered:false, suppressExerciseImageClick:false, generatingExerciseId:"", uploadingExerciseVideoId:"", generatingDefinitions:false, generatingThumbs:false, thumbGenerationCompleted:0, thumbGenerationTotal:0, voiceRecorder:null, voiceStream:null, voiceTarget:null, editingWorkout:null };
+let homeSelectedMuscleIds=[],homeSelectedMuscleName="";
 
 let catalogCreateName="",catalogCreateError="";
 const runningMiniPlayer=byId("runningMiniPlayer"),runningMiniPlayerHomeParent=runningMiniPlayer?.parentNode||null,runningMiniPlayerHomeNext=runningMiniPlayer?.nextSibling||null;
@@ -474,7 +475,19 @@ function homeMuscleViewer(frame=elements.muscleProgressMapTrack){try{return fram
 function bindHomeMuscleViewer(frame){
   if(!frame||frame.dataset.viewerLoadBound==="true")return;
   frame.dataset.viewerLoadBound="true";
-  const sync=()=>{const viewer=homeMuscleViewer(frame);if(!viewer)return;if(frame.dataset.viewerSelectionBound!=="true"){frame.dataset.viewerSelectionBound="true";try{frame.contentWindow.addEventListener("ilife:muscle-select",(event)=>{const viewerId=String(event.detail?.id||""),view=event.detail?.view||"front",muscleIds=Object.entries(WORKOUT_COMPLETION_3D_MUSCLE_BY_ID).filter(([,target])=>target.id===viewerId&&target.view===view).map(([muscleId])=>muscleId);if(muscleIds.length)renderMuscleExercises(muscleIds,"dashboard",viewer.getMuscles().find((item)=>item.id===viewerId)?.name||PROJECT200_MUSCLE_BY_ID[muscleIds[0]]?.name);});}catch{}}refreshMuscleProgressMap();};
+  const sync=()=>{
+    const viewer=homeMuscleViewer(frame);if(!viewer)return;
+    if(frame.dataset.viewerSelectionBound!=="true"){
+      frame.dataset.viewerSelectionBound="true";
+      try{frame.contentWindow.addEventListener("ilife:muscle-select",(event)=>{
+        const viewerId=String(event.detail?.id||""),view=event.detail?.view||"front";
+        homeSelectedMuscleIds=Object.entries(WORKOUT_COMPLETION_3D_MUSCLE_BY_ID).filter(([,target])=>target.id===viewerId&&target.view===view).map(([muscleId])=>muscleId);
+        homeSelectedMuscleName=PROJECT200_MUSCLE_BY_ID[homeSelectedMuscleIds[0]]?.name||viewer.getMuscles().find((item)=>item.id===viewerId)?.name||"Músculo";
+        if(elements.muscleProgressExercisesButton){elements.muscleProgressExercisesButton.hidden=!homeSelectedMuscleIds.length;elements.muscleProgressExercisesButton.setAttribute("aria-label",`Ver exercícios para ${homeSelectedMuscleName}`);}
+      });}catch{}
+    }
+    refreshMuscleProgressMap();
+  };
   frame.addEventListener("load",sync,{once:true});sync();
 }
 function syncHomeMuscleViewer(progress=currentMuscleProgress()){
@@ -497,7 +510,7 @@ function refreshMuscleProgressMap(){
 }
 function renderMuscleProgressMap(){
   if(!elements.muscleProgressMapTrack)return;
-  if(!elements.muscleProgressMapTrack.getAttribute("src"))elements.muscleProgressMapTrack.src="/200/muscle-viewer-3d.html?v=20261015-muscle-home-3d-v1";
+  if(!elements.muscleProgressMapTrack.getAttribute("src"))elements.muscleProgressMapTrack.src="/200/muscle-viewer-3d.html?mode=home&v=20261015-muscle-home-3d-v2";
   bindHomeMuscleViewer(elements.muscleProgressMapTrack);
   refreshMuscleProgressMap();
 }
@@ -1466,6 +1479,7 @@ elements.catalogAddFrame?.addEventListener("click",()=>toggleExerciseVideo(eleme
 byId("wellnessExerciseDetailClose")?.addEventListener("click",()=>{ if(state.detailMode==="catalog")openCatalog(); else hideLayers(); });
 elements.muscleMapTrack?.addEventListener("click",(event)=>{ const region=event.target.closest("[data-muscle-id]"); if(region)renderMuscleExercises(region.dataset.muscleId,"detail"); });
 elements.muscleMapTrack?.addEventListener("keydown",(event)=>{ if(!["Enter"," "].includes(event.key))return; const region=event.target.closest("[data-muscle-id]"); if(region){event.preventDefault();renderMuscleExercises(region.dataset.muscleId);} });
+elements.muscleProgressExercisesButton?.addEventListener("click",()=>{if(homeSelectedMuscleIds.length)renderMuscleExercises(homeSelectedMuscleIds,"dashboard",homeSelectedMuscleName);});
 elements.muscleMapTrack?.addEventListener("scroll",()=>{ const width=Math.max(1,elements.muscleMapTrack.clientWidth),index=Math.max(0,Math.min(PROJECT200_MUSCLE_MAPS.length-1,Math.round(elements.muscleMapTrack.scrollLeft/width))); [...elements.muscleMapDots.children].forEach((dot,dotIndex)=>dot.classList.toggle("is-active",dotIndex===index)); },{passive:true});
 byId("wellnessMuscleExercisesClose")?.addEventListener("click",()=>{ if(state.muscleReturnView==="dashboard")hideLayers(); else openExerciseDetail(state.selectedExercise,state.detailMode); });
 elements.muscleExercisesList?.addEventListener("click",(event)=>{ const id=event.target.closest("[data-muscle-exercise-id]")?.dataset.muscleExerciseId,exercise=exerciseCatalog().find((item)=>item.id===id); if(exercise)openExerciseDetail(exercise,libraryItem(exercise.id)?"selected":"catalog"); });

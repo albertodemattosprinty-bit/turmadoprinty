@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>iLife · Componente Muscular 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@700;800&family=Sora:wght@700;800&display=swap" rel="stylesheet">
 <!--
   iLife — COMPONENTE VISUAL AUTÔNOMO PARA O CODEX
   EXIBIR: SOMENTE O CANVAS 3D (nenhuma lista, painel, título ou exercício).
@@ -33,10 +36,11 @@
     display:block; width:100%; height:100%; cursor:grab; touch-action:none;
     outline:none;
   }
+  #ilife-muscle-viewer[data-home-presentation="true"] canvas {cursor:pointer;}
   #ilife-muscle-viewer canvas:active {cursor:grabbing;}
   #ilife-muscle-viewer canvas:focus-visible {outline:2px solid #88eadc;outline-offset:-2px;}
   #musclePointLabels {position:absolute;inset:0;overflow:hidden;pointer-events:none;}
-  #musclePointLabels span {position:absolute;transform:translate(-50%,-50%);color:#fff;font:900 12px/1 "Sora",Arial,sans-serif;letter-spacing:-.02em;text-shadow:0 1px 3px #000,0 0 7px rgba(0,0,0,.95);white-space:nowrap;will-change:left,top;}
+  #musclePointLabels span {position:absolute;transform:translate(-50%,-50%);color:#fff;font:900 15.6px/1 "Sora","Exo 2",system-ui,sans-serif;letter-spacing:-.04em;text-shadow:0 1px 3px #000,0 0 7px rgba(0,0,0,.95),0 0 10px rgba(34,211,238,.3);-webkit-text-stroke:.2px rgba(255,255,255,.55);white-space:nowrap;will-change:left,top,font-size;}
   .ilife-viewer-error {position:absolute;inset:20% 10% auto;padding:14px;
     font:14px/1.5 sans-serif;text-align:center;color:#fff;background:#29354b;
     border-radius:10px;border:1px solid #b86a7f;}
@@ -79,12 +83,15 @@ const NEUTRAL_MUSCLE_COLOR = '#7d8794';
 const stage = document.getElementById('ilife-muscle-viewer');
 const canvas = document.getElementById('anatomyCanvas');
 const pointLabels = document.getElementById('musclePointLabels');
+const HOME_PRESENTATION = new URLSearchParams(location.search).get('mode') === 'home';
+stage.dataset.homePresentation = String(HOME_PRESENTATION);
 const error = document.getElementById('stageError');
 const BASE_DISTANCE = 8.75;
 const FOCUS_DISTANCE = BASE_DISTANCE / 2; // +100% em ampliação linear (aproximadamente 2×)
 const BASE_AIM = [0,2.06,0];
 let selected=null, angle=0, pitch=.025, distance=BASE_DISTANCE, autorotate=false;
 let focus = [...BASE_AIM], flight = null;
+let homePresentationView='front', homePresentationTimer=null, homePresentationResumeTimer=null;
 let musclePointLabels=[];
 let gl, fallbackCtx, shader, sphereIndexLength, posBuf, normBuf, idxBuf, pickFb, pickTexture, depthRb;
 let projectedShapes=[];
@@ -122,13 +129,15 @@ const SIDE_FOCUS = new Set(['delts','biceps','triceps','forearms','obliques','se
                            'quads','hamstrings','adductors','calves','shins','glutes']);
 function select(id,move=true,clickedPart=null,side=null,view=null){
  const m=byId[id];if(!m)return false;
+ if(HOME_PRESENTATION)pauseHomePresentationForFocus();
  selected=id;
  if(move){
    const anchor=FOCUS_ANCHORS[id] || BASE_AIM;
-   const center=[...anchor];
-   let nextAngle=view==='back'?Math.PI:view==='side'?Math.PI/2:view==='front'?0:m.view;
+   const center=HOME_PRESENTATION?[0,anchor[1],0]:[...anchor];
+   const targetView=view;
+   let nextAngle=targetView==='back'?Math.PI:targetView==='side'?Math.PI/2:targetView==='front'?0:m.view;
    let sideX=0;
-   if(SIDE_FOCUS.has(id)){
+   if(SIDE_FOCUS.has(id)&&!HOME_PRESENTATION){
      if(clickedPart){ sideX=clickedPart.mat[12]; center[0]=sideX; }
      else if(side==='left'||side==='right'){
        sideX=(side==='right'?1:-1)*(id==='delts'?.88:id==='forearms'?1.21:id==='biceps'||id==='triceps'?1.11:.43);
@@ -139,7 +148,7 @@ function select(id,move=true,clickedPart=null,side=null,view=null){
        center[0]=sideX;
      }
    }
-   if(Math.abs(sideX)>.05){
+   if(!HOME_PRESENTATION&&Math.abs(sideX)>.05){
      let surfaceAngle=-Math.atan2(sideX,anchor[2]);
      const maxTurn=['delts','biceps','triceps','forearms','serratus','obliques'].includes(id)?1.32:1.05;
      nextAngle=m.view+clamp(normalizeAngle(surfaceAngle-m.view),-maxTurn,maxTurn);
@@ -169,6 +178,23 @@ function flyTo(nextAngle,nextFocus=focus,nextDistance=distance,nextPitch=pitch){
    angle=flight.to.angle;pitch=nextPitch;distance=nextDistance;focus=[...nextFocus];flight=null;draw();
  }
 }
+function startHomePresentation(){
+ if(!HOME_PRESENTATION||homePresentationTimer)return;
+ homePresentationTimer=window.setInterval(()=>{
+   homePresentationView=homePresentationView==='front'?'back':'front';
+   flyTo(homePresentationView==='back'?Math.PI:0,BASE_AIM,BASE_DISTANCE,.025);
+ },1500);
+}
+function pauseHomePresentationForFocus(){
+ if(homePresentationTimer){window.clearInterval(homePresentationTimer);homePresentationTimer=null;}
+ if(homePresentationResumeTimer)window.clearTimeout(homePresentationResumeTimer);
+ homePresentationResumeTimer=window.setTimeout(()=>{
+   selected=null;
+   homePresentationView=Math.abs(normalizeAngle(angle))<Math.PI/2?'front':'back';
+   flyTo(homePresentationView==='back'?Math.PI:0,BASE_AIM,BASE_DISTANCE,.025);
+   homePresentationResumeTimer=window.setTimeout(()=>{homePresentationResumeTimer=null;startHomePresentation();},1050);
+ },4000);
+}
 function normalizeAngle(a){return ((a+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI}
 function viewLabel(){
  if(!pointLabels||!musclePointLabels.length)return;
@@ -186,7 +212,7 @@ function viewLabel(){
    const clipX=vp[0]*x+vp[4]*y+vp[8]*z+vp[12],clipY=vp[1]*x+vp[5]*y+vp[9]*z+vp[13],clipW=vp[3]*x+vp[7]*y+vp[11]*z+vp[15];
    if(clipW<=0){node.hidden=true;continue;}
    const nx=clipX/clipW,ny=clipY/clipW;node.hidden=nx< -1||nx>1||ny< -1||ny>1;
-   if(!node.hidden){node.style.left=`${(nx+1)*50}%`;node.style.top=`${(1-ny)*50}%`;node.style.opacity=String(clamp((facing-.10)/.35,.25,1));}
+   if(!node.hidden){node.style.left=`${(nx+1)*50}%`;node.style.top=`${(1-ny)*50}%`;node.style.opacity=String(clamp((facing-.10)/.35,.25,1));node.style.fontSize=`${15.6*clamp(BASE_DISTANCE/clipW,.72,3.25)}px`;}
  }
 }
 function setMuscleLabels(labels){
@@ -198,7 +224,7 @@ function setMuscleLabels(labels){
  });
  draw();return true;
 }
-function resetView(){selected=null;flyTo(0,BASE_AIM,BASE_DISTANCE,.025)}
+function resetView(){selected=null;if(homePresentationResumeTimer){window.clearTimeout(homePresentationResumeTimer);homePresentationResumeTimer=null;}if(HOME_PRESENTATION){homePresentationView='front';flyTo(0,BASE_AIM,BASE_DISTANCE,.025);if(homePresentationTimer)window.clearInterval(homePresentationTimer);homePresentationTimer=null;startHomePresentation();return;}flyTo(0,BASE_AIM,BASE_DISTANCE,.025)}
 // API pública para o Codex/iLife usar de forma imperativa SEM renderizar controles:
 // window.iLifeMuscle3D.focusMuscle('abs');
 // window.iLifeMuscle3D.focusMuscle('biceps', 'right');
@@ -207,8 +233,8 @@ function resetView(){selected=null;flyTo(0,BASE_AIM,BASE_DISTANCE,.025)}
 window.iLifeMuscle3D=Object.freeze({
  focusMuscle:(id,side=null,view=null)=>select(id,true,null,side,view),
  reset:resetView,
- setView:(view)=>{const a=view==='front'?0:view==='back'?Math.PI:view==='side'?Math.PI/2:null;if(a===null)return false;flyTo(a);return true},
- zoomBy:(delta)=>{flight=null;distance=clamp(distance+delta,2.4,14);draw()},
+ setView:(view)=>{if(HOME_PRESENTATION)return false;const a=view==='front'?0:view==='back'?Math.PI:view==='side'?Math.PI/2:null;if(a===null)return false;flyTo(a);return true},
+ zoomBy:(delta)=>{if(HOME_PRESENTATION)return false;flight=null;distance=clamp(distance+delta,2.4,14);draw()},
  getSelected:()=>selected,
  getMuscles:()=>muscles.map(({id,name,latin,color,group})=>({id,name,latin,color,group})),
  setMuscleColor:(id,color)=>setMuscleColor(id,color),
@@ -367,7 +393,7 @@ function pick(evt){
 const pointers=new Map();let gestureMoved=false,lastTap=0;
 canvas.addEventListener('pointerdown',evt=>{
  pointers.set(evt.pointerId,{x:evt.clientX,y:evt.clientY,startX:evt.clientX,startY:evt.clientY});
- canvas.setPointerCapture(evt.pointerId);flight=null;
+ canvas.setPointerCapture(evt.pointerId);if(!HOME_PRESENTATION)flight=null;
  if(pointers.size>=2)gestureMoved=true;
 });
 canvas.addEventListener('pointermove',evt=>{
@@ -375,12 +401,12 @@ canvas.addEventListener('pointermove',evt=>{
  const dx=evt.clientX-p.x,dy=evt.clientY-p.y;
  if(Math.hypot(evt.clientX-p.startX,evt.clientY-p.startY)>5)gestureMoved=true;
  if(pointers.size===1){
-   if(gestureMoved){angle+=dx*.011;pitch=clamp(pitch+dy*.006,-.50,.50);stopAuto();draw()}
+   if(gestureMoved&&!HOME_PRESENTATION){angle+=dx*.011;pitch=clamp(pitch+dy*.006,-.50,.50);stopAuto();draw()}
  } else if(pointers.size===2){
    const arr=[...pointers.entries()];const other=arr.find(([id])=>id!==evt.pointerId)?.[1];
    if(other){const before=Math.hypot(p.x-other.x,p.y-other.y);
      const after=Math.hypot(evt.clientX-other.x,evt.clientY-other.y);
-     if(before>1){distance=clamp(distance*before/Math.max(after,1),2.4,14);stopAuto();draw()}}
+     if(before>1&&!HOME_PRESENTATION){distance=clamp(distance*before/Math.max(after,1),2.4,14);stopAuto();draw()}}
  }
  p.x=evt.clientX;p.y=evt.clientY;
 });
@@ -388,15 +414,16 @@ canvas.addEventListener('pointerup',evt=>{
  const p=pointers.get(evt.pointerId);
  if(p&&pointers.size===1&&!gestureMoved){
    const now=performance.now();
-   if(now-lastTap<300){lastTap=0;resetView()}
+   if(now-lastTap<300&&!HOME_PRESENTATION){lastTap=0;resetView()}
    else {lastTap=now;pick(evt)}
  }
  pointers.delete(evt.pointerId);
  if(pointers.size===0)gestureMoved=false;
 });
 canvas.addEventListener('pointercancel',evt=>{pointers.delete(evt.pointerId);if(!pointers.size)gestureMoved=false});
-canvas.addEventListener('wheel',evt=>{evt.preventDefault();flight=null;distance=clamp(distance+Math.sign(evt.deltaY)*.45,2.4,14);draw()},{passive:false});
+canvas.addEventListener('wheel',evt=>{evt.preventDefault();if(HOME_PRESENTATION)return;flight=null;distance=clamp(distance+Math.sign(evt.deltaY)*.45,2.4,14);draw()},{passive:false});
 canvas.addEventListener('keydown',evt=>{
+ if(HOME_PRESENTATION){evt.preventDefault();return;}
  let changed=true;
  if(evt.key==='ArrowLeft')angle-=.17;
  else if(evt.key==='ArrowRight')angle+=.17;
@@ -433,7 +460,7 @@ function animate(t){
  else if(colorAnimating)draw();
  animID=requestAnimationFrame(animate);
 }
-try{initGL();draw();animID=requestAnimationFrame(animate)}catch(ex){error.hidden=false;error.textContent=ex.message||'Não foi possível carregar o modelo 3D.';console.error(ex);}
+try{initGL();draw();animID=requestAnimationFrame(animate);startHomePresentation()}catch(ex){error.hidden=false;error.textContent=ex.message||'Não foi possível carregar o modelo 3D.';console.error(ex);}
 })();
 
 </script>
