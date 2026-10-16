@@ -16536,6 +16536,49 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if ((request.method === "GET" || request.method === "HEAD") && pathname === "/api/200/audio/stream") {
+    if (request.method === "HEAD" && !requestUrl.searchParams.has("url")) {
+      response.writeHead(204);
+      response.end();
+      return;
+    }
+    const sourceUrl = String(requestUrl.searchParams.get("url") || "").trim();
+    const minuteCueUrl = /^https:\/\/pub-3f5e3a74474b4527bc44ecf90f75585a\.r2\.dev\/project200\/audio\/pt-BR\/minutos-restantes\/v1\/\d{3}-minutos\.mp3$/i.test(sourceUrl);
+    const stations = minuteCueUrl ? [] : await listProject200MusicStations();
+    const musicUrl = stations.some((station) => station.tracks.some((track) => track.url === sourceUrl));
+    if (!minuteCueUrl && !musicUrl) {
+      sendJson(response, 404, { error: "Áudio não encontrado no catálogo do Projeto 200." });
+      return;
+    }
+    const abortController = new AbortController();
+    response.once("close", () => abortController.abort());
+    try {
+      const range = String(request.headers.range || "");
+      const headers = /^bytes=\d*-\d*$/i.test(range) ? { Range: range } : {};
+      const upstream = await fetch(sourceUrl, { headers, signal: abortController.signal });
+      if (!upstream.ok || !upstream.body) {
+        sendJson(response, 502, { error: "Não foi possível carregar o áudio." });
+        return;
+      }
+      const responseHeaders = { "Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff" };
+      for (const name of ["content-type", "content-length", "content-range", "accept-ranges", "etag", "last-modified"]) {
+        const value = upstream.headers.get(name);
+        if (value) responseHeaders[name] = value;
+      }
+      response.writeHead(upstream.status, responseHeaders);
+      if (request.method === "HEAD") {
+        response.end();
+        return;
+      }
+      Readable.fromWeb(upstream.body).on("error", () => response.destroy()).pipe(response);
+    } catch (error) {
+      if (!response.headersSent && !abortController.signal.aborted) {
+        sendJson(response, 502, { error: "Não foi possível carregar o áudio." });
+      }
+    }
+    return;
+  }
+
   if (request.method === "POST" && pathname === "/api/200/music/favorites") {
     try {
       const user = await requireAuth(request, response);

@@ -14,7 +14,7 @@ import {
 } from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
-const project200AppVersion = "1.55";
+const project200AppVersion = "1.62";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
 const project200UpdateBypassPassword = "1444";
@@ -1325,6 +1325,71 @@ const runningEndBellAudio = typeof Audio !== "undefined" ? new Audio("/200/bicyc
 const runningPunctualityUpAudio = typeof Audio !== "undefined" ? new Audio("/200/coin-punctuality.mp3") : null;
 const runningPunctualityDownAudio = typeof Audio !== "undefined" ? new Audio("/200/pause-punctuality.mp3") : null;
 const sleepFrequencyAudio = typeof Audio !== "undefined" ? new Audio() : null;
+const PROJECT200_MUSIC_GAIN = 1.2;
+const project200MusicAudioContexts = new WeakMap();
+let project200AudioStreamProbe = null;
+let runningAudioTrackUrl = "";
+let runningMusicPlaybackGeneration = 0;
+let sleepFrequencyTrackUrl = "";
+
+function getProject200AudioStreamUrl(url) {
+  return getApiUrl(`/api/200/audio/stream?url=${encodeURIComponent(url)}`);
+}
+
+async function canStreamProject200Audio() {
+  if (navigator.onLine === false) return false;
+  if (!project200AudioStreamProbe) {
+    project200AudioStreamProbe = fetch(getApiUrl("/api/200/audio/stream"), { method: "HEAD", cache: "no-store" })
+      .then((response) => response.status === 204)
+      .catch(() => false);
+  }
+  return project200AudioStreamProbe;
+}
+
+async function enableProject200MusicGain(audio) {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!audio || !AudioContextClass || !await canStreamProject200Audio()) return false;
+  let context = project200MusicAudioContexts.get(audio);
+  if (!context) {
+    try {
+      context = new AudioContextClass();
+      await context.resume();
+      if (context.state !== "running") {
+        void context.close();
+        return false;
+      }
+      audio.crossOrigin = "anonymous";
+      const source = context.createMediaElementSource(audio);
+      const gain = context.createGain();
+      gain.gain.value = PROJECT200_MUSIC_GAIN;
+      source.connect(gain).connect(context.destination);
+      project200MusicAudioContexts.set(audio, context);
+    } catch {
+      if (context && !project200MusicAudioContexts.has(audio)) void context.close().catch(() => {});
+      return false;
+    }
+  }
+  if (context.state === "suspended") {
+    try { await context.resume(); } catch {}
+  }
+  return project200MusicAudioContexts.has(audio);
+}
+
+function getRunningAudioTrackUrl() {
+  return runningAudioTrackUrl || String(runningAudio?.currentSrc || runningAudio?.src || "");
+}
+
+function resumeProject200MusicGain() {
+  for (const audio of [runningAudio, sleepFrequencyAudio]) {
+    const context = audio && project200MusicAudioContexts.get(audio);
+    if (context?.state === "suspended") void context.resume().catch(() => {});
+  }
+}
+
+document.addEventListener("pointerdown", resumeProject200MusicGain, { capture: true });
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") resumeProject200MusicGain();
+});
 const touchClickSoundUrls = [
   "/200/sfx/touch-1.mp3",
   "/200/sfx/touch-2.mp3",
@@ -1414,6 +1479,7 @@ let missionRunAlarmTicker = null;
 let missionVariantsTicker = null;
 let missionVariantsLastScrollAt = 0;
 let missionRunCueAudio = null;
+let missionRunCueSeconds = 0;
 let missionRunCycleAudio = null;
 let missionRunCycleAudioQueue = Promise.resolve();
 let missionRunCycleCueTimer = null;
@@ -3452,7 +3518,7 @@ function applyHomeViewMode() {
   runningTaskContent?.setAttribute("data-home-view", mode);
 }
 function syncRunningPlayerSelectionToAudio() {
-  const audioUrl = normalizeRunningTrackUrl(runningAudio?.currentSrc || runningAudio?.src || "");
+  const audioUrl = normalizeRunningTrackUrl(getRunningAudioTrackUrl());
   if (!audioUrl || !Array.isArray(state.runningPlayer.stations) || !state.runningPlayer.stations.length) return false;
   const match = findRunningTrackByUrl(audioUrl);
   if (!match?.station || !match?.track) return false;
@@ -3861,13 +3927,19 @@ async function playRunningEndBellCue(actionId) {
     return;
   }
   if (!runningEndBellAudio) return;
+  const musicVolumeBeforeBell = Number(runningAudio?.volume ?? 1);
   const baseRunningVolume = Math.max(0.2, Number(runningAudio?.volume || 1) || 1);
   const nextVolume = Math.min(1, Math.max(0.2, baseRunningVolume * 1.8));
   try {
     if (runningAudio && !runningAudio.paused) {
+      const musicSrc = String(runningAudio.currentSrc || runningAudio.src || "");
+      const musicGeneration = runningMusicPlaybackGeneration;
       await fadeAudioVolume(runningAudio, 0, 2000);
-      runningAudio.pause();
-      runningAudio.currentTime = 0;
+      if (musicGeneration === runningMusicPlaybackGeneration && musicSrc === String(runningAudio.currentSrc || runningAudio.src || "")) {
+        runningAudio.pause();
+        runningAudio.currentTime = 0;
+        runningAudio.volume = musicVolumeBeforeBell;
+      }
     }
     for (let index = 0; index < 3; index += 1) {
       runningEndBellAudio.pause();
@@ -3924,14 +3996,27 @@ function primeRunningTrackBuffer() {
   if (!runningAudio) return;
   const track = getCurrentRunningTrack();
   if (!track?.url) return;
-  if (runningAudio.src !== track.url) {
-    runningAudio.src = track.url;
+  const playbackUrl = project200MusicAudioContexts.has(runningAudio) ? getProject200AudioStreamUrl(track.url) : track.url;
+  if (getRunningAudioTrackUrl() !== track.url || runningAudio.src !== playbackUrl) {
+    runningAudioTrackUrl = track.url;
+    runningAudio.src = playbackUrl;
     runningAudio.load();
   }
 }
 
+const activeAudioVolumeFades = new WeakMap();
+
+function cancelAudioVolumeFade(audio) {
+  const active = audio && activeAudioVolumeFades.get(audio);
+  if (!active) return;
+  window.clearInterval(active.timer);
+  activeAudioVolumeFades.delete(audio);
+  active.resolve();
+}
+
 function fadeAudioVolume(audio, target, durationMs) {
   if (!audio) return Promise.resolve();
+  cancelAudioVolumeFade(audio);
   const start = Number(audio.volume ?? 1);
   const delta = target - start;
   if (Math.abs(delta) < 0.001 || durationMs <= 0) {
@@ -3946,9 +4031,11 @@ function fadeAudioVolume(audio, target, durationMs) {
       audio.volume = Math.max(0, Math.min(1, start + (delta * ratio)));
       if (ratio >= 1) {
         window.clearInterval(timer);
+        activeAudioVolumeFades.delete(audio);
         resolve();
       }
     }, 40);
+    activeAudioVolumeFades.set(audio, { timer, resolve });
   });
 }
 
@@ -4116,6 +4203,7 @@ async function stopSleepFrequencyPlayback({ keepEnabled = false } = {}) {
     sleepFrequencyAudio.removeAttribute("src");
     sleepFrequencyAudio.load();
     sleepFrequencyAudio.volume = 1;
+    sleepFrequencyTrackUrl = "";
   }
   state.sleepModal.fadeStarted = false;
   state.sleepModal.lastPhase = "";
@@ -4138,8 +4226,11 @@ async function playSleepFrequencyCurrentTrack() {
   if (!state.sleepModal?.fadeStarted) {
     sleepFrequencyAudio.volume = 1;
   }
-  if (normalizeRunningTrackUrl(sleepFrequencyAudio.src || "") !== normalizeRunningTrackUrl(selectedUrl)) {
-    sleepFrequencyAudio.src = selectedUrl;
+  const boosted = await enableProject200MusicGain(sleepFrequencyAudio);
+  const playbackUrl = boosted ? getProject200AudioStreamUrl(selectedUrl) : selectedUrl;
+  if (sleepFrequencyTrackUrl !== selectedUrl || sleepFrequencyAudio.src !== playbackUrl) {
+    sleepFrequencyTrackUrl = selectedUrl;
+    sleepFrequencyAudio.src = playbackUrl;
   }
   try {
     await sleepFrequencyAudio.play();
@@ -4235,7 +4326,8 @@ async function loadMinuteCueBlob(url) {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 6000);
     try {
-      const response = await fetch(url, { cache: "force-cache", signal: controller.signal });
+      const sourceUrl = await canStreamProject200Audio() ? getProject200AudioStreamUrl(url) : url;
+      const response = await fetch(sourceUrl, { cache: "force-cache", signal: controller.signal });
       if (!response.ok) return null;
       if (cache) void cache.put(url, response.clone()).catch(() => {});
       return await response.blob();
@@ -4303,24 +4395,22 @@ function resetRunningMinuteCueState(actionId = "", optionKey = "") {
 
 async function playRunningMinuteCuePlayers(minute, taskTitle, actionId, generation) {
   const players = [...runningMinuteCuePlayers];
-  if (!players.length || !state.options.runningMinuteVoiceEnabled || state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.generation !== generation) return;
-  const baseVolume = runningAudio ? Number(runningAudio.volume ?? 1) : 1;
-  const musicSrc = String(runningAudio?.currentSrc || runningAudio?.src || "");
-  const shouldRestoreMusic = Boolean(runningAudio && !runningAudio.paused);
+  if (!players.length || !state.options.runningMinuteVoiceEnabled || state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.generation !== generation) return false;
+  let playedAll = true;
   try {
-    if (shouldRestoreMusic) {
-      await fadeAudioVolume(runningAudio, baseVolume * 0.25, 200);
-    }
     for (const audio of players) {
       await audio._project200Ready;
-      if (!state.options.runningMinuteVoiceEnabled || state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.generation !== generation) break;
+      if (!state.options.runningMinuteVoiceEnabled || state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.generation !== generation) {
+        playedAll = false;
+        break;
+      }
       audio.currentTime = 0;
-      await playVoiceAudioWithTimeout(audio);
+      if (!await playVoiceAudioWithTimeout(audio)) {
+        playedAll = false;
+        break;
+      }
     }
   } finally {
-    if (shouldRestoreMusic && runningAudio && !runningAudio.paused && musicSrc === String(runningAudio.currentSrc || runningAudio.src || "")) {
-      await fadeAudioVolume(runningAudio, baseVolume, 200);
-    }
     if ("mediaSession" in navigator) {
       try { navigator.mediaSession.playbackState = runningAudio && !runningAudio.paused ? "playing" : "none"; } catch {}
     }
@@ -4329,12 +4419,23 @@ async function playRunningMinuteCuePlayers(minute, taskTitle, actionId, generati
       state.runningMinuteCue.preparedKey = "";
     }
   }
+  return playedAll;
 }
 
-function queueRunningMinuteCuePlayback(minute, taskTitle, actionId) {
+function queueRunningMinuteCuePlayback(entry, taskTitle, actionId) {
   const generation = state.runningMinuteCue.generation;
   state.runningMinuteCue.pendingPlayback = true;
-  const playSequence = () => playRunningMinuteCuePlayers(minute, taskTitle, actionId, generation);
+  const playSequence = async () => {
+    let played = await playRunningMinuteCuePlayers(entry.minute, taskTitle, actionId, generation);
+    if (!played && state.options.runningMinuteVoiceEnabled && state.runningMinuteCue.actionId === actionId && state.runningMinuteCue.generation === generation) {
+      runningMinuteCuePlayers = entry.urls.map(createRunningMinuteCueAudio);
+      await wait(600);
+      played = await playRunningMinuteCuePlayers(entry.minute, taskTitle, actionId, generation);
+    }
+    if (played && state.runningMinuteCue.actionId === actionId && state.runningMinuteCue.generation === generation) {
+      state.runningMinuteCue.played.add(entry.minute);
+    }
+  };
   taskSpeechPlaybackQueue = taskSpeechPlaybackQueue.then(playSequence, playSequence).finally(() => {
     if (state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.generation !== generation) return;
     state.runningMinuteCue.pendingPlayback = false;
@@ -4356,9 +4457,8 @@ function prepareRunningMinuteCue(entry, actionId, taskTitle, secondsUntilCue) {
   if (state.runningMinuteCue.playTimer) return;
   state.runningMinuteCue.playTimer = window.setTimeout(() => {
     state.runningMinuteCue.playTimer = 0;
-    if (!state.options.runningMinuteVoiceEnabled || state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.played.has(entry.minute)) return;
-    state.runningMinuteCue.played.add(entry.minute);
-    queueRunningMinuteCuePlayback(entry.minute, taskTitle, actionId);
+    if (!state.options.runningMinuteVoiceEnabled || state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.pendingPlayback || state.runningMinuteCue.played.has(entry.minute)) return;
+    queueRunningMinuteCuePlayback(entry, taskTitle, actionId);
   }, Math.max(0, Math.round(secondsUntilCue * 1000)));
 }
 
@@ -4371,7 +4471,7 @@ function scheduleRunningMinuteCueWorker(entry, actionId, taskTitle, secondsUntil
   runningMinuteCueWorker.postMessage({
     type: "schedule",
     key: cueKey,
-    urls: entry.urls,
+    urls: [],
     preloadDelayMs: Math.max(0, Math.round((secondsUntilCue - MINUTE_CUE_PRELOAD_SECONDS) * 1000)),
     playDelayMs: Math.max(0, Math.round(Math.min(MINUTE_CUE_PRELOAD_SECONDS, secondsUntilCue) * 1000))
   });
@@ -4407,9 +4507,8 @@ if (runningMinuteCueWorker) {
     }
     if (payload.type === "play") {
       state.runningMinuteCue.workerCue = null;
-      if (!state.options.runningMinuteVoiceEnabled || state.runningMinuteCue.played.has(workerCue.entry.minute)) return;
-      state.runningMinuteCue.played.add(workerCue.entry.minute);
-      queueRunningMinuteCuePlayback(workerCue.entry.minute, workerCue.taskTitle, workerCue.actionId);
+      if (!state.options.runningMinuteVoiceEnabled || state.runningMinuteCue.pendingPlayback || state.runningMinuteCue.played.has(workerCue.entry.minute)) return;
+      queueRunningMinuteCuePlayback(workerCue.entry, workerCue.taskTitle, workerCue.actionId);
     }
   });
 }
@@ -5277,7 +5376,7 @@ function findRunningTrackByUrl(trackUrl = "", preferredStation = null) {
 function getRunningPlaybackState() {
   const station = getCurrentRunningStation();
   const currentTrack = getCurrentRunningTrack();
-  const audioUrl = normalizeRunningTrackUrl(runningAudio?.currentSrc || runningAudio?.src || "");
+  const audioUrl = normalizeRunningTrackUrl(getRunningAudioTrackUrl());
   const match = findRunningTrackByUrl(audioUrl, station);
   return {
     station: match?.station || station,
@@ -5330,7 +5429,7 @@ function renderRunningMusicPlayer() {
   const stationIsDefault = isRunningStationDefaultForCurrentTask(station);
   const orderedUrls = Array.isArray(state.runningPlayer.playOrderUrls) ? state.runningPlayer.playOrderUrls : [];
   const hasTrackNavigation = orderedUrls.length > 1;
-  const isPlaying = Boolean(runningAudio && !runningAudio.paused && track?.url && normalizeRunningTrackUrl(runningAudio.currentSrc || runningAudio.src || "") === normalizeRunningTrackUrl(track.url));
+  const isPlaying = Boolean(runningAudio && !runningAudio.paused && track?.url && normalizeRunningTrackUrl(getRunningAudioTrackUrl()) === normalizeRunningTrackUrl(track.url));
 
   if (runningPlayerStation) {
     runningPlayerStation.textContent = String(station?.name || "Carregando rádios");
@@ -5416,7 +5515,10 @@ async function playRunningTrack(trackUrl = "", options = {}) {
   const targetUrl = String(trackUrl || orderedUrls[state.runningPlayer.playOrderIndex] || orderedUrls[0] || "").trim();
   const track = station?.tracks?.find((item) => String(item?.url || "").trim() === targetUrl) || null;
   if (!runningAudio || !track?.url) return false;
+  runningMusicPlaybackGeneration += 1;
   cancelMissionRunMusicFade();
+  cancelAudioVolumeFade(runningAudio);
+  runningAudio.volume = 1;
 
   const requiredAutoplay = options.requiredAutoplay === true;
   if (requiredAutoplay) {
@@ -5433,7 +5535,9 @@ async function playRunningTrack(trackUrl = "", options = {}) {
     state.runningPlayer.playOrderIndex = nextIndex;
   }
 
-  runningAudio.src = track.url;
+  const boosted = await enableProject200MusicGain(runningAudio);
+  runningAudioTrackUrl = track.url;
+  runningAudio.src = boosted ? getProject200AudioStreamUrl(track.url) : track.url;
   ensureRunningAudioLoopState();
   try {
     await runningAudio.play();
@@ -5461,8 +5565,19 @@ async function toggleRunningPlayPause() {
   }
   if (runningAudio.paused) {
     try {
+      runningMusicPlaybackGeneration += 1;
       cancelMissionRunMusicFade();
+      cancelAudioVolumeFade(runningAudio);
+      runningAudio.volume = 1;
       ensureRunningAudioLoopState();
+      const boosted = await enableProject200MusicGain(runningAudio);
+      const playbackUrl = boosted ? getProject200AudioStreamUrl(track.url) : track.url;
+      if (runningAudio.src !== playbackUrl) {
+        const pausedAt = Number(runningAudio.currentTime || 0);
+        runningAudio.src = playbackUrl;
+        runningAudioTrackUrl = track.url;
+        if (pausedAt > 0) runningAudio.addEventListener("loadedmetadata", () => { runningAudio.currentTime = pausedAt; }, { once: true });
+      }
       await runningAudio.play();
       state.runningPlayer.isPlaying = true;
       renderRunningMusicPlayer();
@@ -9035,7 +9150,7 @@ async function requestTaskSpeechBlob(payload) {
   } catch {}
   if (navigator.onLine === false) throw new Error("Áudio ainda não disponível offline.");
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 6000);
+  const timer = window.setTimeout(() => controller.abort(), 100000);
   taskSpeechControllers.add(controller);
   try {
     const response = await fetch(getApiUrl("/api/200/task-speech"), {
@@ -9061,29 +9176,68 @@ async function requestTaskSpeechBlob(payload) {
 function playVoiceAudioWithTimeout(audio, cancellations = null) {
   return new Promise((resolve) => {
     let settled = false;
-    const timer = window.setTimeout(() => finish(), 30000);
-    const finish = () => {
+    const finish = (played) => {
       if (settled) return;
       settled = true;
       window.clearTimeout(timer);
-      ["ended", "error", "pause"].forEach((name) => audio.removeEventListener(name, finish));
-      cancellations?.delete(finish);
+      audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("error", onFailure);
+      audio.removeEventListener("pause", onFailure);
+      cancellations?.delete(cancel);
       try { audio.pause(); } catch {}
-      resolve();
+      resolve(played);
     };
-    cancellations?.add(finish);
-    ["ended", "error", "pause"].forEach((name) => audio.addEventListener(name, finish, { once: true }));
-    try { Promise.resolve(audio.play()).catch(finish); } catch { finish(); }
+    const onEnded = () => finish(true);
+    const onFailure = () => finish(false);
+    const cancel = () => finish(false);
+    const timer = window.setTimeout(onFailure, 30000);
+    cancellations?.add(cancel);
+    audio.addEventListener("ended", onEnded, { once: true });
+    audio.addEventListener("error", onFailure, { once: true });
+    audio.addEventListener("pause", onFailure, { once: true });
+    try { Promise.resolve(audio.play()).catch(onFailure); } catch { onFailure(); }
   });
 }
 
 async function playTaskSpeechBlob(blob) {
-  if (!blob || typeof Audio === "undefined") return;
+  if (!blob || typeof Audio === "undefined") return false;
   const url = URL.createObjectURL(blob);
   const audio = new Audio(url);
   audio.preload = "auto";
-  try { await playVoiceAudioWithTimeout(audio, taskSpeechCancellations); }
+  try { return await playVoiceAudioWithTimeout(audio, taskSpeechCancellations); }
   finally { URL.revokeObjectURL(url); }
+}
+
+function getTaskSpeechFallbackText(request) {
+  if (request?.kind === "system" && request.id === "nova_tarefa") return "Nova tarefa iniciada";
+  if (request?.kind === "system" && request.id === "tempo_livre") return "O tempo livre começou";
+  return String(request?.title || "").trim();
+}
+
+function playTaskSpeechFallback(text) {
+  if (!text || !window.speechSynthesis || typeof SpeechSynthesisUtterance === "undefined") return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "pt-BR";
+    let settled = false;
+    let started = false;
+    const finish = (played) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      window.clearTimeout(startTimer);
+      taskSpeechCancellations.delete(cancel);
+      resolve(played);
+    };
+    const cancel = () => { window.speechSynthesis.cancel(); finish(false); };
+    const timer = window.setTimeout(cancel, 30000);
+    const startTimer = window.setTimeout(() => { if (!started) cancel(); }, 2500);
+    utterance.onstart = () => { started = true; window.clearTimeout(startTimer); };
+    utterance.onend = () => finish(true);
+    utterance.onerror = () => finish(false);
+    taskSpeechCancellations.add(cancel);
+    try { window.speechSynthesis.speak(utterance); } catch { finish(false); }
+  });
 }
 
 function syncTaskSpeechContext() {
@@ -9101,34 +9255,28 @@ function queueTaskSpeechSequence(requests) {
   if (!Array.isArray(requests) || !requests.length) return;
   syncTaskSpeechContext();
   const generation = taskSpeechGeneration;
-  // Carregar uma fala não ocupa a fila do contador nem pausa a música.
-  const prepared = Promise.all(requests.map((request) => requestTaskSpeechBlob(request))).catch(() => null);
-  void prepared.then((blobs) => {
-    if (!blobs || generation !== taskSpeechGeneration) return;
-    const playSequence = async () => {
-      if (generation !== taskSpeechGeneration) return;
-      const playback = getRunningPlaybackState();
-      const musicSrc = String(runningAudio?.currentSrc || runningAudio?.src || "");
-      const baseVolume = Number(runningAudio?.volume ?? 1);
-      const duckMusic = Boolean(runningAudio && !runningAudio.paused);
-      try {
-        if (duckMusic) await fadeAudioVolume(runningAudio, baseVolume * 0.25, 200);
-        for (const blob of blobs) {
-          if (generation !== taskSpeechGeneration) break;
-          await playTaskSpeechBlob(blob);
+  const blobs = requests.map(() => null);
+  const prepared = Promise.allSettled(requests.map((request, index) => requestTaskSpeechBlob(request)
+    .then((blob) => { blobs[index] = blob; })));
+  const playSequence = async () => {
+    if (generation !== taskSpeechGeneration) return;
+    await Promise.race([prepared, wait(4500)]);
+    if (generation !== taskSpeechGeneration) return;
+    try {
+      for (let index = 0; index < requests.length; index += 1) {
+        if (generation !== taskSpeechGeneration) break;
+        const request = requests[index];
+        const played = blobs[index] ? await playTaskSpeechBlob(blobs[index]) : false;
+        if (!played && generation === taskSpeechGeneration) {
+          await playTaskSpeechFallback(getTaskSpeechFallbackText(request));
         }
-      } catch {
-        // Áudio de voz não deve interromper o início ou a contagem da atividade.
-      } finally {
-        if (duckMusic && runningAudio && !runningAudio.paused && musicSrc === String(runningAudio.currentSrc || runningAudio.src || "")) {
-          await fadeAudioVolume(runningAudio, baseVolume, 200);
-        }
-        if (playback?.track) renderRunningMusicPlayer();
       }
-    };
-    taskSpeechPlaybackQueue = taskSpeechPlaybackQueue.then(playSequence, playSequence)
-      .catch((error) => console.warn("Falha ao reproduzir a fala de início:", error));
-  });
+    } finally {
+      renderRunningMusicPlayer();
+    }
+  };
+  taskSpeechPlaybackQueue = taskSpeechPlaybackQueue.then(playSequence, playSequence)
+    .catch((error) => console.warn("Falha ao reproduzir a fala de início:", error));
 }
 
 function queueActionStartSpeech(action) {
@@ -9292,6 +9440,7 @@ async function toggleActionStatus(actionId, options = {}) {
     openPrimaryRunningSurface({ overview: false });
     closeActionsModalWithFade();
     void autoPlayRunningTaskDefaultPreference(optimisticStatusAction);
+    queueActionStartSpeech(optimisticStatusAction);
   }
 
   try {
@@ -9312,9 +9461,6 @@ async function toggleActionStatus(actionId, options = {}) {
     }
 
     state.actions = state.actions.map((item) => (item.id === targetId ? updated : item));
-    if ([actionStatuses.pending, actionStatuses.paused].includes(currentStatus) && normalizeActionStatus(updated?.status) === actionStatuses.inProgress) {
-      queueActionStartSpeech(updated);
-    }
     cacheCurrentActionsState();
     registerSystemEventFromActionTransition(targetAction, updated);
     const nextStatus = normalizeActionStatus(updated?.status);
@@ -9340,6 +9486,7 @@ async function toggleActionStatus(actionId, options = {}) {
       setActionOptimisticSync(targetId, false);
       updateActionInState(targetAction);
       delete state.runningLocalStarts[targetId];
+      syncTaskSpeechContext();
       closeModal("runningTaskModal");
       openModal("actionsModal");
       renderActions();
@@ -16858,6 +17005,7 @@ function stopMissionRunCueAudio() {
   if (!missionRunCueAudio) return;
   try { missionRunCueAudio.pause(); missionRunCueAudio.currentTime = 0; } catch {}
   missionRunCueAudio = null;
+  missionRunCueSeconds = 0;
 }
 
 function stopMissionRunCycleAudio() {
@@ -16916,12 +17064,29 @@ function playMissionRunCycleCue(cycleNumber) {
 
 function playMissionRunRemainingCue(seconds) {
   const fileName = missionRunCueMap.get(seconds);
-  if (!fileName || !isMissionRunModalOpen()) return;
-  if (missionRunCycleAudio && !missionRunCycleAudio.paused && !missionRunCycleAudio.ended) return;
+  if (!fileName || !isMissionRunModalOpen()) return false;
+  if (missionRunCycleAudio && !missionRunCycleAudio.paused && !missionRunCycleAudio.ended) return false;
+  if (missionRunCueAudio && missionRunCueSeconds === seconds) return true;
   stopMissionRunCueAudio();
-  missionRunCueAudio = new Audio(`/200/mission-cues/${fileName}`);
-  missionRunCueAudio.volume = 1;
-  missionRunCueAudio.play().catch(() => {});
+  const audio = new Audio(`/200/mission-cues/${fileName}`);
+  missionRunCueAudio = audio;
+  missionRunCueSeconds = seconds;
+  audio.volume = 1;
+  audio.addEventListener("ended", () => {
+    if (missionRunCueAudio !== audio || !isMissionRunModalOpen()) return;
+    const announced = new Set(state.missionRun.announcedCueSeconds || []);
+    announced.add(seconds);
+    state.missionRun.announcedCueSeconds = [...announced];
+    missionRunCueAudio = null;
+    missionRunCueSeconds = 0;
+  }, { once: true });
+  audio.addEventListener("error", () => {
+    if (missionRunCueAudio === audio) stopMissionRunCueAudio();
+  }, { once: true });
+  audio.play().catch(() => {
+    if (missionRunCueAudio === audio) stopMissionRunCueAudio();
+  });
+  return true;
 }
 
 async function playMissionRunAlarmBurst() {
@@ -17419,12 +17584,11 @@ function renderMissionRunState() {
   const totalSeconds = Math.ceil(durationMs / 1000);
   for (const cueSeconds of missionRunCueMap.keys()) {
     if (totalSeconds >= cueSeconds && remainingSeconds <= cueSeconds && !announced.has(cueSeconds) && isMissionRunModalOpen()) {
-      announced.add(cueSeconds);
       if (shouldSuppressMissionRunTimeCueNearCycle(cueSeconds, totalSeconds)) {
+        announced.add(cueSeconds);
         continue;
       }
-      playMissionRunRemainingCue(cueSeconds);
-      break;
+      if (playMissionRunRemainingCue(cueSeconds)) break;
     }
   }
   state.missionRun.announcedCueSeconds = [...announced];
