@@ -271,6 +271,8 @@
       const error = new Error(payload?.error || "Nao foi possivel sincronizar os dados offline.");
       error.httpResponse = true;
       error.status = response.status;
+      error.code = String(payload?.code || "");
+      error.runningAction = payload?.runningAction || null;
       throw error;
     }
     return payload;
@@ -297,7 +299,18 @@
             writeJson(storageKey, outbox);
             rejected += 1;
             (item.invalidates || []).forEach((prefix) => invalidates.add(prefix));
-            if (outboxStorageKey() === storageKey) emit("project200:offline-sync-error", { path: item.path, message: error.message });
+            if (outboxStorageKey() === storageKey) {
+              let requestedStatus = "";
+              try { requestedStatus = String(JSON.parse(item.body || "{}").status || "").toUpperCase(); } catch {}
+              emit("project200:offline-sync-error", {
+                path: item.path,
+                message: error.message,
+                status: error.status,
+                code: error.code || "",
+                runningAction: error.runningAction || null,
+                requestedStatus
+              });
+            }
             continue;
           }
           break;
@@ -307,7 +320,11 @@
         writeJson(storageKey, outbox);
         synced += 1;
         (item.invalidates || []).forEach((prefix) => invalidates.add(prefix));
-        if (outboxStorageKey() === storageKey) emit("project200:offline-mutation-synced", { path: item.path, payload, pending: outbox.length });
+        if (outboxStorageKey() === storageKey) {
+          let requestedStatus = "";
+          try { requestedStatus = String(JSON.parse(item.body || "{}").status || "").toUpperCase(); } catch {}
+          emit("project200:offline-mutation-synced", { path: item.path, payload, pending: outbox.length, requestedStatus });
+        }
       }
       if (outboxStorageKey() === storageKey) {
         if (invalidates.size) markStale([...invalidates]);
@@ -356,8 +373,15 @@
     const maxAgeMs = Math.max(0, Number(requestOptions.cacheMaxAgeMs ?? DEFAULT_MAX_AGE_MS));
     const cached = cacheable ? getCacheRecord(normalized) : null;
 
-    const queuedResponse = () => {
-      enqueue(normalized, requestOptions);
+    const queuedResponse = async () => {
+      try {
+        enqueue(normalized, requestOptions);
+      } catch (error) {
+        if (global.navigator?.onLine === false || readJson(outboxStorageKey(), []).length) throw error;
+        const payload = await execute({ background: false });
+        if (requestOptions.offlineInvalidates) markStale(requestOptions.offlineInvalidates);
+        return payload;
+      }
       if (global.navigator?.onLine !== false) void sync();
       const fallback = clone(requestOptions.offlineResponse || {});
       return { ...fallback, offlineQueued: true };
@@ -384,7 +408,7 @@
       return payload;
     } catch (error) {
       if (account !== accountKey()) throw error;
-      if (cacheable && hasCached(normalized)) return peek(normalized);
+      if (cacheable && !requestOptions.requireNetwork && hasCached(normalized)) return peek(normalized);
       if (method !== "GET" && requestOptions.offlineQueue && isOfflineFailure(error)) {
         return queuedResponse();
       }

@@ -14,7 +14,7 @@ import {
 } from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
-const project200AppVersion = "1.62";
+const project200AppVersion = "1.63";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
 const project200UpdateBypassPassword = "1444";
@@ -1276,6 +1276,10 @@ let actionStatusTargetId = "";
 let runningTaskTicker = null;
 let runningTaskTickerGeneration = 0;
 let continuousTaskTransitionTimer = 0;
+let actionsModalCloseTimer = 0;
+const runningStartMusicWasPlaying = new Map();
+const failedRunningStartIds = new Set();
+const rejectedRunningStarts = new Map();
 let taskSpeechPlaybackQueue = Promise.resolve();
 let taskSpeechContextKey = "";
 let taskSpeechGeneration = 0;
@@ -5953,6 +5957,8 @@ async function executeRunningTaskDefaultPreference(preferenceOverride = null) {
 
 async function autoPlayRunningTaskDefaultPreference(action) {
   const taskTitle = String(action?.title || "").trim();
+  const actionId = String(action?.id || "").trim();
+  const stopIfStartFails = actionId && runningStartMusicWasPlaying.get(actionId) === false;
   if (!taskTitle) {
     return;
   }
@@ -5960,11 +5966,15 @@ async function autoPlayRunningTaskDefaultPreference(action) {
   if (!state.runningPlayer.stationsLoaded || !state.runningPlayer.preferencesLoaded) {
     await loadRunningMusicStations();
   }
+  if (actionId && normalizeActionStatus(findActionById(actionId)?.status) !== actionStatuses.inProgress) return;
   const preference = getRunningDefaultPreferenceForAction(action);
   if (!preference) {
     return;
   }
   await executeRunningTaskDefaultPreference(preference);
+  if (actionId && failedRunningStartIds.has(actionId) && stopIfStartFails) {
+    stopRunningMusicAfterFinishedActivity();
+  }
 }
 
 async function saveRunningTaskDefault(mode = "track") {
@@ -6718,6 +6728,7 @@ async function apiRequest(path, options = {}) {
     offlineResponse,
     offlineInvalidates,
     forceNetwork,
+    requireNetwork,
     cacheMaxAgeMs,
     loadingIcon,
     skipGlobalLoading,
@@ -6740,6 +6751,7 @@ async function apiRequest(path, options = {}) {
     offlineResponse,
     offlineInvalidates: resolvedOfflineInvalidates,
     forceNetwork,
+    requireNetwork,
     cacheMaxAgeMs
   };
   const executeNetworkRequest = ({ background = false } = {}) => runWithGlobalLoading(async () => {
@@ -7818,6 +7830,12 @@ function openModal(id) {
 
   if (!modal) {
     return;
+  }
+
+  if (id === "actionsModal" && actionsModalCloseTimer) {
+    window.clearTimeout(actionsModalCloseTimer);
+    actionsModalCloseTimer = 0;
+    modal.classList.remove("is-fading-out");
   }
 
   const wasAlreadyActive = modal.classList.contains("active");
@@ -8948,12 +8966,13 @@ async function loadActions(options = {}) {
   const generation = ++actionsLoadGeneration;
   const mutationGeneration = actionsMutationGeneration;
   const accountToken = getToken();
+  let applied = false;
 
   if (!getToken()) {
     state.actions = [];
     state.homeSnapshotReady = false;
     renderActions();
-    return;
+    return false;
   }
 
   const date = dateFromOffset(state.activeOffset);
@@ -8966,11 +8985,12 @@ async function loadActions(options = {}) {
   try {
     const payload = options.payload || await apiRequestWithTimeout(actionsPath, {
       skipGlobalLoading: options.silent === true,
-      forceNetwork: options.forceNetwork === true
+      forceNetwork: options.forceNetwork === true,
+      requireNetwork: options.requireNetwork === true
     }, 7000);
-    if (generation !== actionsLoadGeneration || accountToken !== getToken()) return;
+    if (generation !== actionsLoadGeneration || accountToken !== getToken()) return false;
     // Uma resposta iniciada antes de um toque não pode desfazer esse toque.
-    if (mutationGeneration !== actionsMutationGeneration) return;
+    if (mutationGeneration !== actionsMutationGeneration) return false;
     const protectedIds = new Set([
       ...state.optimisticActionIds,
       ...(window.Project200Offline?.pendingActionIds?.() || [])
@@ -8980,6 +9000,7 @@ async function loadActions(options = {}) {
       if (protectedIds.has(String(action.id))) actions.set(String(action.id), action);
     });
     state.actions = [...actions.values()];
+    applied = true;
     const nextRunningLocalStarts = {};
     state.actions.forEach((action) => {
       if (normalizeActionStatus(action?.status) !== actionStatuses.inProgress) return;
@@ -9003,13 +9024,14 @@ async function loadActions(options = {}) {
     if (state.activeOffset === 0) void scheduleMissionNotifications();
     registerDayCloseEventIfNeeded();
   } catch (error) {
-    if (generation !== actionsLoadGeneration || accountToken !== getToken()) return;
+    if (generation !== actionsLoadGeneration || accountToken !== getToken()) return false;
     if (options.silent !== true || !state.actions.length) {
       actionsProgress.hidden = true;
       actionsList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     }
   }
   renderHomeRunningTask();
+  return applied;
 }
 
 async function completeActionImmediately(action, { returnToActions = true, actionListFeedback = false } = {}) {
@@ -9428,6 +9450,8 @@ async function toggleActionStatus(actionId, options = {}) {
     startingOptimistically ? actionStatuses.inProgress : actionStatuses.completed
   );
   if (startingOptimistically) {
+    failedRunningStartIds.delete(targetId);
+    runningStartMusicWasPlaying.set(targetId, Boolean(runningAudio && !runningAudio.paused));
     window.clearTimeout(continuousTaskTransitionTimer);
     continuousTaskTransitionTimer = 0;
     setActionOptimisticSync(targetId, true);
@@ -9450,7 +9474,7 @@ async function toggleActionStatus(actionId, options = {}) {
       body: JSON.stringify({ status: optimisticStatusAction.status, startedAt: optimisticStatusAction.startedAt, occurredAt: new Date(getServerNowMs()).toISOString() }),
       skipGlobalLoading: true,
       offlineQueue: true,
-      offlineImmediate: true,
+      offlineImmediate: false,
       offlineResponse: { action: optimisticStatusAction },
       offlineInvalidates: ["/api/actions", "/api/200/extra-goals"]
     });
@@ -9459,11 +9483,32 @@ async function toggleActionStatus(actionId, options = {}) {
     if (!updated) {
       throw new Error("Nao foi possivel atualizar o status.");
     }
-
     state.actions = state.actions.map((item) => (item.id === targetId ? updated : item));
     cacheCurrentActionsState();
     registerSystemEventFromActionTransition(targetAction, updated);
     const nextStatus = normalizeActionStatus(updated?.status);
+    if (startingOptimistically && !payload?.offlineQueued && nextStatus !== actionStatuses.inProgress) {
+      failedRunningStartIds.add(targetId);
+      setActionOptimisticSync(targetId, false);
+      delete state.runningLocalStarts[targetId];
+      syncTaskSpeechContext();
+      if (runningStartMusicWasPlaying.get(targetId) === false && !getRunningActionForSelectedProfile()) {
+        stopRunningMusicAfterFinishedActivity();
+      }
+      runningStartMusicWasPlaying.delete(targetId);
+      closeModal("runningTaskModal");
+      openModal("actionsModal");
+      renderActions();
+      renderHomeRunningTask();
+      showFloatingNotice(nextStatus === actionStatuses.completed
+        ? "Essa tarefa já estava concluída. A lista foi atualizada."
+        : "O servidor não confirmou o início da tarefa. A lista foi atualizada.");
+      return;
+    }
+    if (startingOptimistically && !payload?.offlineQueued) {
+      failedRunningStartIds.delete(targetId);
+      runningStartMusicWasPlaying.delete(targetId);
+    }
     if ([actionStatuses.pending, actionStatuses.paused].includes(currentStatus) && nextStatus === actionStatuses.inProgress) {
       state.runningLocalStarts[String(targetId)] = new Date(updated?.startedAt || "").getTime() || state.runningLocalStarts[String(targetId)] || getServerNowMs();
     }
@@ -9483,10 +9528,15 @@ async function toggleActionStatus(actionId, options = {}) {
     renderHomeRunningTask();
   } catch (error) {
     if (startingOptimistically) {
+      failedRunningStartIds.add(targetId);
       setActionOptimisticSync(targetId, false);
       updateActionInState(targetAction);
       delete state.runningLocalStarts[targetId];
       syncTaskSpeechContext();
+      if (runningStartMusicWasPlaying.get(targetId) === false && !getRunningActionForSelectedProfile()) {
+        stopRunningMusicAfterFinishedActivity();
+      }
+      runningStartMusicWasPlaying.delete(targetId);
       closeModal("runningTaskModal");
       openModal("actionsModal");
       renderActions();
@@ -10043,8 +10093,11 @@ function closeActionsModalWithFade() {
   if (!actionsModal || !actionsModal.classList.contains("active")) {
     return;
   }
+  if (actionsModalCloseTimer) window.clearTimeout(actionsModalCloseTimer);
   actionsModal.classList.add("is-fading-out");
-  window.setTimeout(() => {
+  actionsModalCloseTimer = window.setTimeout(() => {
+    actionsModalCloseTimer = 0;
+    if (!actionsModal.classList.contains("is-fading-out")) return;
     closeModal(actionsModal);
     actionsModal.classList.remove("is-fading-out");
   }, 500);
@@ -23243,8 +23296,27 @@ void (async () => {
     if (action?.id && !pending.has(String(action.id)) && !state.optimisticActionIds.includes(String(action.id))) {
       updateActionInState(action);
       if (normalizeActionStatus(action.status) === actionStatuses.inProgress) {
+        failedRunningStartIds.delete(String(action.id));
         state.runningLocalStarts[String(action.id)] = new Date(action.startedAt).getTime();
       }
+      const startNotConfirmed = String(event.detail?.requestedStatus || "").toUpperCase() === actionStatuses.inProgress
+        && normalizeActionStatus(action.status) !== actionStatuses.inProgress;
+      if (startNotConfirmed) {
+        failedRunningStartIds.add(String(action.id));
+        delete state.runningLocalStarts[String(action.id)];
+        syncTaskSpeechContext();
+        if (runningStartMusicWasPlaying.get(String(action.id)) === false && !getRunningActionForSelectedProfile()) {
+          stopRunningMusicAfterFinishedActivity();
+        }
+        if (runningTaskModalElement?.classList.contains("active")) {
+          closeModal("runningTaskModal");
+          openModal("actionsModal");
+        }
+        showFloatingNotice(normalizeActionStatus(action.status) === actionStatuses.completed
+          ? "Essa tarefa já estava concluída. A lista foi atualizada."
+          : "O servidor não confirmou o início da tarefa. A lista foi atualizada.");
+      }
+      runningStartMusicWasPlaying.delete(String(action.id));
       renderActions();
       renderHomeRunningTask();
     }
@@ -23252,11 +23324,53 @@ void (async () => {
   });
 
   window.addEventListener("project200:offline-sync-error", (event) => {
-    showFloatingNotice(event.detail?.message || "Não foi possível sincronizar uma alteração.");
+    const detail = event.detail || {};
+    const statusMatch = String(detail.path || "").match(/^\/api\/actions\/([^/?]+)\/status$/);
+    if (statusMatch && String(detail.requestedStatus || "").toUpperCase() === actionStatuses.inProgress) {
+      const actionId = decodeURIComponent(statusMatch[1]);
+      rejectedRunningStarts.set(actionId, {
+        message: String(detail.message || "Não foi possível iniciar a tarefa."),
+        runningAction: detail.runningAction || null,
+        targetAction: state.actions.find((action) => String(action?.id || "") === actionId) || null
+      });
+      showFloatingNotice("Falha ao sincronizar o início; conferindo a tarefa...");
+      return;
+    }
+    showFloatingNotice(detail.message || "Não foi possível sincronizar uma alteração.");
   });
 
   window.addEventListener("project200:offline-sync-complete", (event) => {
-    if (!event.detail?.pending) void loadActions({ silent: true, forceNetwork: true });
+    if (!event.detail?.pending || rejectedRunningStarts.size) {
+      void loadActions({ silent: true, forceNetwork: true, requireNetwork: rejectedRunningStarts.size > 0 }).then((applied) => {
+        if (!applied) {
+          if (rejectedRunningStarts.size) showFloatingNotice("Não foi possível conferir a tarefa agora. Abra Ações para atualizar.");
+          return;
+        }
+        for (const [actionId, failure] of rejectedRunningStarts) {
+          rejectedRunningStarts.delete(actionId);
+          const confirmedAction = state.actions.find((action) => String(action?.id || "") === actionId);
+          if (normalizeActionStatus(confirmedAction?.status) === actionStatuses.inProgress) {
+            failedRunningStartIds.delete(actionId);
+            runningStartMusicWasPlaying.delete(actionId);
+            continue;
+          }
+          failedRunningStartIds.add(actionId);
+          delete state.runningLocalStarts[actionId];
+          syncTaskSpeechContext();
+          if (runningStartMusicWasPlaying.get(actionId) === false && !getRunningActionForSelectedProfile()) {
+            stopRunningMusicAfterFinishedActivity();
+          }
+          runningStartMusicWasPlaying.delete(actionId);
+          showFloatingNotice(`Não foi possível iniciar a tarefa: ${failure.message}`);
+          if (failure.runningAction && failure.targetAction && runningTaskModalElement?.classList.contains("active")) {
+            void handleRunningActionConflict(failure.runningAction, failure.targetAction);
+          } else if (runningTaskModalElement?.classList.contains("active")) {
+            closeModal("runningTaskModal");
+            openModal("actionsModal");
+          }
+        }
+      });
+    }
     if (document.getElementById("historyModal")?.classList.contains("active")) void loadMissions().then(renderMissions);
     if (document.getElementById("financeModal")?.classList.contains("active")) void loadFinanceSummary();
     if (document.getElementById("platformModal")?.classList.contains("active")) void loadPlatformFinance();
