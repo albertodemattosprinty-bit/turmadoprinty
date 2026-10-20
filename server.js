@@ -2272,7 +2272,7 @@ function extractTranscriptSegments(payload) {
     .filter(Boolean);
 }
 
-async function generateTimedLyricsForTrack(apiKey, track) {
+async function generateTimedLyricsForTrack(apiKey, track, { context = "", characterNames = [] } = {}) {
   const audioUrl = String(track?.streamUrl || "").trim();
   if (!audioUrl) {
     throw new Error("A faixa nao possui streamUrl publico para transcrever.");
@@ -2294,9 +2294,22 @@ async function generateTimedLyricsForTrack(apiKey, track) {
 
   const safeFileName = `${String(track?.title || track?.label || "faixa").replace(/[^a-z0-9_-]+/gi, "-").toLowerCase() || "faixa"}.mp3`;
   const formData = new FormData();
-  formData.append("model", OPENAI_TRANSCRIBE_MODEL);
+  const safeContext = String(context || "").trim().slice(0, 1200);
+  const safeCharacterNames = [...new Set((Array.isArray(characterNames) ? characterNames : [])
+    .map((name) => String(name || "").trim().slice(0, 80))
+    .filter(Boolean))].slice(0, 20);
+  const transcriptionPrompt = [
+    safeContext ? `Contexto da peça: ${safeContext}` : "",
+    safeCharacterNames.length ? `Nomes próprios dos personagens (escreva exatamente assim quando forem falados): ${safeCharacterNames.join(", ")}` : "",
+    "Transcreva somente o que for audível, sem acrescentar palavras."
+  ].filter(Boolean).join("\n").slice(0, 850);
+
+  formData.append("model", "whisper-1");
   formData.append("language", "pt");
-  formData.append("response_format", "json");
+  formData.append("response_format", "verbose_json");
+  formData.append("timestamp_granularities[]", "segment");
+  formData.append("timestamp_granularities[]", "word");
+  if (transcriptionPrompt) formData.append("prompt", transcriptionPrompt);
   formData.append("file", new Blob([audioBuffer], { type: "audio/mpeg" }), safeFileName);
 
   const transcriptionResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
@@ -2322,18 +2335,12 @@ async function generateTimedLyricsForTrack(apiKey, track) {
     throw new Error("A OpenAI nao retornou texto para esta faixa.");
   }
 
-  let syncLines = normalizeLyricsSyncLines(
-    splitTextIntoShortLyricsLines(fullText, 30).map((text) => ({
-      text,
-      timestampMs: null
-    }))
-  );
-
-  syncLines = syncLines.map((line) => ({
-    ...line,
-    text: String(line.text || "").slice(0, 30).trim(),
-    timestampMs: null
-  })).filter((line) => line.text);
+  const syncLines = buildTimedLyricsSyncLines(transcriptionPayload, fullText);
+  try {
+    await assignTimedLyricsCharacters(apiKey, syncLines, safeContext, safeCharacterNames, track?.albumCharacters);
+  } catch {
+    // Keep the transcript and timestamps even if optional character labeling is unavailable.
+  }
 
   return {
     lyrics: buildLyricsTextFromSyncLines(syncLines),
@@ -2342,12 +2349,93 @@ async function generateTimedLyricsForTrack(apiKey, track) {
       lines: syncLines,
       generatedAt: new Date().toISOString(),
       generatedBy: "openai",
-      transcriptionModel: OPENAI_TRANSCRIBE_MODEL,
-      organizerModel: "local-line-split",
-      mode: "phrases-only",
+      transcriptionModel: "whisper-1",
+      organizerModel: "word-timestamp-grouping",
+      mode: "timed-lyrics",
       maxCharsPerLine: 30
     }
   };
+}
+
+function buildTimedLyricsSyncLines(payload, fullText) {
+  const words = Array.isArray(payload?.words) ? payload.words : [];
+  const output = [];
+  let current = null;
+  const flush = () => {
+    if (!current?.text) return;
+    output.push({ text: current.text.trim(), timestampMs: current.timestampMs });
+    current = null;
+  };
+  for (const word of words) {
+    const token = String(word?.word || word?.text || "").replace(/\s+/g, " ").trim();
+    if (!token) continue;
+    const candidate = current ? `${current.text} ${token}` : token;
+    if (current && (candidate.length > 30 || /[.!?]$/.test(current.text))) flush();
+    if (!current) {
+      current = {
+        text: token,
+        timestampMs: Math.max(0, Math.round((Number(word?.start) || 0) * 1000))
+      };
+    } else {
+      current.text = `${current.text} ${token}`;
+    }
+  }
+  flush();
+
+  if (!output.length) {
+    const segments = Array.isArray(payload?.segments) ? payload.segments : [];
+    for (const segment of segments) {
+      const parts = splitTextIntoShortLyricsLines(String(segment?.text || ""), 30);
+      const startMs = Math.max(0, Math.round((Number(segment?.start) || 0) * 1000));
+      const endMs = Math.max(startMs, Math.round((Number(segment?.end) || 0) * 1000));
+      parts.forEach((text, index) => output.push({
+        text,
+        timestampMs: startMs + Math.round((endMs - startMs) * index / Math.max(1, parts.length))
+      }));
+    }
+  }
+  if (!output.length) {
+    splitTextIntoShortLyricsLines(fullText, 30).forEach((text) => output.push({ text, timestampMs: 0 }));
+  }
+  return normalizeLyricsSyncLines(output.map((line) => ({ ...line, text: line.text.slice(0, 30) })));
+}
+
+async function assignTimedLyricsCharacters(apiKey, lines, context, requestedNames, albumCharacters) {
+  if (!lines.length || !requestedNames.length || !Array.isArray(albumCharacters)) return;
+  const normalizeName = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const requested = new Set(requestedNames.map(normalizeName));
+  const allowedCharacters = albumCharacters.filter((character) => requested.has(normalizeName(character?.name)));
+  if (!allowedCharacters.length) return;
+
+  const completion = await createChatCompletion(apiKey, {
+    model: OPENAI_INSTANT_MODEL || OPENAI_MODEL,
+    temperature: 0,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content: "Identifique o personagem que fala em cada linha de uma peça. Use apenas os personagens fornecidos. Se não houver evidência clara no texto e contexto, deixe characterId vazio. Não altere nem reescreva as falas. Retorne JSON no formato {\"assignments\":[{\"line\":1,\"characterId\":\"id\"}]} ."
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          context: String(context || "").slice(0, 1200),
+          characters: allowedCharacters.map(({ id, name }) => ({ id, name })),
+          lines: lines.map((line, index) => ({ line: index + 1, text: line.text }))
+        })
+      }
+    ]
+  }, { timeoutMs: 45000 });
+  const content = completion?.choices?.[0]?.message?.content || "";
+  const parsed = parseStructuredJsonText(content);
+  const allowedIds = new Set(allowedCharacters.map((character) => String(character.id)));
+  for (const assignment of (Array.isArray(parsed?.assignments) ? parsed.assignments : [])) {
+    const index = Number(assignment?.line) - 1;
+    const characterId = String(assignment?.characterId || "").trim();
+    if (index >= 0 && index < lines.length && allowedIds.has(characterId)) {
+      lines[index].characterId = characterId;
+    }
+  }
 }
 
 async function readJsonBody(request) {
@@ -8680,7 +8768,15 @@ async function handleStoreTrackTextsGenerateRequest(request, response, productId
 
     const library = await loadMiniMediaLibrary();
     const databaseSong = await getSyncedMiniMediaSong(library, sourceAlbumId, sourceSongId);
-    const generated = await generateTimedLyricsForTrack(apiKey, track);
+    const body = await readJsonBody(request);
+    const generationContext = String(body?.context || "").trim().slice(0, 1200);
+    const requestedCharacterNames = [...new Set((Array.isArray(body?.characters) ? body.characters : [])
+      .map((name) => String(name || "").trim().slice(0, 80))
+      .filter(Boolean))].slice(0, 20);
+    const generated = await generateTimedLyricsForTrack(apiKey, track, {
+      context: generationContext,
+      characterNames: requestedCharacterNames
+    });
     const updatedSong = await updateMiniMediaSongLyrics(databaseSong.id, generated.lyrics, generated.syncData);
 
     sendJson(response, 200, {
@@ -8695,7 +8791,7 @@ async function handleStoreTrackTextsGenerateRequest(request, response, productId
         ? updatedSong.lyrics_sync_json
         : generated.syncData,
       updatedAt: updatedSong?.lyrics_updated_at || null,
-      feedback: "Texto simples gerado com sucesso e timestamps antigos removidos."
+      feedback: "Texto transcrito com timestamps automáticos e sincronizado ao catálogo do MINI."
     });
   } catch (error) {
     sendJson(response, 400, {

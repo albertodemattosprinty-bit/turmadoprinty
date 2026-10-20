@@ -1731,14 +1731,60 @@ function ensureTrackGenerationModal() {
         </div>
       </div>
       <p id="track-generation-message" class="track-generation-message">Conectando o audio ao fluxo do MINI...</p>
-      <div class="track-generation-progress">
-        <div id="track-generation-bar" class="track-generation-progress-bar"></div>
+      <div id="track-generation-context-form" class="track-generation-context-form">
+        <label class="track-generation-field" for="track-generation-context">Contexto da peça</label>
+        <textarea id="track-generation-context" rows="3" placeholder="Ex.: peça bíblica sobre a vida de Jesus, cenário e acontecimentos importantes"></textarea>
+        <label class="track-generation-field" for="track-generation-characters">Personagens da história</label>
+        <input id="track-generation-characters" type="text" placeholder="Ex.: Jesus, Maria, Pedro">
+        <small class="track-generation-hint">Use nomes cadastrados nos personagens do álbum para a IA marcar as falas.</small>
+        <div class="bulk-track-title-actions">
+          <button id="track-generation-cancel" class="ghost-button" type="button">Cancelar</button>
+          <button id="track-generation-start" class="primary-button" type="button">Ler áudio e criar textos</button>
+        </div>
       </div>
-      <div id="track-generation-percent" class="track-generation-percent">0%</div>
+      <div id="track-generation-progress" hidden>
+        <div class="track-generation-progress">
+          <div id="track-generation-bar" class="track-generation-progress-bar"></div>
+        </div>
+        <div id="track-generation-percent" class="track-generation-percent">0%</div>
+      </div>
     </div>
   `;
   document.body.appendChild(modal);
+  modal.querySelector("#track-generation-cancel")?.addEventListener("click", () => resolveTrackGenerationContext(null));
+  modal.querySelector("#track-generation-start")?.addEventListener("click", () => {
+    const context = String(modal.querySelector("#track-generation-context")?.value || "").trim();
+    const characters = String(modal.querySelector("#track-generation-characters")?.value || "")
+      .split(/[\n,;]+/)
+      .map((name) => name.trim())
+      .filter(Boolean);
+    resolveTrackGenerationContext({ context, characters });
+  });
   return modal;
+}
+
+let trackGenerationContextResolver = null;
+
+function resolveTrackGenerationContext(value) {
+  if (typeof trackGenerationContextResolver !== "function") return;
+  const resolver = trackGenerationContextResolver;
+  trackGenerationContextResolver = null;
+  if (!value) setTrackGenerationModalState({ open: false });
+  resolver(value);
+}
+
+function requestTrackGenerationContext() {
+  const modal = ensureTrackGenerationModal();
+  modal.querySelector("#track-generation-context").value = "";
+  modal.querySelector("#track-generation-characters").value = "";
+  setTrackGenerationModalState({
+    title: "Contexto da peça",
+    message: "Conte à IA sobre a história e informe os personagens para ajudar na transcrição e na identificação das falas.",
+    stage: "context"
+  });
+  return new Promise((resolve) => {
+    trackGenerationContextResolver = resolve;
+  });
 }
 
 function formatTrackTextsPlaybackRateLabel(rate) {
@@ -1783,10 +1829,10 @@ function ensureTrackTextsConfirmModal() {
       <div class="track-texts-head">
         <div>
           <p class="eyebrow">Recriar textos</p>
-          <h3 id="track-text-confirm-title" class="section-title small">Deseja excluir o timestamp atual?</h3>
+          <h3 id="track-text-confirm-title" class="section-title small">Deseja substituir a sync atual?</h3>
         </div>
       </div>
-      <p id="track-text-confirm-message" class="track-generation-message">Os textos serao recriados pela OpenAI e a faixa ficara somente com texto simples, sem a syncagem atual.</p>
+      <p id="track-text-confirm-message" class="track-generation-message">A OpenAI vai transcrever a faixa novamente e criar uma nova sync automática para as falas.</p>
       <div class="bulk-track-title-actions">
         <button id="track-text-confirm-cancel" class="ghost-button" type="button">Cancelar</button>
         <button id="track-text-confirm-accept" class="primary-button" type="button">Continuar</button>
@@ -1851,8 +1897,8 @@ function resolveTrackTextsConfirm(accepted) {
 function confirmTrackTextsReset() {
   return openTrackTextsConfirm({
     eyebrow: "Recriar textos",
-    title: "Deseja excluir o timestamp atual?",
-    message: "Os textos serao recriados pela OpenAI e a faixa ficara somente com texto simples, sem a syncagem atual.",
+    title: "Deseja substituir a sync atual?",
+    message: "A OpenAI vai transcrever a faixa novamente e criar uma nova sync automática para as falas.",
     acceptLabel: "Continuar",
     cancelLabel: "Cancelar"
   });
@@ -2559,12 +2605,14 @@ function ensureTrackFullTextEditModal() {
   return modal;
 }
 
-function setTrackGenerationModalState({ open = true, title = "Preparando...", message = "", progress = 0 } = {}) {
+function setTrackGenerationModalState({ open = true, title = "Preparando...", message = "", progress = 0, stage = "progress" } = {}) {
   const modal = ensureTrackGenerationModal();
   const titleNode = modal.querySelector("#track-generation-title");
   const messageNode = modal.querySelector("#track-generation-message");
   const barNode = modal.querySelector("#track-generation-bar");
   const percentNode = modal.querySelector("#track-generation-percent");
+  const contextForm = modal.querySelector("#track-generation-context-form");
+  const progressNode = modal.querySelector("#track-generation-progress");
   const safeProgress = Math.max(0, Math.min(100, Number(progress) || 0));
 
   if (titleNode) {
@@ -2579,6 +2627,8 @@ function setTrackGenerationModalState({ open = true, title = "Preparando...", me
   if (percentNode) {
     percentNode.textContent = `${Math.round(safeProgress)}%`;
   }
+  if (contextForm) contextForm.hidden = stage !== "context";
+  if (progressNode) progressNode.hidden = stage !== "progress";
 
   modal.setAttribute("aria-hidden", open ? "false" : "true");
   modal.classList.toggle("show", open);
@@ -4328,6 +4378,9 @@ async function createTrackTexts(card, album, track) {
     }
   }
 
+  const generationContext = await requestTrackGenerationContext();
+  if (!generationContext) return;
+
   startTrackGenerationProgress();
 
   try {
@@ -4336,7 +4389,8 @@ async function createTrackTexts(card, album, track) {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${getToken()}`
-      }
+      },
+      body: JSON.stringify(generationContext)
     });
     const data = await response.json().catch(() => ({}));
 
@@ -4348,8 +4402,8 @@ async function createTrackTexts(card, album, track) {
     setTrackGenerationModalState({
       title: "Tudo pronto",
       message: hasExistingTimestamps
-        ? "Os timestamps antigos foram removidos e a faixa agora ficou com texto simples."
-        : "O texto simples foi criado e ligado ao catalogo do MINI.",
+        ? "A sync anterior foi substituída pelos novos textos e timestamps automáticos."
+        : "Os textos e timestamps automáticos foram criados e ligados ao catálogo do MINI.",
       progress: 100
     });
 
@@ -4364,7 +4418,7 @@ async function createTrackTexts(card, album, track) {
     updateTrackInCurrentAlbum(updatedTrack);
     await renderTracks(currentAlbum);
     openTrackTextsModal(updatedTrack);
-    showFloatingNotice(hasExistingTimestamps ? "Timestamp removido e texto recriado." : "Textos criados com sucesso.");
+    showFloatingNotice(hasExistingTimestamps ? "Sync substituída e texto recriado." : "Textos sincronizados criados com sucesso.");
     window.setTimeout(() => {
       setTrackGenerationModalState({ open: false });
     }, 900);
