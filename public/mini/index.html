@@ -684,6 +684,11 @@
       place-items: center;
       padding: 24px;
     }
+    .media-album-add-track-shell {
+      display: flex;
+      justify-content: center;
+      padding: 4px 0 18px;
+    }
     .media-empty-add-btn {
       width: 88px;
       height: 88px;
@@ -8819,7 +8824,7 @@
             ${mediaAlbumEditMode ? `<div class="media-album-detail-head-actions"><button class="media-play-btn is-delete" type="button" data-media-delete-album="${escapeAttr(album.id)}" aria-label="Excluir album">${getTrashSvg()}</button></div>` : ""}
           </div>
           ${album.songs.length
-            ? `<div class="media-track-list">${album.songs.map((song) => buildMediaTrackCard(song, album.id, { editMode: mediaAlbumEditMode })).join("")}</div>`
+            ? `<div class="media-track-list">${album.songs.map((song) => buildMediaTrackCard(song, album.id, { editMode: mediaAlbumEditMode })).join("")}</div>${mediaAlbumEditMode ? `<div class="media-album-add-track-shell"><button class="media-empty-add-btn" type="button" data-media-add-track-order="${album.songs.length}" data-media-scope="${escapeAttr(album.id)}" aria-label="Adicionar faixas" title="Adicionar faixas">${getMediaPlusSvg()}</button></div>` : ""}`
             : (mediaAlbumEditMode
               ? `<div class="media-empty-add-shell"><button class="media-empty-add-btn" type="button" data-media-add-track-order="0" data-media-scope="${escapeAttr(album.id)}" aria-label="Adicionar faixas">${getMediaPlusSvg()}</button></div>`
               : `<div class="courses-empty">Este album ainda nao tem faixas.</div>`)}
