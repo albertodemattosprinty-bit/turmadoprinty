@@ -16724,11 +16724,16 @@ const server = http.createServer(async (request, response) => {
         trackName: body.trackName,
         trackUrl: body.trackUrl
       };
+      const actionId = String(body?.actionId || "").trim();
+      let linkedAction = null;
       const result = isGlobalDefault
         ? await setProject200MusicGlobalDefault(musicPayload)
-        : await setProject200MusicTaskDefault({ ...musicPayload, taskTitle: body.taskTitle });
+        : actionId
+          ? null
+          : await setProject200MusicTaskDefault({ ...musicPayload, taskTitle: body.taskTitle });
       if (!isGlobalDefault) {
-        await setActionMusicDefaultByTitle(user.id, body.taskTitle, {
+        const affected = await setActionMusicDefaultByTitle(user.id, body.taskTitle, {
+          actionId,
           mode: body.mode,
           stationId: body.stationId,
           trackId: body.trackId,
@@ -16736,11 +16741,17 @@ const server = http.createServer(async (request, response) => {
           trackName: body.trackName,
           trackUrl: body.trackUrl
         });
+        if (actionId) {
+          if (!affected) {
+            throw new Error("Tarefa não encontrada.");
+          }
+          linkedAction = await getUserActionById(user.id, actionId);
+        }
       }
 
       const stations = await listProject200MusicStations();
       const personalized = await getProject200MusicStationsForUser({ userId: user.id, stations });
-      sendJson(response, 200, { ok: true, ...personalized, defaults: result.defaults });
+      sendJson(response, 200, { ok: true, ...personalized, defaults: result?.defaults || null, action: linkedAction });
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel salvar o padrão."

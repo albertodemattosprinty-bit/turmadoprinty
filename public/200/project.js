@@ -1832,6 +1832,7 @@ const state = {
     globalDefaultPreference: null,
     currentTaskTitle: "",
     configurationTaskTitle: "",
+    configurationActionId: "",
     configurationScope: "task",
     configurationMode: false,
     defaultSaving: false,
@@ -5200,11 +5201,12 @@ function isRunningGlobalMusicConfiguration() {
   );
 }
 
-function setRunningMusicConfiguration(scope = "task", taskTitle = "") {
+function setRunningMusicConfiguration(scope = "task", taskTitle = "", actionId = "") {
   const safeScope = scope === "global" ? "global" : "task";
   state.runningPlayer.configurationMode = true;
   state.runningPlayer.configurationScope = safeScope;
   state.runningPlayer.configurationTaskTitle = safeScope === "global" ? "" : String(taskTitle || "").trim();
+  state.runningPlayer.configurationActionId = safeScope === "global" ? "" : String(actionId || "").trim();
   [runningMusicListModal, runningMusicDefaultModal, runningMusicDefaultChoiceModal].forEach((modal) => {
     if (modal) modal.dataset.musicDefaultScope = safeScope;
   });
@@ -5213,6 +5215,7 @@ function setRunningMusicConfiguration(scope = "task", taskTitle = "") {
 function clearRunningMusicConfiguration() {
   state.runningPlayer.configurationMode = false;
   state.runningPlayer.configurationTaskTitle = "";
+  state.runningPlayer.configurationActionId = "";
   state.runningPlayer.configurationScope = "task";
   [runningMusicListModal, runningMusicDefaultModal, runningMusicDefaultChoiceModal].forEach((modal) => {
     if (modal) delete modal.dataset.musicDefaultScope;
@@ -5984,6 +5987,10 @@ async function saveRunningTaskDefault(mode = "track") {
   const taskTitle = getRunningMusicTargetTaskTitle();
   const isGlobalDefault = isRunningGlobalMusicConfiguration();
   const shouldRenderTaskComposer = !isGlobalDefault && state.runningPlayer.configurationMode && isTaskComposerMode();
+  const configuredActionId = String(state.runningPlayer.configurationActionId || "").trim();
+  const targetAction = configuredActionId
+    ? findActionById(configuredActionId)
+    : getRunningActionForSelectedProfile();
 
   if (!station?.name) {
     showFloatingNotice("Escolha uma estação válida.");
@@ -6016,6 +6023,18 @@ async function saveRunningTaskDefault(mode = "track") {
     trackUrl: safeMode === "track" ? String(track?.url || "").trim() : ""
   };
 
+  if (shouldRenderTaskComposer) {
+    state.wizard.musicDefault = optimisticPreference;
+    state.startDecisionContext.dirty = true;
+    closeModal("runningMusicDefaultModal");
+    closeModal("runningMusicDefaultChoiceModal");
+    closeRunningMusicListModal();
+    clearRunningMusicConfiguration();
+    renderTaskComposerModal();
+    showFloatingNotice("Música vinculada à tarefa. Toque em Criar tarefa ou Salvar edição.");
+    return;
+  }
+
   if (isGlobalDefault) {
     state.runningPlayer.globalDefaultPreference = optimisticPreference;
   } else if (preferenceKey) {
@@ -6044,6 +6063,7 @@ async function saveRunningTaskDefault(mode = "track") {
         scope: isGlobalDefault ? "global" : "task",
         mode: safeMode,
         taskTitle: isGlobalDefault ? "" : taskTitle,
+        actionId: isGlobalDefault ? "" : String(targetAction?.id || ""),
         stationId: getRunningStationId(station),
         trackId: safeMode === "track" ? getRunningTrackId(track) : "",
         stationName: station.name,
@@ -6055,6 +6075,9 @@ async function saveRunningTaskDefault(mode = "track") {
     state.runningPlayer.defaultPreferenceByTaskTitle = buildRunningDefaultPreferenceMap(payload?.preferences);
     state.runningPlayer.globalDefaultPreference = buildRunningGlobalDefaultPreference(payload?.preferences);
     state.runningPlayer.preferencesLoaded = true;
+    if (payload?.action?.id) {
+      state.actions = state.actions.map((item) => String(item?.id || "") === String(payload.action.id) ? payload.action : item);
+    }
     if (isGlobalDefault && !state.runningPlayer.globalDefaultPreference) {
       throw new Error("O servidor não confirmou o padrão global. Tente novamente.");
     }
@@ -6627,6 +6650,7 @@ function buildInitialWizardState() {
     categoryThinking: false,
     svgIconUrl: "",
     svgIconLabel: "",
+    musicDefault: null,
     editingActionId: null,
     replaceOverlaps: false
   };
@@ -10207,6 +10231,7 @@ function closeStartDecisionModalWith(value) {
   closeProjectNativeKeyboard({ commit: false, immediate: true });
   state.runningPlayer.configurationMode = false;
   state.runningPlayer.configurationTaskTitle = "";
+  state.runningPlayer.configurationActionId = "";
   state.runningPlayer.configurationScope = "task";
   closeModal(startDecisionModal);
   if (startDecisionContent) {
@@ -10706,6 +10731,7 @@ function openTaskComposer(action = null, options = {}) {
     state.wizard.categoryThinking = false;
     state.wizard.svgIconUrl = String(action.svgIconUrl || "").trim();
     state.wizard.svgIconLabel = String(action.svgIconLabel || "").trim();
+    state.wizard.musicDefault = getRunningIndividualPreferenceForAction(action);
     state.wizard.editingActionId = action.id;
     state.wizard.repeatOpen = String(action.repeatRule || "none") !== "none";
     state.wizard.repeatMode = normalizeRepeatMode(String(action.repeatRule || "none"));
@@ -13124,10 +13150,11 @@ function formatRepeatLabel(repeatRule, repeatDays) {
 
 function formatActionMusicDecisionLabel(action) {
   const title = String(action?.title || taskTitle?.value || "").trim();
-  const preference = getRunningDefaultPreferenceForTaskTitle(title);
-  const mode = String(action?.musicDefaultMode || preference?.mode || "").trim().toLowerCase();
-  const stationName = String(action?.musicStationName || preference?.stationName || "").trim();
-  const trackName = String(action?.musicTrackName || preference?.trackName || "").trim();
+  const composerPreference = isTaskComposerMode() ? state.wizard.musicDefault : null;
+  const preference = composerPreference || getRunningDefaultPreferenceForTaskTitle(title);
+  const mode = String(action?.musicDefaultMode || composerPreference?.mode || preference?.mode || "").trim().toLowerCase();
+  const stationName = String(action?.musicStationName || composerPreference?.stationName || preference?.stationName || "").trim();
+  const trackName = String(action?.musicTrackName || composerPreference?.trackName || preference?.trackName || "").trim();
   if (mode === "station" && stationName) {
     return `Música padrão da atividade: ${stationName}`;
   }
@@ -16459,6 +16486,7 @@ async function saveTaskComposer() {
       ? `/api/actions/${encodeURIComponent(editingAction.id)}`
       : "/api/actions";
     const requestMethod = editingAction ? "PATCH" : "POST";
+    const musicDefault = state.wizard.musicDefault;
     await apiRequest(requestPath, {
       method: requestMethod,
       headers: { "Content-Type": "application/json" },
@@ -16472,7 +16500,13 @@ async function saveTaskComposer() {
         repeatConfig,
         occurrences,
         applyTo,
-        replaceOverlaps: Boolean(state.wizard.replaceOverlaps || state.wizard.forceReplaceOverlaps)
+        replaceOverlaps: Boolean(state.wizard.replaceOverlaps || state.wizard.forceReplaceOverlaps),
+        ...(musicDefault ? {
+          musicDefaultMode: musicDefault.mode,
+          musicStationName: musicDefault.stationName,
+          musicTrackName: musicDefault.trackName,
+          musicTrackUrl: musicDefault.trackUrl
+        } : {})
       })
     });
     state.wizard.forceReplaceOverlaps = false;
@@ -22287,6 +22321,7 @@ function openSynchronizedRunningMusicList() {
   state.startDecisionContext.actionId = "";
   state.runningPlayer.configurationMode = false;
   state.runningPlayer.configurationTaskTitle = "";
+  state.runningPlayer.configurationActionId = "";
   state.runningPlayer.configurationScope = "task";
   renderRunningMusicPlayer();
   void openRunningMusicListModal();
@@ -23022,7 +23057,7 @@ startDecisionMusicLabel?.addEventListener("click", () => {
     window.alert("Defina primeiro o nome da tarefa.");
     return;
   }
-  setRunningMusicConfiguration("task", targetTitle);
+  setRunningMusicConfiguration("task", targetTitle, String(action?.id || ""));
   openRunningMusicListModal();
 });
 startDecisionMicButton?.addEventListener("click", () => {

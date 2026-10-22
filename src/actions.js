@@ -863,6 +863,25 @@ export async function listUserActions(userId, { from, to }) {
   return result.rows.map(normalizeAction);
 }
 
+function normalizeActionMusicDefault(payload = {}, fallback = {}) {
+  const hasMusicPayload = ["musicDefaultMode", "musicStationName", "musicTrackName", "musicTrackUrl"].some((key) => Object.prototype.hasOwnProperty.call(payload || {}, key));
+  const source = hasMusicPayload ? payload : fallback;
+  const mode = String(source?.musicDefaultMode || source?.mode || "").trim().toLowerCase() === "station" ? "station" : "track";
+  const stationName = String(source?.musicStationName || source?.stationName || "").trim();
+  const trackName = String(source?.musicTrackName || source?.trackName || "").trim();
+  const trackUrl = String(source?.musicTrackUrl || source?.trackUrl || "").trim();
+
+  if (!stationName || (mode === "track" && !trackUrl)) {
+    return { mode: "track", stationName: null, trackName: null, trackUrl: null };
+  }
+  return {
+    mode,
+    stationName,
+    trackName: mode === "track" ? trackName || null : null,
+    trackUrl: mode === "track" ? trackUrl : null
+  };
+}
+
 export async function createUserAction(userId, payload) {
   await ensureActionsSchema();
 
@@ -876,6 +895,7 @@ export async function createUserAction(userId, payload) {
   const repeatDays = normalizeRepeatDays(payload?.repeatDays);
   const repeatConfig = normalizeRepeatConfig(payload?.repeatConfig);
   const replaceOverlaps = Boolean(payload?.replaceOverlaps);
+  const musicDefault = normalizeActionMusicDefault(payload);
   const rawOccurrences = Array.isArray(payload?.occurrences) && payload.occurrences.length
     ? payload.occurrences
     : [{ startAt: payload?.startAt, endAt: payload?.endAt }];
@@ -931,10 +951,14 @@ export async function createUserAction(userId, payload) {
   const repeatGroupId = storedOccurrences.length > 1 || repeatRule !== "none" ? crypto.randomUUID() : null;
   const values = [];
   const placeholders = storedOccurrences.map((occurrence, index) => {
-    const offset = index * 12;
+    const offset = index * 16;
     values.push(
       userId,
       title,
+      musicDefault.mode,
+      musicDefault.stationName,
+      musicDefault.trackName,
+      musicDefault.trackUrl,
       assignee,
       categoryId,
       svgIconUrl,
@@ -947,14 +971,14 @@ export async function createUserAction(userId, payload) {
       JSON.stringify(repeatConfig)
     );
 
-    return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}::jsonb, $${offset + 12}::jsonb)`;
+    return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}::timestamptz, $${offset + 12}::timestamptz, $${offset + 13}, $${offset + 14}, $${offset + 15}::jsonb, $${offset + 16}::jsonb)`;
   });
 
   const result = await query(
     `
-      insert into actions (user_id, title, assignee, category_id, svg_icon_url, svg_icon_label, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, repeat_config)
+      insert into actions (user_id, title, music_default_mode, music_station_name, music_track_name, music_track_url, assignee, category_id, svg_icon_url, svg_icon_label, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, repeat_config)
       values ${placeholders.join(", ")}
-      returning id, user_id, title, assignee, category_id, svg_icon_url, svg_icon_label, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, repeat_config, created_at
+      returning id, user_id, title, music_default_mode, music_station_name, music_track_name, music_track_url, assignee, category_id, svg_icon_url, svg_icon_label, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, repeat_config, created_at
     `,
     values
   );
@@ -1051,12 +1075,13 @@ export async function setActionMusicDefaultByTitle(userId, title, payload = {}) 
   await ensureActionsSchema();
 
   const safeTitle = normalizeActionTitle(title);
+  const safeActionId = String(payload?.actionId || "").trim();
   const defaultMode = String(payload?.mode || "").trim().toLowerCase() === "station" ? "station" : "track";
   const stationName = String(payload?.stationName || "").trim() || null;
   const trackName = String(payload?.trackName || "").trim() || null;
   const trackUrl = String(payload?.trackUrl || "").trim() || null;
 
-  if (!safeTitle || !stationName || (defaultMode === "track" && !trackUrl)) {
+  if ((!safeActionId && !safeTitle) || !stationName || (defaultMode === "track" && !trackUrl)) {
     return 0;
   }
 
@@ -1068,9 +1093,9 @@ export async function setActionMusicDefaultByTitle(userId, title, payload = {}) 
              music_track_name = $5,
              music_track_url = $6
        where user_id = $1
-         and title = $2
+         and ${safeActionId ? "id = $2" : "title = $2"}
     `,
-    [userId, safeTitle, defaultMode, stationName, trackName, trackUrl]
+    [userId, safeActionId || safeTitle, defaultMode, stationName, trackName, trackUrl]
   );
 
   return Number(result.rowCount || 0);
@@ -1095,6 +1120,7 @@ export async function updateUserAction(userId, actionId, payload) {
   const repeatConfig = normalizeRepeatConfig(payload?.repeatConfig);
   const applyTo = String(payload?.applyTo || "").trim().toLowerCase() === "series" ? "series" : "single";
   const replaceOverlaps = Boolean(payload?.replaceOverlaps);
+  const musicDefault = normalizeActionMusicDefault(payload, action);
   const occurrences = parseActionOccurrences(payload);
   const sameRepeatDefinition = repeatRule === String(action.repeatRule || "none")
     && JSON.stringify(repeatDays) === JSON.stringify(normalizeRepeatDays(action.repeatDays));
@@ -1152,11 +1178,15 @@ export async function updateUserAction(userId, actionId, payload) {
                    category_id = $5,
                    svg_icon_url = $6,
                    svg_icon_label = $7,
-                   start_at = $8::timestamptz,
-                   end_at = $9::timestamptz,
-                   repeat_rule = $10,
-                   repeat_days = $11::jsonb,
-                   repeat_config = $12::jsonb
+                   music_default_mode = $8,
+                   music_station_name = $9,
+                   music_track_name = $10,
+                   music_track_url = $11,
+                   start_at = $12::timestamptz,
+                   end_at = $13::timestamptz,
+                   repeat_rule = $14,
+                   repeat_days = $15::jsonb,
+                   repeat_config = $16::jsonb
              where user_id = $1
                and id = $2
           `,
@@ -1168,6 +1198,10 @@ export async function updateUserAction(userId, actionId, payload) {
             categoryId,
             svgIconUrl,
             svgIconLabel,
+            musicDefault.mode,
+            musicDefault.stationName,
+            musicDefault.trackName,
+            musicDefault.trackUrl,
             item.startAt.toISOString(),
             item.endAt.toISOString(),
             repeatRule,
@@ -1197,6 +1231,10 @@ export async function updateUserAction(userId, actionId, payload) {
       categoryId,
       svgIconUrl,
       svgIconLabel,
+      musicDefaultMode: musicDefault.mode,
+      musicStationName: musicDefault.stationName || "",
+      musicTrackName: musicDefault.trackName || "",
+      musicTrackUrl: musicDefault.trackUrl || "",
       repeatRule,
       repeatDays,
       repeatConfig,
@@ -1229,11 +1267,15 @@ export async function updateUserAction(userId, actionId, payload) {
           category_id = $5,
           svg_icon_url = $6,
           svg_icon_label = $7,
-          start_at = $8::timestamptz,
-          end_at = $9::timestamptz,
-          repeat_group_id = $10,
-          repeat_rule = $11,
-          repeat_days = $12::jsonb
+          music_default_mode = $8,
+          music_station_name = $9,
+          music_track_name = $10,
+          music_track_url = $11,
+          start_at = $12::timestamptz,
+          end_at = $13::timestamptz,
+          repeat_group_id = $14,
+          repeat_rule = $15,
+          repeat_days = $16::jsonb
       where user_id = $1
         and id = $2
       returning id
@@ -1246,6 +1288,10 @@ export async function updateUserAction(userId, actionId, payload) {
       categoryId,
       svgIconUrl,
       svgIconLabel,
+      musicDefault.mode,
+      musicDefault.stationName,
+      musicDefault.trackName,
+      musicDefault.trackUrl,
       occurrence.startAt.toISOString(),
       occurrence.endAt.toISOString(),
       nextRepeatGroupId,
