@@ -14,7 +14,7 @@ import {
 } from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
-const project200AppVersion = "1.63";
+const project200AppVersion = "1.64";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
 const project200UpdateBypassPassword = "1444";
@@ -8961,6 +8961,12 @@ function showDbLoadingState(target, minHeight = 140) {
   target.innerHTML = buildDbLoadingMarkup(minHeight);
 }
 
+function getActionsRequestPath() {
+  const date = dateFromOffset(state.activeOffset);
+  const rangeStartDate = projectDateKeyToDate(addDaysToDateKey(getProjectDateKey(date), -(Math.max(1, state.actionPeriodDays) - 1)));
+  return `/api/actions?from=${encodeURIComponent(startOfDayIso(rangeStartDate))}&to=${encodeURIComponent(nextDayIso(date))}`;
+}
+
 async function loadActions(options = {}) {
   renderDateHeader();
   const generation = ++actionsLoadGeneration;
@@ -8975,9 +8981,7 @@ async function loadActions(options = {}) {
     return false;
   }
 
-  const date = dateFromOffset(state.activeOffset);
-  const rangeStartDate = projectDateKeyToDate(addDaysToDateKey(getProjectDateKey(date), -(Math.max(1, state.actionPeriodDays) - 1)));
-  const actionsPath = `/api/actions?from=${encodeURIComponent(startOfDayIso(rangeStartDate))}&to=${encodeURIComponent(nextDayIso(date))}`;
+  const actionsPath = getActionsRequestPath();
   const hasLocalActions = Boolean(window.Project200Offline?.hasCached?.(actionsPath));
   if (options.silent !== true && !hasLocalActions) {
     showDbLoadingState(actionsList, 220);
@@ -8985,10 +8989,11 @@ async function loadActions(options = {}) {
   try {
     const payload = options.payload || await apiRequestWithTimeout(actionsPath, {
       skipGlobalLoading: options.silent === true,
-      forceNetwork: options.forceNetwork === true,
+      forceNetwork: options.forceNetwork === true || (actionsModal?.classList.contains("active") && window.navigator.onLine !== false),
       requireNetwork: options.requireNetwork === true
-    }, 7000);
-    if (generation !== actionsLoadGeneration || accountToken !== getToken()) return false;
+    }, 15000);
+    if (generation !== actionsLoadGeneration || accountToken !== getToken() || actionsPath !== getActionsRequestPath()) return false;
+    if (!Array.isArray(payload?.actions)) throw new Error("A lista de ações não está disponível.");
     // Uma resposta iniciada antes de um toque não pode desfazer esse toque.
     if (mutationGeneration !== actionsMutationGeneration) return false;
     const protectedIds = new Set([
@@ -9024,7 +9029,7 @@ async function loadActions(options = {}) {
     if (state.activeOffset === 0) void scheduleMissionNotifications();
     registerDayCloseEventIfNeeded();
   } catch (error) {
-    if (generation !== actionsLoadGeneration || accountToken !== getToken()) return false;
+    if (generation !== actionsLoadGeneration || accountToken !== getToken() || actionsPath !== getActionsRequestPath()) return false;
     if (options.silent !== true || !state.actions.length) {
       actionsProgress.hidden = true;
       actionsList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
@@ -11387,7 +11392,9 @@ function updateActionInState(nextAction) {
   if (!actionId) {
     return;
   }
-  state.actions = (Array.isArray(state.actions) ? state.actions : []).map((action) => (
+  const currentActions = Array.isArray(state.actions) ? state.actions : [];
+  if (!currentActions.some((action) => String(action?.id || "").trim() === actionId)) return;
+  state.actions = currentActions.map((action) => (
     String(action?.id || "").trim() === actionId
       ? { ...action, ...nextAction }
       : action
@@ -11397,10 +11404,8 @@ function updateActionInState(nextAction) {
 
 function cacheCurrentActionsState() {
   actionsMutationGeneration += 1;
-  if (!window.Project200Offline?.put) return;
-  const date = dateFromOffset(state.activeOffset);
-  const rangeStartDate = projectDateKeyToDate(addDaysToDateKey(getProjectDateKey(date), -(Math.max(1, state.actionPeriodDays) - 1)));
-  const path = `/api/actions?from=${encodeURIComponent(startOfDayIso(rangeStartDate))}&to=${encodeURIComponent(nextDayIso(date))}`;
+  if (!window.Project200Offline?.put || !state.actions.length) return;
+  const path = getActionsRequestPath();
   const cached = window.Project200Offline.peek(path) || {};
   window.Project200Offline.put(path, { ...cached, actions: state.actions, serverNow: new Date(getServerNowMs()).toISOString() });
 }
@@ -23275,7 +23280,9 @@ void (async () => {
 
   window.addEventListener("project200:offline-data-updated", (event) => {
     const path = String(event?.detail?.path || "");
-    if (path.startsWith("/api/actions?")) void loadActions({ silent: true, payload: event.detail.payload });
+    if (path.startsWith("/api/actions?") && path === getActionsRequestPath()) {
+      void loadActions({ silent: true, payload: event.detail.payload });
+    }
     if (path.startsWith("/api/200/extra-goals?")) {
       void Promise.all([loadMissions(), loadActionMissions()]).then(() => {
         renderMissions();
