@@ -2809,7 +2809,7 @@ function buildMissionInstallments({ availableOnly = true, nowMs = getServerNowMs
   });
   const microtasks = [...pendingByGoal.entries()].map(([goalId, group]) => ({
     goal: group.goal, goalId, variants: group.variants,
-    variantCount: Math.max(group.variants.length, Array.isArray(group.goal?.variants) ? group.goal.variants.length : 0),
+    variantCount: group.variants.length,
     pendingVariantCount: group.variants.length,
     title: String(group.goal?.title || "Pasta"), unitKey: goalId, installmentNumber: 1,
     target: group.variants.length, completed: false, kind: "mission-installment",
@@ -3158,7 +3158,7 @@ function renderActionsMissionsPanel() {
   entries.forEach(({ goal, variant, variants, key, title }) => {
     const progress = variant ? { progress: 0, target: 1, percent: 0 } : getActionsMissionProgress(goal);
     const pendingCount = Array.isArray(variants) ? variants.length : 0;
-    const variantCount = pendingCount ? Math.max(pendingCount, Array.isArray(goal?.variants) ? goal.variants.length : 0) : 0;
+    const variantCount = pendingCount;
     const goalId = String(goal?.id || "");
     const goalIcon = getMissionDisplayIcon(goal);
     const priorPercent = previousProgress.get(key);
@@ -3175,7 +3175,7 @@ function renderActionsMissionsPanel() {
     card.innerHTML = `
       <img class="actions-mission-card-icon" src="${escapeHtml(String(goalIcon?.src || "/200/icons/target.svg"))}" alt="${escapeHtml(String(goalIcon?.alt || "Ícone da missão"))}" />
       <div class="actions-mission-card-copy">
-        <h3>${escapeHtml(title)}${variantCount ? `<span class="actions-mission-count-badge" aria-label="${variantCount} microtarefas na pasta">${variantCount}</span>` : ""}</h3>
+        <h3>${escapeHtml(title)}${variantCount ? `<span class="actions-mission-count-badge" aria-label="${variantCount} microtarefas pendentes para hoje">${variantCount}</span>` : ""}</h3>
         <p>${variant ? "Pendente" : pendingCount ? `${pendingCount} microtarefas pendentes` : goal.financialGoal ? `${escapeHtml(formatMoney(goal.financialGoal.progressCents))} de ${escapeHtml(formatMoney(goal.financialGoal.targetAmountCents))}` : `${progress.progress} de ${progress.target}`}</p>
       </div>
       <div class="actions-mission-card-track" role="progressbar" aria-label="Progresso de ${escapeHtml(title)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}">
@@ -8708,7 +8708,7 @@ function createActionsDynamicMissionDeck(entries = []) {
         const countBadge = document.createElement('span');
         countBadge.className = 'actions-mission-count-badge';
         countBadge.textContent = String(entry.variantCount);
-        countBadge.setAttribute('aria-label', `${entry.variantCount} microtarefas na pasta`);
+        countBadge.setAttribute('aria-label', `${entry.variantCount} microtarefas pendentes para hoje`);
         title.appendChild(countBadge);
       }
       const progress = card.querySelector('.history-mission-card-progress');
@@ -8812,7 +8812,7 @@ function renderActions() {
       row.innerHTML = `
         ${buildTaskAvatarMarkup(missionIcon.src, missionIcon.alt, { categoryIcon: missionIcon.categoryIcon })}
         <div class="task-main">
-          <div class="task-title">${window.project200Projects?.isLinked("mission", action.goalId) ? '<span class="project-star">★</span>' : ""}${escapeHtml(action.title)}${action.variantCount ? `<span class="actions-mission-count-badge" aria-label="${action.variantCount} microtarefas na pasta">${action.variantCount}</span>` : ""}</div>
+          <div class="task-title">${window.project200Projects?.isLinked("mission", action.goalId) ? '<span class="project-star">★</span>' : ""}${escapeHtml(action.title)}${action.variantCount ? `<span class="actions-mission-count-badge" aria-label="${action.variantCount} microtarefas pendentes para hoje">${action.variantCount}</span>` : ""}</div>
           <div class="task-assignee task-duration">${action.variantCount ? `${action.pendingVariantCount || action.variantCount} microtarefas pendentes` : `${action.installmentNumber} de ${action.target}`}</div>
         </div>
         <div class="task-time">${formatActionPeriodTime(action.startAt)}</div>
