@@ -14,7 +14,7 @@ import {
 } from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
-const project200AppVersion = "1.64";
+const project200AppVersion = "1.66";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
 const project200UpdateBypassPassword = "1444";
@@ -892,6 +892,9 @@ const missionVariantsKicker = document.getElementById("missionVariantsKicker");
 const missionVariantsTitle = document.getElementById("missionVariantsTitle");
 const missionVariantCycleSelection = document.getElementById("missionVariantCycleSelection");
 const missionVariantsList = document.getElementById("missionVariantsList");
+const missionPlaylistFooter = document.getElementById("missionPlaylistFooter");
+const missionPlaylistSelectionCount = document.getElementById("missionPlaylistSelectionCount");
+const missionPlaylistStartButton = document.getElementById("missionPlaylistStartButton");
 const missionVariantAddButton = document.getElementById("missionVariantAddButton");
 const missionVariantEditor = document.getElementById("missionVariantEditor");
 const missionVariantTitleInput = document.getElementById("missionVariantTitleInput");
@@ -2785,15 +2788,24 @@ function buildMissionInstallments({ availableOnly = true, nowMs = getServerNowMs
       delayMinutes: Math.floor((nowMs - unit.dueAtMs) / 60000)
     };
   });
-  const microtasks = getActionsMissionEntries(nowMs).filter((entry) => entry.variant).map(({ goal, variant, title }) => {
+  const pendingByGoal = new Map();
+  getActionsMissionEntries(nowMs).filter((entry) => entry.variant).forEach(({ goal, variant }) => {
+    const goalId = String(goal.id || "");
+    if (!pendingByGoal.has(goalId)) pendingByGoal.set(goalId, { goal, variants: [], dueAtMs: Number.POSITIVE_INFINITY });
+    const group = pendingByGoal.get(goalId);
     const dueAtMs = getMissionVariantTiming(variant, nowMs).dueAtMs;
-    return {
-      goal, goalId: String(goal.id), variant, variantId: String(variant.id), title,
-      unitKey: `${goal.id}:${variant.id}`, installmentNumber: 1, target: 1, completed: false,
-      kind: "mission-installment", id: `microtask-${goal.id}-${variant.id}-${windowState.dateKey}`,
-      dueAtMs, startAt: new Date(dueAtMs).toISOString(), delayMinutes: Math.floor((nowMs - dueAtMs) / 60000)
-    };
+    group.variants.push(variant);
+    group.dueAtMs = Math.min(group.dueAtMs, dueAtMs);
   });
+  const microtasks = [...pendingByGoal.entries()].map(([goalId, group]) => ({
+    goal: group.goal, goalId, variants: group.variants,
+    variantCount: Math.max(group.variants.length, Array.isArray(group.goal?.variants) ? group.goal.variants.length : 0),
+    pendingVariantCount: group.variants.length,
+    title: String(group.goal?.title || "Pasta"), unitKey: goalId, installmentNumber: 1,
+    target: group.variants.length, completed: false, kind: "mission-installment",
+    id: `microtasks-${goalId}-${windowState.dateKey}`, dueAtMs: group.dueAtMs,
+    startAt: new Date(group.dueAtMs).toISOString(), delayMinutes: Math.floor((nowMs - group.dueAtMs) / 60000)
+  }));
   return [...scheduled, ...microtasks].filter((entry) => !entry.completed)
     .filter((entry) => !isActionsMissionMutedForDate(entry.goalId, windowState.dateKey))
     .filter((entry) => !availableOnly || nowMs >= entry.dueAtMs - (15 * 60000))
@@ -3060,9 +3072,8 @@ function getActionsMissionEntries(nowMs = getServerNowMs()) {
   return (Array.isArray(state.actionMissions) ? state.actionMissions : []).flatMap((goal) => {
     if (isLimitGoal(goal)) return [];
     if (isMissionFolder(goal)) {
-      return getPendingActionsMicrotasks(goal, nowMs).map((variant) => ({
-        goal, variant, key: `${goal.id}:${variant.id}`, title: String(variant.title || "Microtarefa")
-      }));
+      const variants = getPendingActionsMicrotasks(goal, nowMs);
+      return variants.length ? [{ goal, variants, key: String(goal.id), title: String(goal.title || "Pasta") }] : [];
     }
     return isMissionScheduledForToday(goal, nowMs)
       ? [{ goal, variant: null, key: String(goal.id || ""), title: String(goal.title || "Missão") }]
@@ -3071,12 +3082,26 @@ function getActionsMissionEntries(nowMs = getServerNowMs()) {
 }
 
 function openActionsMissionEntry(goalId, variantId = "") {
-  if (!variantId) { openMissionEntryModal(goalId); return; }
+  if (!variantId) {
+    const goal = getAvailableMissionById(goalId);
+    if (isMissionFolder(goal)) { void openActionsMissionFolder(goal); return; }
+    openMissionEntryModal(goalId);
+    return;
+  }
   const goal = (state.actionMissions || []).find((item) => String(item.id) === String(goalId)) || getAvailableMissionById(goalId);
   const variant = getPendingActionsMicrotasks(goal).find((item) => String(item.id) === String(variantId));
   if (!goal || !variant) { renderActions(); return; }
   state.missionRun.availableVariants = Array.isArray(goal.variants) ? goal.variants : [];
   beginMissionRun(goal, variant);
+}
+
+async function openActionsMissionFolder(goal) {
+  if (!goal?.id) return;
+  let refreshedVariants = Array.isArray(goal.variants) ? goal.variants : [];
+  try { refreshedVariants = await loadMissionVariants(goal.id, { force: true }); } catch {}
+  const variants = getPendingActionsMicrotasks({ ...goal, variants: refreshedVariants });
+  if (!variants.length) { renderActions(); return; }
+  await openMissionVariantsModal(goal.id, "playlist", { items: variants });
 }
 
 function animateProgressFillWidth(element, nextPercent, fromPercent = null) {
@@ -3120,14 +3145,16 @@ function renderActionsMissionsPanel() {
     return;
   }
 
-  entries.forEach(({ goal, variant, key, title }) => {
+  entries.forEach(({ goal, variant, variants, key, title }) => {
     const progress = variant ? { progress: 0, target: 1, percent: 0 } : getActionsMissionProgress(goal);
+    const pendingCount = Array.isArray(variants) ? variants.length : 0;
+    const variantCount = pendingCount ? Math.max(pendingCount, Array.isArray(goal?.variants) ? goal.variants.length : 0) : 0;
     const goalId = String(goal?.id || "");
     const goalIcon = getMissionDisplayIcon(goal);
     const priorPercent = previousProgress.get(key);
     const initialPercent = Number.isFinite(priorPercent) ? priorPercent : progress.percent;
     const card = document.createElement("article");
-    const expectation = variant ? { tone: "blue" } : getMissionExpectation(goal);
+    const expectation = variant || pendingCount ? { tone: "blue" } : getMissionExpectation(goal);
     card.className = `actions-mission-card mission-expectation-${expectation.tone}`;
     card.dataset.actionsMissionGoalId = goalId;
     card.dataset.actionsMissionEntryKey = key;
@@ -3138,8 +3165,8 @@ function renderActionsMissionsPanel() {
     card.innerHTML = `
       <img class="actions-mission-card-icon" src="${escapeHtml(String(goalIcon?.src || "/200/icons/target.svg"))}" alt="${escapeHtml(String(goalIcon?.alt || "Ícone da missão"))}" />
       <div class="actions-mission-card-copy">
-        <h3>${escapeHtml(title)}</h3>
-        <p>${variant ? "Pendente" : goal.financialGoal ? `${escapeHtml(formatMoney(goal.financialGoal.progressCents))} de ${escapeHtml(formatMoney(goal.financialGoal.targetAmountCents))}` : `${progress.progress} de ${progress.target}`}</p>
+        <h3>${escapeHtml(title)}${variantCount ? `<span class="actions-mission-count-badge" aria-label="${variantCount} microtarefas na pasta">${variantCount}</span>` : ""}</h3>
+        <p>${variant ? "Pendente" : pendingCount ? `${pendingCount} microtarefas pendentes` : goal.financialGoal ? `${escapeHtml(formatMoney(goal.financialGoal.progressCents))} de ${escapeHtml(formatMoney(goal.financialGoal.targetAmountCents))}` : `${progress.progress} de ${progress.target}`}</p>
       </div>
       <div class="actions-mission-card-track" role="progressbar" aria-label="Progresso de ${escapeHtml(title)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}">
         <div class="actions-mission-card-fill" style="width:${initialPercent}%"></div>
@@ -4430,16 +4457,9 @@ async function playRunningMinuteCuePlayers(minute, taskTitle, actionId, generati
 function queueRunningMinuteCuePlayback(entry, taskTitle, actionId) {
   const generation = state.runningMinuteCue.generation;
   state.runningMinuteCue.pendingPlayback = true;
+  state.runningMinuteCue.played.add(entry.minute);
   const playSequence = async () => {
-    let played = await playRunningMinuteCuePlayers(entry.minute, taskTitle, actionId, generation);
-    if (!played && state.options.runningMinuteVoiceEnabled && state.runningMinuteCue.actionId === actionId && state.runningMinuteCue.generation === generation) {
-      runningMinuteCuePlayers = entry.urls.map(createRunningMinuteCueAudio);
-      await wait(600);
-      played = await playRunningMinuteCuePlayers(entry.minute, taskTitle, actionId, generation);
-    }
-    if (played && state.runningMinuteCue.actionId === actionId && state.runningMinuteCue.generation === generation) {
-      state.runningMinuteCue.played.add(entry.minute);
-    }
+    await playRunningMinuteCuePlayers(entry.minute, taskTitle, actionId, generation);
   };
   taskSpeechPlaybackQueue = taskSpeechPlaybackQueue.then(playSequence, playSequence).finally(() => {
     if (state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.generation !== generation) return;
@@ -4804,7 +4824,10 @@ function renderHomeRunningTask() {
   }
   if (remainingSeconds <= 0) {
     void playRunningEndBellCue(runningActionId);
-    if ((isQuickTaskAction(action) || state.options.continuousTasksEnabled) && !state.quickTaskAutoFinalizing) {
+    const hasTimedDuration = getActionDurationMinutes(action) > 0
+      || (String(action?.categoryId || "").trim().toLowerCase() === "free_time"
+        && new Date(action?.endAt || "").getTime() > new Date(action?.startAt || "").getTime());
+    if ((isQuickTaskAction(action) || (state.options.continuousTasksEnabled && hasTimedDuration)) && !state.quickTaskAutoFinalizing) {
       state.quickTaskAutoFinalizing = true;
       void performRunningFinalize(action);
     }
@@ -8668,6 +8691,20 @@ function createActionsDynamicMissionDeck(entries = []) {
     const visual = getMissionInstallmentVisual(entry.delayMinutes);
     card.classList.add('actions-dynamic-mission-card', visual.className);
     card.dataset.missionGoalId = String(entry.goalId || '');
+    if (Number(entry.variantCount || 0) > 0) {
+      const title = card.querySelector('.history-mission-card-title');
+      if (title) {
+        title.textContent = String(entry.title || entry.goal?.title || 'Pasta');
+        const countBadge = document.createElement('span');
+        countBadge.className = 'actions-mission-count-badge';
+        countBadge.textContent = String(entry.variantCount);
+        countBadge.setAttribute('aria-label', `${entry.variantCount} microtarefas na pasta`);
+        title.appendChild(countBadge);
+      }
+      const progress = card.querySelector('.history-mission-card-progress');
+      if (progress) progress.textContent = `${entry.pendingVariantCount || entry.variantCount} microtarefas pendentes`;
+      card.classList.add('has-microtasks');
+    }
     if (entry.variantId) {
       card.dataset.missionVariantId = String(entry.variantId);
       const title = card.querySelector('.history-mission-card-title');
@@ -8765,8 +8802,8 @@ function renderActions() {
       row.innerHTML = `
         ${buildTaskAvatarMarkup(missionIcon.src, missionIcon.alt, { categoryIcon: missionIcon.categoryIcon })}
         <div class="task-main">
-          <div class="task-title">${window.project200Projects?.isLinked("mission", action.goalId) ? '<span class="project-star">★</span>' : ""}${escapeHtml(action.title)}</div>
-          <div class="task-assignee task-duration">${action.variantId ? "Pendente" : `${action.installmentNumber} de ${action.target}`}</div>
+          <div class="task-title">${window.project200Projects?.isLinked("mission", action.goalId) ? '<span class="project-star">★</span>' : ""}${escapeHtml(action.title)}${action.variantCount ? `<span class="actions-mission-count-badge" aria-label="${action.variantCount} microtarefas na pasta">${action.variantCount}</span>` : ""}</div>
+          <div class="task-assignee task-duration">${action.variantCount ? `${action.pendingVariantCount || action.variantCount} microtarefas pendentes` : `${action.installmentNumber} de ${action.target}`}</div>
         </div>
         <div class="task-time">${formatActionPeriodTime(action.startAt)}</div>
       `;
@@ -9317,10 +9354,9 @@ function queueTaskSpeechSequence(requests) {
       for (let index = 0; index < requests.length; index += 1) {
         if (generation !== taskSpeechGeneration) break;
         const request = requests[index];
-        const played = blobs[index] ? await playTaskSpeechBlob(blobs[index]) : false;
-        if (!played && generation === taskSpeechGeneration) {
-          await playTaskSpeechFallback(getTaskSpeechFallbackText(request));
-        }
+        if (blobs[index]) await playTaskSpeechBlob(blobs[index]);
+        // A voz de tarefa deve ser exclusivamente a gravação do Harry. Não
+        // trocar para speechSynthesis, que introduz uma segunda voz no fluxo.
       }
     } finally {
       renderRunningMusicPlayer();
@@ -17884,19 +17920,23 @@ function ensureMissionVariantsAddButton() {
 
 function renderMissionVariants() {
   const editorOpen = Boolean(state.missionVariants.editorOpen);
-  const chooseMode = state.missionVariants.mode === "choose" || state.missionVariants.mode === "cycle-choose";
+  const playlistMode = state.missionVariants.mode === "playlist";
+  const chooseMode = playlistMode || state.missionVariants.mode === "choose" || state.missionVariants.mode === "cycle-choose";
   const cycleChooseMode = state.missionVariants.mode === "cycle-choose";
   const cycleSelectionTarget = normalizeMissionRunCycleTarget(state.missionVariants.cycleSelectionTarget);
   const cycleSelections = Array.isArray(state.missionVariants.cycleSelections) ? state.missionVariants.cycleSelections : [];
   const manageMode = !chooseMode;
   const currentFolder = getAvailableMissionById(state.missionVariants?.goalId);
+  missionVariantsModal?.classList.toggle("is-playlist-mode", playlistMode);
   const editAllButton = ensureMissionVariantsEditAllButton();
   const addFromDailyButton = ensureMissionVariantsAddButton();
   if (editAllButton) editAllButton.hidden = editorOpen || state.missionVariants.mode !== "choose" || !isMissionFolder(currentFolder);
   if (addFromDailyButton) addFromDailyButton.hidden = editorOpen || state.missionVariants.mode !== "choose" || !isMissionFolder(currentFolder);
-  if (missionVariantsKicker) missionVariantsKicker.textContent = manageMode ? "PASTA DE AÇÕES" : "";
+  if (missionVariantsKicker) missionVariantsKicker.textContent = playlistMode ? "PLAYLIST DE MICROTAREFAS" : manageMode ? "PASTA DE AÇÕES" : "";
   const missionVariantFolderName = String(getAvailableMissionById(state.missionVariants?.goalId)?.title || "Pasta de ações").trim();
-  if (missionVariantsTitle) missionVariantsTitle.textContent = manageMode
+  if (missionVariantsTitle) missionVariantsTitle.textContent = playlistMode
+    ? missionVariantFolderName
+    : manageMode
     ? ((state.missionVariants.items || []).length ? "Organize as ações dessa pasta" : missionVariantFolderName)
     : "";
   if (missionVariantCycleSelection) {
@@ -17906,6 +17946,14 @@ function renderMissionVariants() {
       : "";
   }
   if (missionVariantAddButton) missionVariantAddButton.hidden = chooseMode || editorOpen;
+  if (missionPlaylistFooter) missionPlaylistFooter.hidden = !playlistMode || editorOpen;
+  if (playlistMode) {
+    const selectedCount = (state.missionVariants.playlistSelectedIds || []).length;
+    if (missionPlaylistSelectionCount) missionPlaylistSelectionCount.textContent = selectedCount
+      ? `${selectedCount} microtarefa${selectedCount === 1 ? "" : "s"} selecionada${selectedCount === 1 ? "" : "s"} (máximo ${MISSION_RUN_MAX_CYCLES})`
+      : `Selecione as microtarefas que deseja fazer (máximo ${MISSION_RUN_MAX_CYCLES})`;
+    if (missionPlaylistStartButton) missionPlaylistStartButton.disabled = selectedCount < 1;
+  }
   if (missionVariantEditor) missionVariantEditor.hidden = !editorOpen;
   if (missionVariantSortButton) {
     const sortModeLabel = state.missionVariants.sortMode === "priority" ? "Prioridade" : "Usuário";
@@ -17972,8 +18020,9 @@ function renderMissionVariants() {
       ? `Semanal: ${normalizeMissionRepeatDays(variant?.repeatDays, []).map((day) => weekdayNames[day]).join(", ")}`
       : `Prazo: ${unitLabel}`;
     const variantDuration = normalizeMissionDurationOption(variant.unitDurationSeconds || getMissionUnitDurationSeconds(getMissionRunGoalById(state.missionVariants.goalId)) || DEFAULT_MISSION_DURATION_SECONDS);
-    return `<article class="mission-variant-card${timing.completedCycle ? " is-completed" : ""}${timing.overdueMs > 0 ? " is-overdue" : ""}" data-mission-variant-id="${escapeHtml(variant.id)}">
-      <button class="mission-variant-main" type="button"><span><strong>${escapeHtml(variant.title)}</strong><small>${scheduleLabel} &middot; Tempo: ${formatMissionDurationValue(variantDuration)} &middot; ${formatMissionVariantRemaining(timing)}</small></span>${chooseMode ? `<span class="mission-variant-play">${cycleChooseMode ? "Escolher" : "Iniciar"}</span>` : ""}</button>
+    const playlistSelected = playlistMode && (state.missionVariants.playlistSelectedIds || []).includes(String(variant.id));
+    return `<article class="mission-variant-card${timing.completedCycle ? " is-completed" : ""}${timing.overdueMs > 0 ? " is-overdue" : ""}${playlistSelected ? " is-playlist-selected" : ""}" data-mission-variant-id="${escapeHtml(variant.id)}">
+      <button class="mission-variant-main" type="button"${playlistMode ? ` aria-pressed="${playlistSelected ? "true" : "false"}"` : ""}><span><strong>${escapeHtml(variant.title)}</strong><small>${scheduleLabel} &middot; Tempo: ${formatMissionDurationValue(variantDuration)} &middot; ${formatMissionVariantRemaining(timing)}</small></span>${playlistMode ? `<span class="mission-playlist-check" aria-hidden="true">${playlistSelected ? "✓" : ""}</span>` : chooseMode ? `<span class="mission-variant-play">${cycleChooseMode ? "Escolher" : "Iniciar"}</span>` : ""}</button>
       ${chooseMode ? "" : `<button class="mission-variant-share" type="button" data-mission-variant-share="${escapeHtml(variant.id)}" aria-label="Compartilhar ${escapeHtml(variant.title)}">↗</button><button class="mission-variant-delete" type="button" data-mission-variant-delete="${escapeHtml(variant.id)}" aria-label="Excluir ${escapeHtml(variant.title)}">×</button>`}
       <div class="mission-variant-bar"><span class="${tone}" style="width:${barPercent.toFixed(2)}%"></span></div>
     </article>`;
@@ -18004,6 +18053,7 @@ async function openMissionVariantsModal(goalId, mode = "edit", options = {}) {
     editingId: "",
     cycleSelectionTarget: normalizeMissionRunCycleTarget(options?.cycleTarget || 1),
     cycleSelections: Array.isArray(options?.initialSelections) ? options.initialSelections.slice(0, MISSION_RUN_MAX_CYCLES) : [],
+    playlistSelectedIds: [],
     cycleSelectionResumeMode: options?.resumeMode === "advance" ? "advance" : "preserve",
     sortMode: loadMissionVariantSortMode(),
     sortMenuOpen: false,
@@ -22000,6 +22050,21 @@ missionVariantsList?.addEventListener("scroll", () => {
   missionVariantsLastScrollAt = Date.now();
 }, { passive: true });
 
+missionPlaylistStartButton?.addEventListener("click", () => {
+  const goal = getMissionRunGoalById(state.missionVariants.goalId);
+  const selectedIds = (state.missionVariants.playlistSelectedIds || []).slice(0, MISSION_RUN_MAX_CYCLES);
+  const variantsById = new Map((state.missionVariants.items || []).map((variant) => [String(variant.id), variant]));
+  const selectedVariants = selectedIds.map((id) => variantsById.get(String(id))).filter(Boolean);
+  if (!goal || !selectedVariants.length) return;
+  closeModal("missionVariantsModal");
+  state.missionRun.availableVariants = [...(state.missionVariants.items || [])];
+  beginMissionRun(goal, selectedVariants[0], {
+    selectedVariantIds: selectedVariants.map((variant) => String(variant.id)),
+    cycleTarget: selectedVariants.length,
+    cycleDurationsSeconds: selectedVariants.map((variant) => getMissionRunDurationSeconds(goal, variant))
+  });
+});
+
 missionVariantsList?.addEventListener("click", async (event) => {
   const deleteButton = event.target.closest("[data-mission-variant-delete]");
   const shareButton = event.target.closest("[data-mission-variant-share]");
@@ -22033,6 +22098,14 @@ missionVariantsList?.addEventListener("click", async (event) => {
         }
       })();
     });
+    return;
+  }
+  if (state.missionVariants.mode === "playlist") {
+    const selected = new Set((state.missionVariants.playlistSelectedIds || []).map(String));
+    if (selected.has(id)) selected.delete(id);
+    else if (selected.size < MISSION_RUN_MAX_CYCLES) selected.add(id);
+    state.missionVariants.playlistSelectedIds = [...selected];
+    renderMissionVariants();
     return;
   }
   if (state.missionVariants.mode === "choose") {

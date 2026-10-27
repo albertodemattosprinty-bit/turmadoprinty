@@ -17036,3 +17036,22 @@ body[data-background-theme="edge"] :is(#universalScheduleModal,#dailyrepetitionM
   --universal-schedule-border:rgba(174,255,205,.18);
   --universal-schedule-accent:#2fd36b;
 }
+#actionsModal .actions-mission-card-copy h3 { display:flex; align-items:center; gap:9px; }
+.actions-mission-count-badge { display:inline-grid; place-items:center; min-width:25px; height:25px; padding:0 7px; flex:0 0 auto; border-radius:999px; background:#1769e8; color:#fff; font-size:.78rem; font-weight:950; line-height:1; box-shadow:0 3px 12px rgba(23,105,232,.34); }
+.task-row.task-mission-dynamic .actions-mission-count-badge { margin-left:auto; }
+.task-row.task-mission-dynamic .task-title { display:flex; align-items:center; gap:8px; }
+.actions-dynamic-mission-card .history-mission-card-title { display:flex; align-items:center; gap:8px; }
+.mission-variants-modal.is-playlist-mode .mission-variants-kicker,
+.mission-variants-modal.is-playlist-mode .mission-variants-title { display:block; }
+.mission-variants-modal.is-playlist-mode .mission-variant-sort-wrap,
+.mission-variants-modal.is-playlist-mode #missionVariantAddButton { display:none !important; }
+.mission-playlist-footer { position:sticky; bottom:-1px; display:grid; gap:12px; padding:14px 0 2px; background:linear-gradient(180deg, transparent, rgba(3,9,22,.98) 18%); }
+.mission-playlist-footer[hidden] { display:none !important; }
+.mission-playlist-selection-count { color:rgba(255,255,255,.74); text-align:center; font-size:.85rem; font-weight:750; }
+.mission-playlist-start { min-height:54px; display:flex; align-items:center; justify-content:center; gap:10px; border:0; border-radius:16px; background:linear-gradient(135deg,#22c55e,#15803d); color:#fff; font:inherit; font-weight:950; box-shadow:0 12px 28px rgba(21,128,61,.3); }
+.mission-playlist-start:disabled { opacity:.42; box-shadow:none; }
+.mission-playlist-start svg { width:23px; height:23px; }
+.mission-variant-card.is-playlist-selected { border-color:rgba(75,165,255,.85); background:linear-gradient(135deg,rgba(23,105,232,.3),rgba(255,255,255,.08)); }
+.mission-playlist-check { width:27px; height:27px; flex:0 0 auto; display:grid; place-items:center; border:2px solid rgba(255,255,255,.55); border-radius:50%; color:#fff; font-size:1rem; font-weight:950; }
+.mission-variant-card.is-playlist-selected .mission-playlist-check { border-color:#2d8bff; background:#1769e8; }
+.mission-variant-main .mission-playlist-check:first-child { display:grid; }
