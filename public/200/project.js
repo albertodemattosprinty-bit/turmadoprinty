@@ -10934,20 +10934,18 @@ function openStartConflictModalForActions(currentAction, nextAction) {
 }
 
 async function handleRunningActionConflict(currentAction, nextAction) {
-  const conflictChoice = await openStartConflictModalForActions(currentAction, nextAction);
-  if (conflictChoice === "finalize_and_start") {
-    await toggleActionStatus(currentAction.id, { skipEndConfirm: true });
-    await toggleActionStatus(nextAction.id, { skipDecision: true, ignoreRunningConflict: true });
+  const currentActionId = String(currentAction?.id || "");
+  const nextActionId = String(nextAction?.id || "");
+  if (!currentActionId || !nextActionId) return false;
+  try {
+    await restoreActionToPending(currentActionId);
+    await toggleActionStatus(nextActionId, { skipDecision: true, ignoreRunningConflict: true });
+    showFloatingNotice("A tarefa anterior ficou como Não concluída.");
+    return true;
+  } catch (error) {
+    showFloatingNotice(error instanceof Error ? error.message : "Não foi possível liberar a tarefa anterior.");
     return true;
   }
-  if (conflictChoice === "partial_and_start") {
-    const pausedResult = await pauseActionWithSelectedProgress(currentAction);
-    if (!pausedResult) return true;
-    delete state.runningLocalStarts[String(currentAction.id || "")];
-    await toggleActionStatus(nextAction.id, { skipDecision: true, ignoreRunningConflict: true });
-    return true;
-  }
-  return conflictChoice === "cancel";
 }
 
 function openStartDecisionModal(targetAction, currentEntry, buttons) {
@@ -12798,7 +12796,11 @@ async function restoreActionToPending(actionId) {
   });
   const updated = payload?.action;
   if (updated) {
-    state.actions = state.actions.map((item) => (item.id === actionId ? updated : item));
+    const actionIdString = String(actionId || "");
+    const alreadyLoaded = state.actions.some((item) => String(item?.id || "") === actionIdString);
+    state.actions = alreadyLoaded
+      ? state.actions.map((item) => (String(item?.id || "") === actionIdString ? updated : item))
+      : [...state.actions, updated];
     cacheCurrentActionsState();
   }
   const targetDay = toLocalDateKey(updated?.startAt || new Date().toISOString());
@@ -16594,7 +16596,7 @@ function openQuickTaskModal() {
   window.setTimeout(() => quickTaskTitleInput?.focus(), 60);
 }
 
-async function submitQuickTaskStart(conflictMode = "") {
+async function submitQuickTaskStart() {
   const title = String(quickTaskTitleInput?.value || "").trim();
   const plannedMinutes = Math.max(1, Math.round(Number(quickTaskMinutesInput?.value || 15) || 15));
   if (!title) {
@@ -16616,8 +16618,7 @@ async function submitQuickTaskStart(conflictMode = "") {
       body: JSON.stringify({
         title,
         plannedMinutes,
-        assignee: getSelectedProfileName(),
-        conflictMode
+        assignee: getSelectedProfileName()
       })
     });
     closeModal("quickTaskModal");
@@ -22689,26 +22690,7 @@ document.addEventListener("keydown", () => {
   registerScreenLockActivity();
 }, true);
 quickTaskStartButton?.addEventListener("click", () => {
-  void (async () => {
-    const runningAction = getRunningActionForSelectedProfile();
-    if (!runningAction) {
-      await submitQuickTaskStart();
-      return;
-    }
-    const choice = await openStartConflictModalForActions(runningAction, {
-      title: String(quickTaskTitleInput?.value || "Tarefa Rápida").trim() || "Tarefa Rápida"
-    });
-    if (!choice || choice === "cancel") {
-      return;
-    }
-    if (choice === "partial_and_start") {
-      const pausedResult = await pauseActionWithSelectedProgress(runningAction);
-      if (!pausedResult) return;
-      await submitQuickTaskStart();
-      return;
-    }
-    await submitQuickTaskStart("finalize");
-  })();
+  void submitQuickTaskStart();
 });
 profileRenameConfirmButton?.addEventListener("click", () => {
   void saveProfileRename();

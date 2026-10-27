@@ -1367,17 +1367,43 @@ export async function updateUserActionStatus(userId, actionId, payload = {}) {
           and a.id <> $2
           and coalesce(upper(o.status), 'PENDING') = 'IN_PROGRESS'
           and lower(trim(coalesce(a.assignee, ''))) = lower(trim(coalesce($3, '')))
-        limit 1
       `,
       [userId, action.id, action.assignee]
     );
 
-    if (inProgressConflict.rows[0]) {
-      const conflictRow = inProgressConflict.rows[0];
-      const conflictError = new Error("Voce ja esta em outra tarefa.");
-      conflictError.code = "ACTION_IN_PROGRESS_CONFLICT";
-      conflictError.runningAction = await getUserActionById(userId, conflictRow.id);
-      throw conflictError;
+    for (const conflictRow of inProgressConflict.rows) {
+      await query(
+        `
+          insert into action_status_overrides (
+            user_id,
+            action_id,
+            repeat_group_id,
+            status,
+            started_at,
+            completed_at,
+            completion_percent,
+            accumulated_seconds
+          )
+          select $1, a.id, a.repeat_group_id, $3, null, null, 0, 0
+          from actions a
+          where a.user_id = $1 and a.id = $2
+          on conflict (user_id, action_id) do update
+            set status = excluded.status,
+                started_at = null,
+                completed_at = null,
+                completion_percent = 0,
+                accumulated_seconds = 0,
+                updated_at = now()
+        `,
+        [userId, conflictRow.id, ACTION_STATUS_PENDING]
+      );
+      await upsertProject200RuntimeState(userId, {
+        actionId: conflictRow.id,
+        actionTitle: conflictRow.title,
+        eventType: "abort",
+        startedAt: null,
+        occurredAt: nowIso
+      });
     }
 
     startedAt = payload?.startedAt
