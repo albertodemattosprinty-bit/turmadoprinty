@@ -2789,13 +2789,23 @@ function buildMissionInstallments({ availableOnly = true, nowMs = getServerNowMs
     };
   });
   const pendingByGoal = new Map();
-  getActionsMissionEntries(nowMs).filter((entry) => entry.variant).forEach(({ goal, variant }) => {
-    const goalId = String(goal.id || "");
+  getActionsMissionEntries(nowMs).forEach((entry) => {
+    const variants = Array.isArray(entry?.variants)
+      ? entry.variants
+      : (entry?.variant ? [entry.variant] : []);
+    if (!variants.length) return;
+    const goal = entry.goal;
+    const goalId = String(goal?.id || "");
+    if (!goalId) return;
     if (!pendingByGoal.has(goalId)) pendingByGoal.set(goalId, { goal, variants: [], dueAtMs: Number.POSITIVE_INFINITY });
     const group = pendingByGoal.get(goalId);
-    const dueAtMs = getMissionVariantTiming(variant, nowMs).dueAtMs;
-    group.variants.push(variant);
-    group.dueAtMs = Math.min(group.dueAtMs, dueAtMs);
+    variants.forEach((variant) => {
+      if (!group.variants.some((item) => String(item?.id || "") === String(variant?.id || ""))) {
+        group.variants.push(variant);
+      }
+      const dueAtMs = getMissionVariantTiming(variant, nowMs).dueAtMs;
+      group.dueAtMs = Math.min(group.dueAtMs, dueAtMs);
+    });
   });
   const microtasks = [...pendingByGoal.entries()].map(([goalId, group]) => ({
     goal: group.goal, goalId, variants: group.variants,
