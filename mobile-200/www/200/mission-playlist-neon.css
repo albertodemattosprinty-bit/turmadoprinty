@@ -1,0 +1,109 @@
+body[data-background-theme="neon"] {
+  color: #f5fff9;
+  background:
+    radial-gradient(ellipse at 12% 8%, rgba(0, 255, 170, .14), transparent 32%),
+    radial-gradient(ellipse at 88% 90%, rgba(0, 204, 255, .12), transparent 34%),
+    #030607;
+  --white: #f5fff9;
+  --soft: rgba(235, 255, 246, .84);
+  --muted: rgba(204, 255, 226, .64);
+  --glass: rgba(5, 16, 15, .72);
+  --line: rgba(71, 255, 187, .3);
+  --accent: #35ff9b;
+  --warn: #dcff63;
+  --ink: #caffea;
+  --project-modal-theme: radial-gradient(circle at top left, rgba(53, 255, 155, .12), transparent 38%), linear-gradient(145deg, #050b09, #071410 56%, #05090c);
+}
+
+body[data-background-theme="neon"] .workspace-modal {
+  color: #f5fff9;
+}
+
+body[data-background-theme="neon"] #missionRunModal.workspace-modal,
+body[data-background-theme="neon"] #missionVariantsModal.workspace-modal,
+body[data-background-theme="neon"] #runningMissionQuickModal.workspace-modal {
+  background:
+    radial-gradient(ellipse at 12% 8%, rgba(0, 255, 170, .13), transparent 34%),
+    radial-gradient(ellipse at 88% 92%, rgba(0, 204, 255, .1), transparent 36%),
+    rgba(2, 5, 6, .98);
+}
+
+body[data-background-theme="neon"] .mission-variants-panel {
+  border-color: rgba(53, 255, 155, .34);
+  background: linear-gradient(145deg, rgba(4, 13, 10, .98), rgba(3, 9, 12, .99));
+  box-shadow: 0 0 36px rgba(0, 255, 157, .1), inset 0 0 30px rgba(0, 255, 157, .025);
+}
+
+body[data-background-theme="neon"] .mission-variants-kicker,
+body[data-background-theme="neon"] .mission-variant-sort-button {
+  color: #48ffad;
+}
+
+body[data-background-theme="neon"] .mission-variant-card.is-playlist-selected {
+  border-color: rgba(52, 255, 175, .88);
+  background: linear-gradient(135deg, rgba(0, 255, 157, .19), rgba(0, 204, 255, .08));
+  box-shadow: 0 0 18px rgba(0, 255, 157, .11);
+}
+
+body[data-background-theme="neon"] .mission-playlist-check,
+body[data-background-theme="neon"] .mission-variant-card.is-playlist-selected .mission-playlist-check {
+  border-color: #38ffa5;
+  background: rgba(0, 255, 157, .24);
+  color: #fff;
+}
+
+body[data-background-theme="neon"] .mission-playlist-footer {
+  background: linear-gradient(180deg, transparent, rgba(3, 8, 7, .99) 18%);
+}
+
+.mission-variants-modal.is-playlist-mode {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100dvh;
+  padding: 0;
+  border-radius: 0;
+  align-items: stretch;
+  justify-content: stretch;
+  overflow: hidden;
+}
+
+.mission-variants-modal.is-playlist-mode.active {
+  display: block;
+}
+
+.mission-variants-modal.is-playlist-mode .mission-variants-panel {
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  min-height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  border: 0;
+  border-radius: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  overflow: hidden;
+}
+
+.mission-variants-modal.is-playlist-mode .mission-variants-list {
+  min-height: 0;
+  align-content: start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 8px;
+}
+
+.mission-variants-modal.is-playlist-mode .mission-playlist-footer {
+  position: static;
+  padding-bottom: 0;
+}
+
+@media (max-width: 520px) {
+  .mission-variants-modal.is-playlist-mode .mission-variants-panel {
+    padding-left: max(14px, env(safe-area-inset-left));
+    padding-right: max(14px, env(safe-area-inset-right));
+  }
+}

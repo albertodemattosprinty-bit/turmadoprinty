@@ -6,7 +6,6 @@ import { listProject200FinancialGoals, financialGoalToProject200Mission } from "
 
 const EXTRA_GOALS_TIME_ZONE = "America/Sao_Paulo";
 const EXTRA_GOAL_MAX_DURATION_SECONDS = 180 * 60;
-const EXTRA_GOAL_MAX_CYCLES = 12;
 const DEFAULT_ACTIVE_TIME_START_MINUTES = 8 * 60;
 const DEFAULT_ACTIVE_TIME_END_MINUTES = 24 * 60;
 let extraGoalsSchemaPromise = null;
@@ -1382,7 +1381,7 @@ export async function updateExtraGoalProgress(userId, profileName = PROJECT200_D
   const safeVariantIds = [...new Set([
     ...(Array.isArray(variantIds) ? variantIds : []),
     variantId
-  ].map((value) => String(value || "").trim()).filter(Boolean))].slice(0, EXTRA_GOAL_MAX_CYCLES);
+  ].map((value) => String(value || "").trim()).filter(Boolean))];
   if (safeDelta > 0 && safeVariantIds.length) {
     const completedAt = new Date();
     const completedVariants = await query(`

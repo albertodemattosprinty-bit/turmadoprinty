@@ -10,14 +10,13 @@ function normalizeProfile(value) {
 function normalizeIds(value) {
   return [...new Set((Array.isArray(value) ? value : [])
     .map((id) => String(id || "").trim())
-    .filter(Boolean))].slice(0, 12);
+    .filter(Boolean))];
 }
 
 function normalizeCycleDurations(value) {
   return (Array.isArray(value) ? value : [])
     .map((seconds) => Math.max(0, Math.min(10800, Math.trunc(Number(seconds || 0) || 0))))
-    .filter((seconds) => seconds > 0)
-    .slice(0, 12);
+    .filter((seconds) => seconds > 0);
 }
 
 function normalizeTimestamp(value, fallback = new Date()) {
@@ -34,12 +33,13 @@ function normalizeRow(row) {
     variantId: row.variant_id || "",
     variantIds: normalizeIds(row.variant_ids),
     taskKind: row.task_kind,
+    playlistMode: Boolean(row.playlist_mode),
     durationSeconds: Math.max(0, Math.trunc(Number(row.duration_seconds || 0) || 0)),
     startedAt: row.started_at ? new Date(row.started_at).toISOString() : null,
     cycleStartedAt: row.cycle_started_at ? new Date(row.cycle_started_at).toISOString() : (row.started_at ? new Date(row.started_at).toISOString() : null),
-    cycleTarget: Math.max(1, Math.min(12, Math.trunc(Number(row.cycle_target || 1) || 1))),
-    cycleIndex: Math.max(1, Math.min(12, Math.trunc(Number(row.cycle_index || 1) || 1))),
-    completedCycles: Math.max(0, Math.min(12, Math.trunc(Number(row.completed_cycles || 0) || 0))),
+    cycleTarget: Math.max(1, Math.trunc(Number(row.cycle_target || 1) || 1)),
+    cycleIndex: Math.max(1, Math.trunc(Number(row.cycle_index || 1) || 1)),
+    completedCycles: Math.max(0, Math.trunc(Number(row.completed_cycles || 0) || 0)),
     cycleDurationsSeconds: normalizeCycleDurations(row.cycle_durations_seconds),
     updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null
   };
@@ -69,6 +69,7 @@ export async function ensureProject200CurrentTaskStateSchema() {
       await query("alter table project200_current_task_state add column if not exists cycle_index integer not null default 1;");
       await query("alter table project200_current_task_state add column if not exists completed_cycles integer not null default 0;");
       await query("alter table project200_current_task_state add column if not exists cycle_durations_seconds jsonb not null default '[]'::jsonb;");
+      await query("alter table project200_current_task_state add column if not exists playlist_mode boolean not null default false;");
       await query("update project200_current_task_state set cycle_started_at = started_at where cycle_started_at is null;");
     })().catch((error) => {
       schemaPromise = null;
@@ -91,8 +92,9 @@ export async function saveProject200CurrentTaskState(userId, payload = {}) {
   const variantId = String(payload?.variantId || "").trim() || null;
   const variantIds = normalizeIds(payload?.variantIds);
   const taskKind = String(payload?.taskKind || "mission").trim().toLowerCase() === "microtask" ? "microtask" : "mission";
+  const playlistMode = payload?.playlistMode === true;
   const durationSeconds = Math.max(0, Math.min(10800, Math.trunc(Number(payload?.durationSeconds || 0) || 0)));
-  const cycleTarget = Math.max(1, Math.min(12, Math.trunc(Number(payload?.cycleTarget || 1) || 1)));
+  const cycleTarget = Math.max(1, Math.trunc(Number(payload?.cycleTarget || 1) || 1));
   const cycleIndex = Math.max(1, Math.min(cycleTarget, Math.trunc(Number(payload?.cycleIndex || 1) || 1)));
   const completedCycles = Math.max(0, Math.min(cycleTarget, Math.trunc(Number(payload?.completedCycles || 0) || 0)));
   const cycleDurationsSeconds = normalizeCycleDurations(payload?.cycleDurationsSeconds);
@@ -102,18 +104,19 @@ export async function saveProject200CurrentTaskState(userId, payload = {}) {
   if (!goalId) throw new Error("Missao invalida.");
   const result = await query(`
     insert into project200_current_task_state (
-      user_id, assigned_profile, goal_id, variant_id, variant_ids, task_kind, duration_seconds,
+      user_id, assigned_profile, goal_id, variant_id, variant_ids, task_kind, playlist_mode, duration_seconds,
       started_at, cycle_started_at, cycle_target, cycle_index, completed_cycles, cycle_durations_seconds
     )
-    values ($1, $2, $3::uuid, $4::uuid, $5::jsonb, $6, $7, $8::timestamptz, $9::timestamptz, $10, $11, $12, $13::jsonb)
+    values ($1, $2, $3::uuid, $4::uuid, $5::jsonb, $6, $7, $8, $9::timestamptz, $10::timestamptz, $11, $12, $13, $14::jsonb)
     on conflict (user_id) do update
       set assigned_profile = excluded.assigned_profile,
           goal_id = excluded.goal_id,
           variant_id = excluded.variant_id,
           variant_ids = excluded.variant_ids,
           task_kind = excluded.task_kind,
+          playlist_mode = excluded.playlist_mode,
           duration_seconds = excluded.duration_seconds,
-          started_at = case when $14::boolean then excluded.started_at else project200_current_task_state.started_at end,
+          started_at = case when $15::boolean then excluded.started_at else project200_current_task_state.started_at end,
           cycle_started_at = excluded.cycle_started_at,
           cycle_target = excluded.cycle_target,
           cycle_index = excluded.cycle_index,
@@ -121,7 +124,7 @@ export async function saveProject200CurrentTaskState(userId, payload = {}) {
           cycle_durations_seconds = excluded.cycle_durations_seconds,
           updated_at = now()
     returning *
-  `, [userId, profile, goalId, variantId, JSON.stringify(variantIds), taskKind, durationSeconds, startedAt, cycleStartedAt, cycleTarget, cycleIndex, completedCycles, JSON.stringify(cycleDurationsSeconds), resetStartedAt]);
+  `, [userId, profile, goalId, variantId, JSON.stringify(variantIds), taskKind, playlistMode, durationSeconds, startedAt, cycleStartedAt, cycleTarget, cycleIndex, completedCycles, JSON.stringify(cycleDurationsSeconds), resetStartedAt]);
   return normalizeRow(result.rows[0]);
 }
 
