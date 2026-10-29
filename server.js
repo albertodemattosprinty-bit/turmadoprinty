@@ -5895,6 +5895,7 @@ async function handleProject200MarinProposalApplyRequest(request, response, mess
     }
 
     let entityId = null;
+    let entityIds = null;
     if (proposal.type === "action") {
       const actions = await createUserAction(user.id, {
         title: proposal.title,
@@ -5942,13 +5943,13 @@ async function handleProject200MarinProposalApplyRequest(request, response, mess
         profileName,
         exercises: proposal.exercisePlan?.exercises
       });
-      entityId = exercises.map((exercise) => exercise.exerciseId).join(",").slice(0, 2000);
+      entityIds = exercises.map((exercise) => exercise.exerciseId);
     } else {
       throw new Error("Tipo de proposta inválido.");
     }
 
     await finishProject200MarinProposal(user.id, messageId, proposal.key, entityId);
-    sendJson(response, 201, { ok: true, applied: true, type: proposal.type, entityId });
+    sendJson(response, 201, { ok: true, applied: true, type: proposal.type, entityId, ...(entityIds ? { entityIds } : {}) });
   } catch (error) {
     if (claim?.claimed) {
       await failProject200MarinProposal(user.id, messageId, proposalKey, error instanceof Error ? error.message : "Falha").catch(() => {});
