@@ -518,7 +518,7 @@ function refreshMuscleProgressMap(){
 }
 function renderMuscleProgressMap(){
   if(!elements.muscleProgressMapTrack)return;
-  if(!elements.muscleProgressMapTrack.getAttribute("src"))elements.muscleProgressMapTrack.src="/200/muscle-viewer-3d.html?mode=home&v=20261015-muscle-touch-v10";
+  if(!elements.muscleProgressMapTrack.getAttribute("src"))elements.muscleProgressMapTrack.src="/200/muscle-viewer-3d.html?mode=home&v=20261029-muscle-label-layout-v11";
   bindHomeMuscleViewer(elements.muscleProgressMapTrack);
   refreshMuscleProgressMap();
 }

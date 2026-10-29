@@ -95,13 +95,14 @@ const stage = document.getElementById('ilife-muscle-viewer');
 const canvas = document.getElementById('anatomyCanvas');
 const pointLabels = document.getElementById('musclePointLabels');
 const HOME_PRESENTATION = new URLSearchParams(location.search).get('mode') === 'home';
+const HOME_PRESENTATION_YAW = 22 * Math.PI / 180;
 stage.dataset.homePresentation = String(HOME_PRESENTATION);
 if(HOME_PRESENTATION)canvas.tabIndex=-1;
 const error = document.getElementById('stageError');
 const BASE_DISTANCE = 8.75;
 const FOCUS_DISTANCE = BASE_DISTANCE / 2; // +100% em ampliação linear (aproximadamente 2×)
 const BASE_AIM = [0,2.06,0];
-let selected=null, angle=0, pitch=.025, distance=BASE_DISTANCE, autorotate=false;
+let selected=null, angle=HOME_PRESENTATION?HOME_PRESENTATION_YAW:0, pitch=.025, distance=BASE_DISTANCE, autorotate=false;
 let focus = [...BASE_AIM], flight = null;
 let homePresentationView='front', homePresentationResumeTimer=null;
 let musclePointLabels=[];
@@ -133,8 +134,8 @@ const LABEL_ANCHORS = {
  lats:{back:[.505,3.190,-.463]}, rhomboids:{back:[-.246,3.585,-.447]},
  abs:{front:[.174,3.010,.480]}, obliques:{front:[.532,2.930,.393]},
  serratus:{front:[-.615,3.303,.356]}, lowerback:{back:[-.164,2.932,-.452]},
- glutes:{back:[.343,2.197,-.488]}, quads:{front:[.438,1.628,.444]},
- hamstrings:{back:[.418,1.672,-.403]}, adductors:{front:[-.257,1.670,.282]},
+ glutes:{back:[.343,2.197,-.488]}, quads:{front:[.438,1.81,.444]},
+ hamstrings:{back:[.418,1.672,-.403]}, adductors:{front:[-.257,1.39,.282]},
  calves:{back:[.444,.726,-.327]}, shins:{front:[.451,.730,.301]}
 };
 // Apenas grupos laterais são focados por lado quando tocados.
@@ -202,7 +203,7 @@ function setHomeView(view){
  if(view!=='front'&&view!=='back')return false;
  if(homePresentationResumeTimer)window.clearTimeout(homePresentationResumeTimer);
  homePresentationResumeTimer=null;homePresentationView=view;selected=null;
- flyTo(view==='back'?Math.PI:0,BASE_AIM,BASE_DISTANCE,.025);
+ flyTo((view==='back'?Math.PI:0)+HOME_PRESENTATION_YAW,BASE_AIM,BASE_DISTANCE,.025);
  draw();return true;
 }
 function pauseHomePresentationForFocus(){
