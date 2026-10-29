@@ -17774,7 +17774,7 @@ function renderMissionRunState() {
 }
 
 function normalizeMissionVariantSortMode(value) {
-  return String(value || "").trim().toLowerCase() === "priority" ? "priority" : "user";
+  return ["availability", "priority"].includes(String(value || "").trim().toLowerCase()) ? "availability" : "user";
 }
 
 function loadMissionVariantSortMode() {
@@ -17822,36 +17822,14 @@ function getMissionVariantTiming(variant, nowMs = getServerNowMs()) {
   };
 }
 
-function formatMissionVariantDuration(durationMs) {
-  const totalSeconds = Math.max(0, Math.floor(Number(durationMs || 0) / 1000));
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  if (days > 0) return `${days} ${days === 1 ? "dia" : "dias"} ${hours}h`;
-  if (hours > 0) return `${hours}h ${String(minutes).padStart(2, "0")}m`;
-  if (minutes > 0) return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
-  return `${seconds}s`;
-}
-
-function formatMissionVariantRemaining(timing) {
-  if (timing.overdueMs > 0) {
-    return `Atraso: ${formatMissionVariantDuration(timing.overdueMs)}`;
-  }
-  return `Restam: ${formatMissionVariantDuration(timing.remainingMs)}`;
-}
-
 function sortMissionVariants(items, sortMode = "user") {
   const normalizedMode = normalizeMissionVariantSortMode(sortMode);
   const nowMs = getServerNowMs();
   return [...(Array.isArray(items) ? items : [])].sort((left, right) => {
-    if (normalizedMode === "priority") {
+    if (normalizedMode === "availability") {
       const leftTiming = getMissionVariantTiming(left, nowMs);
       const rightTiming = getMissionVariantTiming(right, nowMs);
-      if (leftTiming.overdueMs > 0 || rightTiming.overdueMs > 0) {
-        if (leftTiming.overdueMs !== rightTiming.overdueMs) return rightTiming.overdueMs - leftTiming.overdueMs;
-      }
-      const timingDifference = leftTiming.percent - rightTiming.percent;
+      const timingDifference = leftTiming.dueAtMs - rightTiming.dueAtMs;
       if (timingDifference) return timingDifference;
     }
     const leftCreatedAt = new Date(left?.createdAt || 0).getTime();
@@ -17989,7 +17967,7 @@ function renderMissionVariants() {
   }
   if (missionVariantEditor) missionVariantEditor.hidden = !editorOpen;
   if (missionVariantSortButton) {
-    const sortModeLabel = state.missionVariants.sortMode === "priority" ? "Prioridade" : "Usuário";
+    const sortModeLabel = state.missionVariants.sortMode === "availability" ? "Disponibilidade" : "Usuário";
     missionVariantSortButton.hidden = editorOpen;
     missionVariantSortButton.setAttribute("aria-expanded", state.missionVariants.sortMenuOpen ? "true" : "false");
     missionVariantSortButton.setAttribute("aria-label", `Ordenar por: ${sortModeLabel}`);
@@ -18042,24 +18020,19 @@ function renderMissionVariants() {
   missionVariantsList.hidden = editorOpen;
   missionVariantsList.innerHTML = items.length ? items.map((variant) => {
     const timing = getMissionVariantTiming(variant);
-    const tone = timing.overdueMs > 0 ? "red" : timing.percent <= 10 ? "red" : timing.percent <= 30 ? "orange" : "green";
-    const barPercent = timing.completedCycle
-      ? 100
-      : timing.overdueMs > 0
-        ? Math.max(2, Math.min(100, (timing.overdueMs / timing.intervalMs) * 100))
-        : timing.percent;
     const unitLabel = variant.intervalUnit === "hours" ? `${variant.intervalValue}h` : `${variant.intervalValue} ${variant.intervalValue === 1 ? "dia" : "dias"}`;
     const scheduleMode = normalizeMissionVariantScheduleMode(variant?.scheduleMode);
     const weekdayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
-    const scheduleLabel = scheduleMode === "weekly"
-      ? `Semanal: ${normalizeMissionRepeatDays(variant?.repeatDays, []).map((day) => weekdayNames[day]).join(", ")}`
-      : `Prazo: ${unitLabel}`;
+    const scheduleLabel = chooseMode
+      ? "Disponível hoje"
+      : scheduleMode === "weekly"
+        ? `Dias disponíveis: ${normalizeMissionRepeatDays(variant?.repeatDays, []).map((day) => weekdayNames[day]).join(", ")}`
+        : `Disponibilidade: a cada ${unitLabel}`;
     const variantDuration = normalizeMissionDurationOption(variant.unitDurationSeconds || getMissionUnitDurationSeconds(getMissionRunGoalById(state.missionVariants.goalId)) || DEFAULT_MISSION_DURATION_SECONDS);
     const playlistSelected = playlistMode && (state.missionVariants.playlistSelectedIds || []).includes(String(variant.id));
-    return `<article class="mission-variant-card${timing.completedCycle ? " is-completed" : ""}${timing.overdueMs > 0 ? " is-overdue" : ""}${playlistSelected ? " is-playlist-selected" : ""}" data-mission-variant-id="${escapeHtml(variant.id)}">
-      <button class="mission-variant-main" type="button"${playlistMode ? ` aria-pressed="${playlistSelected ? "true" : "false"}"` : ""}><span><strong>${escapeHtml(variant.title)}</strong><small>${scheduleLabel} &middot; Tempo: ${formatMissionDurationValue(variantDuration)} &middot; ${formatMissionVariantRemaining(timing)}</small></span>${playlistMode ? `<span class="mission-playlist-check" aria-hidden="true">${playlistSelected ? "✓" : ""}</span>` : chooseMode ? `<span class="mission-variant-play">${cycleChooseMode ? "Escolher" : "Iniciar"}</span>` : ""}</button>
+    return `<article class="mission-variant-card${timing.completedCycle ? " is-completed" : ""}${playlistSelected ? " is-playlist-selected" : ""}" data-mission-variant-id="${escapeHtml(variant.id)}">
+      <button class="mission-variant-main" type="button"${playlistMode ? ` aria-pressed="${playlistSelected ? "true" : "false"}"` : ""}><span><strong>${escapeHtml(variant.title)}</strong><small>${scheduleLabel} &middot; Tempo: ${formatMissionDurationValue(variantDuration)}</small></span>${playlistMode ? `<span class="mission-playlist-check" aria-hidden="true">${playlistSelected ? "✓" : ""}</span>` : chooseMode ? `<span class="mission-variant-play">${cycleChooseMode ? "Escolher" : "Iniciar"}</span>` : ""}</button>
       ${chooseMode ? "" : `<button class="mission-variant-share" type="button" data-mission-variant-share="${escapeHtml(variant.id)}" aria-label="Compartilhar ${escapeHtml(variant.title)}">↗</button><button class="mission-variant-delete" type="button" data-mission-variant-delete="${escapeHtml(variant.id)}" aria-label="Excluir ${escapeHtml(variant.title)}">×</button>`}
-      <div class="mission-variant-bar"><span class="${tone}" style="width:${barPercent.toFixed(2)}%"></span></div>
     </article>`;
   }).join("") : `<div class="empty-state">${chooseMode ? "Nenhuma ação desta pasta está programada para hoje." : "Crie sua primeira tarefa."}</div>`;
 }
