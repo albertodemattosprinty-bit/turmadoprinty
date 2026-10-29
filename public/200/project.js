@@ -1,6 +1,6 @@
 import { getApiUrl } from "../api.js";
 import { buildGradualFinancialGoalSchedule } from "./finance-goal-schedule.js?v=20260917-finance-missions-v1";
-import { initializeProject200MarinUi } from "./marin.js?v=20260908-native-aspects-v1";
+import { initializeProject200MarinUi } from "./marin.js?v=20261029-training-plan-ai-v1";
 import { initializeProject200TutorsUi } from "./tutors-ui.js?v=0.83-chat-history-v1";
 import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260908-native-aspects-v1";
 import { assessQuality } from "./quality-onboarding.js?v=20260908-native-aspects-v1";

@@ -3927,10 +3927,10 @@ const PROJECT200_MARIN_REPLY_SCHEMA = {
           "financeKind", "amountCents", "settlementType", "scheduleMode",
           "scheduleFrequency", "scheduleConfig", "startsOn", "endsOn",
           "limitIntervalValue", "limitIntervalUnit", "missionGoalIds",
-          "targetMinutes", "useManualTarget"
+          "targetMinutes", "useManualTarget", "exercisePlan"
         ],
         properties: {
-          type: { type: "string", enum: ["action", "mission", "limit", "aspect", "finance"] },
+          type: { type: "string", enum: ["action", "mission", "limit", "aspect", "finance", "exercise_plan"] },
           title: { type: "string", minLength: 2, maxLength: 90 },
           description: { type: ["string", "null"], maxLength: 180 },
           aspectId: { type: ["string", "null"] },
@@ -3986,7 +3986,37 @@ const PROJECT200_MARIN_REPLY_SCHEMA = {
             }
           },
           startsOn: { type: ["string", "null"] },
-          endsOn: { type: ["string", "null"] }
+          endsOn: { type: ["string", "null"] },
+          exercisePlan: {
+            type: ["object", "null"],
+            additionalProperties: false,
+            required: ["exercises"],
+            properties: {
+              exercises: {
+                type: "array", minItems: 1, maxItems: 24,
+                items: {
+                  type: "object", additionalProperties: false,
+                  required: ["sourceName", "exerciseId", "sets", "repMin", "repMax", "rirMin", "rirMax", "restMinSeconds", "restMaxSeconds", "loadKg", "split", "weekDays", "note", "substitutionReason"],
+                  properties: {
+                    sourceName: { type: "string", minLength: 2, maxLength: 120 },
+                    exerciseId: { type: "string", minLength: 1, maxLength: 80 },
+                    sets: { type: "integer", minimum: 1, maximum: 30 },
+                    repMin: { type: "integer", minimum: 1, maximum: 100 },
+                    repMax: { type: "integer", minimum: 1, maximum: 100 },
+                    rirMin: { type: ["number", "null"], minimum: 0, maximum: 10 },
+                    rirMax: { type: ["number", "null"], minimum: 0, maximum: 10 },
+                    restMinSeconds: { type: ["integer", "null"], minimum: 0, maximum: 3600 },
+                    restMaxSeconds: { type: ["integer", "null"], minimum: 0, maximum: 3600 },
+                    loadKg: { type: ["number", "null"], minimum: 0, maximum: 5000 },
+                    split: { type: "string", minLength: 1, maxLength: 80 },
+                    weekDays: { type: "array", minItems: 1, maxItems: 7, items: { type: "integer", minimum: 0, maximum: 6 } },
+                    note: { type: ["string", "null"], maxLength: 300 },
+                    substitutionReason: { type: ["string", "null"], maxLength: 180 }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -4032,6 +4062,7 @@ function detectProject200MarinContextAreas(message) {
   if (/\b(missao|missoes|meta|habito|objetivo|vezes|repetir|progresso)\b/.test(normalized)) areas.add("missions");
   if (/\b(limite|limites|vicio|vicios|impulso|impulsos|ultima vez|recorde|recordes)\b/.test(normalized)) areas.add("limits");
   if (/\b(acao|acoes|tarefa|tarefas|agenda|rotina|horario|hora|minuto|hoje|amanha|semana|escovacao|escovar|dentes)\b/.test(normalized)) areas.add("actions");
+  if (/\b(treino|treinos|exercicio|exercicios|musculacao|ficha|fichas|serie|series|repeticoes|rir|supino|agachamento|remada|rosca|puxada)\b/.test(normalized)) areas.add("exercises");
   if (/\b(estatistica|aspecto|aspectos|barra|ponto|pontos|evolucao|desempenho|qualidade de vida|como estou|minha vida|sono|alimentacao|hidratacao|aprendizado|trabalho|casa|exercicio|exercicios|social|proposito|planejamento|higiene|lazer|familia|escovacao|escovar|dentes)\b/.test(normalized)) areas.add("stats");
   if (/\b(media|medias|historico|historia|ultimos|dias|semanal|mensal|desde|periodo|frequencia|consistencia|tendencia)\b/.test(normalized)) areas.add("history");
   if (/\b(plano de vida|planejar minha vida|organizar minha vida|analise tudo|analisar tudo|visao completa|todos os meus dados)\b/.test(normalized)) {
@@ -4144,6 +4175,30 @@ async function buildProject200MarinUserContext(user, profileName, areas, message
 
   const requestedAreas = areas.filter((area) => area !== "history");
   await Promise.all(requestedAreas.map(async (area) => {
+    if (area === "exercises") {
+      await ensureProject200WellnessSchema();
+      const [catalog, currentPlan] = await Promise.all([
+        query(`select exercise_id, exercise_name, alternative_names, category, tracking_type, equipment, muscles
+          from project200_exercise_definitions where category = 'strength' and tracking_type = 'series'
+          order by popularity desc, exercise_name asc limit 400`),
+        query(`select exercise_id, exercise_name, category, tracking_type, equipment, target_series, target_reps, load_kg, schedule_config
+          from project200_exercise_library where user_id = $1 and assigned_profile = $2
+          order by sort_order asc, created_at asc limit 100`, [user.id, profileName])
+      ]);
+      context.exerciseCatalog = catalog.rows.map((row) => ({
+        id: String(row.exercise_id || ""), name: String(row.exercise_name || ""),
+        alternatives: Array.isArray(row.alternative_names) ? row.alternative_names : [],
+        category: String(row.category || "strength"), trackingType: String(row.tracking_type || "series"),
+        equipment: String(row.equipment || ""), muscles: Array.isArray(row.muscles) ? row.muscles : []
+      }));
+      context.currentExercisePlan = currentPlan.rows.map((row) => ({
+        id: String(row.exercise_id || ""), name: String(row.exercise_name || ""),
+        category: String(row.category || ""), trackingType: String(row.tracking_type || ""),
+        equipment: String(row.equipment || ""), sets: Number(row.target_series || 0),
+        reps: Number(row.target_reps || 0), loadKg: Number(row.load_kg || 0),
+        scheduleConfig: row.schedule_config || null
+      }));
+    }
     if (area === "actions") {
       if (wantsHistory) {
         context.actionHistory = await getProject200MarinActionHistory(user.id, profileName, historyDays);
@@ -4304,10 +4359,10 @@ function sanitizeProject200MarinDataLines(rawLines) {
   });
 }
 
-function sanitizeProject200MarinProposals(rawProposals) {
+function sanitizeProject200MarinProposals(rawProposals, exerciseCatalog = []) {
   const proposals = [];
   for (const raw of Array.isArray(rawProposals) ? rawProposals.slice(0, 8) : []) {
-    const type = ["action", "mission", "limit", "aspect", "finance"].includes(raw?.type) ? raw.type : "";
+    const type = ["action", "mission", "limit", "aspect", "finance", "exercise_plan"].includes(raw?.type) ? raw.type : "";
     const title = String(raw?.title || "").trim().slice(0, 90);
     if (!type || title.length < 2) continue;
 
@@ -4378,6 +4433,71 @@ function sanitizeProject200MarinProposals(rawProposals) {
       proposal.startsOn = startsOn;
       proposal.endsOn = proposal.scheduleMode === "FINITE" ? normalizeProject200MarinDateOnly(raw?.endsOn) : null;
       if (!proposal.amountCents || (proposal.scheduleMode === "FINITE" && !proposal.endsOn)) continue;
+    }
+
+    if (type === "exercise_plan") {
+      const catalog = Array.isArray(exerciseCatalog) ? exerciseCatalog : [];
+      const byId = new Map(catalog.map((item) => [String(item?.id || ""), item]));
+      const planItems = Array.isArray(raw?.exercisePlan?.exercises) ? raw.exercisePlan.exercises.slice(0, 24) : [];
+      const exercises = planItems.flatMap((item) => {
+        const definition = byId.get(String(item?.exerciseId || ""));
+        const sourceName = String(item?.sourceName || "").trim().slice(0, 120);
+        const sets = Math.trunc(Number(item?.sets));
+        const repMin = Math.trunc(Number(item?.repMin));
+        const repMax = Math.trunc(Number(item?.repMax));
+        const split = String(item?.split || "").trim().slice(0, 80);
+        const substitutionReason = String(item?.substitutionReason || "").trim().slice(0, 180);
+        const weekDays = [...new Set((Array.isArray(item?.weekDays) ? item.weekDays : [])
+          .map((day) => Math.trunc(Number(day))).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))];
+        if (!definition || definition.category !== "strength" || definition.trackingType !== "series" ||
+            sourceName.length < 2 || sets < 1 || sets > 30 || repMin < 1 || repMax < repMin || repMax > 100 ||
+            !split || !weekDays.length) return [];
+        const normalizeName = (value) => normalizeProject200MarinSearchText(value).replace(/[^a-z0-9]+/g, " ").trim();
+        const sourceKey = normalizeName(sourceName);
+        const catalogNames = [definition.name, ...(Array.isArray(definition.alternatives) ? definition.alternatives : [])].map(normalizeName);
+        if (!catalogNames.includes(sourceKey) && substitutionReason.length < 8) return [];
+        const optionalNumber = (value, min, max) => {
+          if (value === null || value === undefined || value === "") return null;
+          const number = Number(value);
+          return Number.isFinite(number) && number >= min && number <= max ? number : null;
+        };
+        const rirMin = optionalNumber(item?.rirMin, 0, 10);
+        const rirMax = optionalNumber(item?.rirMax, 0, 10);
+        const restMinSeconds = optionalNumber(item?.restMinSeconds, 0, 3600);
+        const restMaxSeconds = optionalNumber(item?.restMaxSeconds, 0, 3600);
+        const loadKg = optionalNumber(item?.loadKg, 0, 5000);
+        if ((rirMin === null) !== (rirMax === null) || (rirMin !== null && rirMin > rirMax) ||
+            (restMinSeconds === null) !== (restMaxSeconds === null) ||
+            (restMinSeconds !== null && restMinSeconds > restMaxSeconds)) return [];
+        const scheduleConfig = {
+          frequency: "weekly", interval: 1, intervalUnit: "week", weekDays,
+          trainingPlan: {
+            sourceName,
+            split,
+            repRange: { min: repMin, max: repMax },
+            rirRange: rirMin === null && rirMax === null ? null : { min: rirMin, max: rirMax },
+            restSeconds: restMinSeconds === null && restMaxSeconds === null ? null : { min: restMinSeconds, max: restMaxSeconds },
+            note: String(item?.note || "").trim().slice(0, 300),
+            substitutionReason
+          }
+        };
+        return [{
+          exerciseId: String(definition.id), exerciseName: String(definition.name).slice(0, 120),
+          category: "strength", trackingType: "series", equipment: String(definition.equipment || "").slice(0, 120),
+          targetSeries: sets, targetReps: repMax, loadKg,
+          scheduleConfig,
+          sourceName,
+          substitutionReason: scheduleConfig.trainingPlan.substitutionReason
+        }];
+      });
+      if (!exercises.length || exercises.length !== planItems.length) continue;
+      proposal.exercisePlan = { exercises };
+      proposal.exerciseCount = exercises.length;
+      proposal.splitLabels = [...new Set(exercises.map((item) => item.scheduleConfig.trainingPlan.split))].slice(0, 8);
+      proposal.totalSets = exercises.reduce((total, item) => total + item.targetSeries, 0);
+      proposal.substitutions = exercises.filter((item) => item.substitutionReason).map((item) => ({
+        requestedName: item.sourceName, selectedName: item.exerciseName, reason: item.substitutionReason
+      }));
     }
 
     proposals.push(proposal);
@@ -4667,6 +4787,10 @@ async function requestProject200MarinReply({ apiKey, user, profileName, personaK
     "- Preserve sono, alimentacao, saude, seguranca, autonomia e limites fisicos. Disciplina nunca significa privacao perigosa.",
     "- Nao substitua orientacao medica, juridica ou financeira profissional.",
     "- Ao receber uma imagem, descreva e interprete somente o que estiver visivel. Diga quando algo nao puder ser confirmado.",
+    "- Para pedidos de treino, fichas ou listas de exercicios, inclusive fotos, consulte exerciseCatalog no contexto e compare primeiro o nome principal e os nomes alternativos. Use somente exerciseId que exista nesse catalogo, preferindo definicoes strength/series.",
+    "- Monte uma proposta type exercise_plan somente quando conseguir identificar exercicios, series, faixa de repeticoes e dias da semana. Se algum dado necessario estiver ilegivel ou ausente, pergunte e deixe proposals vazio; nunca invente carga, RIR, descanso ou dias. Carga, RIR, descanso, notas e carga atual devem ser null quando nao aparecem na lista.",
+    "- Cada exercicio da ficha deve ter sourceName com o nome lido na lista, exerciseId do catalogo, sets, repMin/repMax, split e weekDays (0=domingo, 1=segunda ... 6=sabado). Se o nome nao existir nem como alternativa, escolha um exercicio do catalogo que trabalhe os mesmos musculos e preencha substitutionReason explicando claramente. Conte a substituicao tambem na mensagem.",
+    "- exercisePlan inclui apenas exercises. Nunca diga que salvou: ofereca o cartao para o usuario tocar e aplicar. Aplicar adiciona/atualiza os exercicios na rotina do perfil atual, preservando sessoes/historico.",
     "- A resposta textual tem no maximo 400 caracteres e as propostas no maximo 8.",
     "",
     "CONTEXTO DO USUARIO CARREGADO SOMENTE PARA ESTA PERGUNTA:",
@@ -5647,6 +5771,7 @@ async function handleProject200MarinMessageRequest(request, response) {
     const userMessage = await appendProject200MarinMessage(user.id, conversation.id, { role: "user", content: storedContent });
     const history = await listProject200MarinMessages(user.id, profileName, personaKey, 24);
     const areas = detectProject200MarinContextAreas(modelText);
+    if (modality === "image" && !areas.includes("exercises")) areas.push("exercises");
     const domainAreas = areas.filter((area) => area !== "history");
     if (!domainAreas.length && areas.includes("history")) {
       const previousUserText = history.messages
@@ -5676,7 +5801,7 @@ async function handleProject200MarinMessageRequest(request, response) {
     const dataLines = sanitizeProject200MarinDataLines(generated.reply?.dataLines);
     const proposals = [
       ...dataLines,
-      ...sanitizeProject200MarinProposals(generated.reply?.proposals)
+      ...sanitizeProject200MarinProposals(generated.reply?.proposals, context.exerciseCatalog)
     ];
     let assistantContent = replyText;
     if (modality === "audio") {
@@ -5791,6 +5916,12 @@ async function handleProject200MarinProposalApplyRequest(request, response, mess
         endsOn: proposal.endsOn
       });
       entityId = item.id || null;
+    } else if (proposal.type === "exercise_plan") {
+      const exercises = await approveProject200ExercisePlan(user.id, {
+        profileName,
+        exercises: proposal.exercisePlan?.exercises
+      });
+      entityId = exercises.map((exercise) => exercise.exerciseId).join(",").slice(0, 2000);
     } else {
       throw new Error("Tipo de proposta inválido.");
     }

@@ -207,6 +207,17 @@ export function initializeProject200MarinUi(dependencies = {}) {
   });
 
   function proposalMeta(proposal) {
+    if (proposal.type === "exercise_plan") {
+      const count = Number(proposal.exerciseCount || proposal.exercisePlan?.exercises?.length || 0);
+      const sets = Number(proposal.totalSets || 0);
+      const splits = Array.isArray(proposal.splitLabels) ? proposal.splitLabels.join(" • ") : "";
+      const substitutions = Array.isArray(proposal.substitutions) ? proposal.substitutions.length : 0;
+      return [
+        count ? count + (count === 1 ? " exercício" : " exercícios") + (sets ? " • " + sets + " séries" : "") : "",
+        splits,
+        substitutions ? substitutions + (substitutions === 1 ? " substituição" : " substituições") : ""
+      ].filter(Boolean);
+    }
     if (proposal.type === "action") {
       const dateLine = proposal.dateLabel || (proposal.startAt ? new Date(proposal.startAt).toLocaleDateString("pt-BR") : "");
       const timeLine = proposal.timeLabel || (proposal.durationMinutes ? proposal.durationMinutes + " minutos" : "");
@@ -240,6 +251,7 @@ export function initializeProject200MarinUi(dependencies = {}) {
   function proposalIcon(proposal) {
     if (proposal.type === "action") return "/200/icons/acts.svg";
     if (proposal.type === "mission" || proposal.type === "limit") return "/200/icons/target.svg";
+    if (proposal.type === "exercise_plan") return ASPECT_ICONS.exercicios;
     if (proposal.type === "aspect" || proposal.type === "context") {
       return ASPECT_ICONS[proposal.aspectId] || "/200/icons/target.svg";
     }
@@ -270,6 +282,7 @@ export function initializeProject200MarinUi(dependencies = {}) {
     button.classList.toggle("is-finance", proposal.type === "finance");
     button.classList.toggle("is-limit", proposal.type === "limit");
     button.classList.toggle("is-aspect", proposal.type === "aspect");
+    button.classList.toggle("is-exercise-plan", proposal.type === "exercise_plan");
     button.classList.toggle("is-finance-income", proposal.type === "finance" && proposal.financeKind === "INCOME");
     button.classList.toggle("is-finance-expense", proposal.type === "finance" && proposal.financeKind !== "INCOME");
     button.classList.toggle("is-applied", Boolean(proposal._applied));

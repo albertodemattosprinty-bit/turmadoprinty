@@ -874,22 +874,26 @@ export async function addProject200ExerciseToLibrary(userId, payload = {}) {
   const targetMinutes = trackingType === "minutes" ? Math.max(1, Math.min(1440, Number(payload.targetMinutes || 30) || 30)) : 0;
   const targetDistanceMeters = trackingType === "gps" ? clampInteger(payload.targetDistanceMeters || 3000, 100, 10000000) : 0;
   const dailyGoal = trackingType === "series" ? targetSeries * targetReps : trackingType === "gps" ? targetDistanceMeters : targetMinutes;
+  const suppliedLoadKg = category === "strength" && payload.loadKg !== null && payload.loadKg !== undefined && payload.loadKg !== ""
+    ? normalizeProject200StrengthLoadKg(payload.loadKg)
+    : null;
   const scheduleConfig = normalizeExerciseSchedule(payload.scheduleConfig);
   const result = await query(
     `insert into project200_exercise_library (
        user_id, assigned_profile, exercise_id, exercise_name, category, tracking_type, equipment,
-       daily_goal, target_series, target_reps, target_minutes, target_distance_meters, schedule_config, sort_order
-     ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, coalesce($13::jsonb, '{"frequency":"daily","interval":1,"intervalUnit":"day"}'::jsonb),
+       daily_goal, target_series, target_reps, target_minutes, target_distance_meters, load_kg, schedule_config, sort_order
+     ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, coalesce($13::numeric, 10), coalesce($14::jsonb, '{"frequency":"daily","interval":1,"intervalUnit":"day"}'::jsonb),
        coalesce((select max(sort_order) + 1 from project200_exercise_library where user_id = $1 and assigned_profile = $2), 0))
      on conflict (user_id, assigned_profile, exercise_id) do update
      set exercise_name = excluded.exercise_name, category = excluded.category, tracking_type = excluded.tracking_type,
        equipment = excluded.equipment, daily_goal = excluded.daily_goal, target_series = excluded.target_series,
        target_reps = excluded.target_reps, target_minutes = excluded.target_minutes,
        target_distance_meters = excluded.target_distance_meters,
-       schedule_config = case when $13::jsonb is null then project200_exercise_library.schedule_config else excluded.schedule_config end, updated_at = now()
+       load_kg = case when $13::numeric is null then project200_exercise_library.load_kg else excluded.load_kg end,
+       schedule_config = case when $14::jsonb is null then project200_exercise_library.schedule_config else excluded.schedule_config end, updated_at = now()
      returning *, 0::integer as today_total_reps, 0::numeric as today_duration_minutes, 0::integer as today_distance_meters`,
     [userId, profile, exerciseId, exerciseName, category, trackingType, String(payload.equipment || "").trim().slice(0, 120),
-      dailyGoal, targetSeries, targetReps, targetMinutes, targetDistanceMeters, scheduleConfig ? JSON.stringify(scheduleConfig) : null]
+      dailyGoal, targetSeries, targetReps, targetMinutes, targetDistanceMeters, suppliedLoadKg, scheduleConfig ? JSON.stringify(scheduleConfig) : null]
   );
   return normalizeExerciseLibraryRow(result.rows[0]);
 }
