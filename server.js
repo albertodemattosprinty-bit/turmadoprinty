@@ -4834,7 +4834,7 @@ async function requestProject200MarinReply({ apiKey, user, profileName, personaK
           schema: PROJECT200_MARIN_REPLY_SCHEMA
         }
       },
-      max_output_tokens: 1600,
+      max_output_tokens: areas.includes("exercises") ? 6000 : 1600,
       store: false,
       safety_identifier: "ilife_" + crypto.createHash("sha256").update(String(user.id)).digest("hex").slice(0, 32)
     })
@@ -4850,9 +4850,30 @@ async function requestProject200MarinReply({ apiKey, user, profileName, personaK
     throw requestError;
   }
   if (!parsedResponse.data) throw new Error("A OpenAI devolveu uma resposta invalida.");
+  if (parsedResponse.data.status === "incomplete" && parsedResponse.data.incomplete_details?.reason === "max_output_tokens") {
+    const error = new Error(areas.includes("exercises")
+      ? "A ficha é longa e a resposta foi cortada. Envie cada divisão (A, B ou C) em uma mensagem para eu montar com segurança."
+      : "A resposta ficou incompleta. Tente enviar a mensagem novamente.");
+    error.statusCode = 502;
+    error.route = route;
+    error.latencyMs = Date.now() - startedAt;
+    throw error;
+  }
+  let reply;
+  try {
+    reply = parseProject200MarinReply(parsedResponse.data);
+  } catch {
+    const error = new Error(areas.includes("exercises")
+      ? "Não consegui terminar de interpretar a ficha. Envie cada divisão (A, B ou C) em uma mensagem para eu montar com segurança."
+      : "A resposta da IA veio incompleta. Tente enviar a mensagem novamente.");
+    error.statusCode = 502;
+    error.route = route;
+    error.latencyMs = Date.now() - startedAt;
+    throw error;
+  }
   return {
     payload: parsedResponse.data,
-    reply: parseProject200MarinReply(parsedResponse.data),
+    reply,
     route,
     latencyMs: Date.now() - startedAt
   };
