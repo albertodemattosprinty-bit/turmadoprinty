@@ -7618,9 +7618,8 @@ body[data-page="home"] .schedule-card strong, body[data-page="eventos"] .schedul
 }
 
 @media (min-width: 761px) {
-  .show-hero { position: relative; display: flex; min-height: clamp(540px, 57.375vw, 800px); overflow: hidden; }
-  .show-hero-image { position: absolute; inset: 0; min-height: 0; }
-  .show-hero-image img { width: 100%; height: 100%; object-fit: contain; object-position: right center; }
-  .show-hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(16, 47, 119, .97) 0%, rgba(16, 47, 119, .88) 19%, rgba(16, 47, 119, .52) 34%, rgba(16, 47, 119, 0) 58%); pointer-events: none; }
-  .show-hero-copy { position: relative; z-index: 1; width: min(48%, 610px); }
+  .show-hero { position: relative; display: grid; grid-template-columns: minmax(300px, 38%) minmax(0, 62%); align-items: center; min-height: 540px; overflow: hidden; background: linear-gradient(110deg, #102f77 0%, #16428c 50%, #102f77 100%); }
+  .show-hero-image { position: relative; min-height: 0; overflow: visible; }
+  .show-hero-image img { width: 100%; height: auto; object-fit: contain; }
+  .show-hero-copy { position: relative; z-index: 1; width: auto; padding-right: clamp(20px, 3vw, 48px); }
 }
