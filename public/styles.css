@@ -7605,7 +7605,7 @@ body[data-page="home"] .schedule-card strong, body[data-page="eventos"] .schedul
 .schedule-card-head { align-items: center; }
 .schedule-message { padding: 24px; margin: 0; color: #66738b; background: #fff; border: 1px solid #e5eaf3; border-radius: 14px; }
 @media (max-width: 760px) {
-  .show-hero { display: flex; flex-direction: column-reverse; }
+  .show-hero { display: flex; flex-direction: column; }
   .show-hero-image { min-height: 0; aspect-ratio: 1.6; }
   .show-hero-copy { padding: 38px 24px 48px; }
   .show-hero h1 { font-size: clamp(2.7rem, 11vw, 4rem); }
@@ -7630,3 +7630,9 @@ body[data-page="home"] .schedule-card strong, body[data-page="eventos"] .schedul
 .show-actions-stacked .show-button-label { text-align:center; }
 .show-actions-stacked .show-button-arrow { justify-self:end; }
 @media(max-width:760px){ .show-actions-stacked .show-button { width:80vw; max-width:none; } }
+@media (min-width: 761px) {
+  .show-hero { grid-template-rows: 1fr auto; }
+  .show-hero-copy, .show-hero-image { grid-row: 1; }
+  .show-actions-stacked { grid-column: 1 / -1; grid-row: 2; width:100%; padding:0 20px 28px; }
+  .show-actions-stacked .show-button { width:50%; }
+}
