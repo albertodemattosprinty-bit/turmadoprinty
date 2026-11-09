@@ -1,5 +1,5 @@
 import { getToken, initSiteHeader } from "./header.js";
-import { applyTextOverrides, initContentAdmin } from "./content-admin.js";
+import { applyTextOverrides, getTextOverride, initContentAdmin } from "./content-admin.js";
 import { getApiUrl } from "./api.js";
 
 const page = document.body.dataset.page || "";
@@ -861,7 +861,7 @@ function whenImageReady(image) {
 function initPageBanner(user = null) {
   const config = bannerConfigByPage[page];
 
-  if (!config) {
+  if (!config || page === "home" || page === "eventos") {
     return;
   }
 
@@ -1012,15 +1012,28 @@ async function loadSchedule(siteConfig, user) {
   const refreshSchedule = async () => {
     const response = await fetch(getApiUrl("/api/site/config"));
     const data = await response.json();
+    if (!response.ok) throw new Error("Falha ao carregar agenda.");
     const scheduleItems = Array.isArray(data.schedule) ? data.schedule : [];
+    // Dates without a year are displayed in calendar order without guessing a year.
+    const dateOrder = (item) => {
+      const label = String(item.dateLabel || "").trim().replace(/\s+/g, " ");
+      const displayLabel = getTextOverride(`raw::${label}`, label);
+      const match = /^\s*(\d{1,2})\/(\d{1,2})\s*$/.exec(displayLabel);
+      return match ? Number(match[2]) * 100 + Number(match[1]) : Infinity;
+    };
+    const visibleItems = [...scheduleItems].sort((a, b) => dateOrder(a) - dateOrder(b));
 
     grid.innerHTML = "";
 
-    scheduleItems.forEach((item, index) => {
+    if (!visibleItems.length) {
+      grid.innerHTML = '<p class="schedule-message">Em breve, novos encontros por aqui!</p>';
+    }
+
+    visibleItems.forEach((item, index) => {
       const card = document.createElement("article");
       card.className = `schedule-card schedule-color-${(index % 5) + 1}`;
-      const canManageEvent = Boolean(user?.isAdmin);
-      const canEditEvent = Boolean(user && (canManageEvent || item.contractorUserId === user.id));
+      const canManageEvent = Boolean(page === "eventos" && user?.isAdmin);
+      const canEditEvent = Boolean(page === "eventos" && user && (canManageEvent || item.contractorUserId === user.id));
       card.innerHTML = `
         <div class="schedule-card-head">
           <p class="schedule-day" data-field="dateLabel">${item.dateLabel}</p>
