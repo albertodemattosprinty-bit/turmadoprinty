@@ -7623,3 +7623,10 @@ body[data-page="home"] .schedule-card strong, body[data-page="eventos"] .schedul
   .show-hero-image img { width: 100%; height: auto; object-fit: contain; }
   .show-hero-copy { position: relative; z-index: 1; width: auto; padding-right: clamp(20px, 3vw, 48px); }
 }
+
+.show-actions-stacked { display:flex; flex-direction:column; align-items:center; width:100%; gap:12px; }
+.show-actions-stacked .show-button { display:grid; grid-template-columns:28px 1fr 20px; align-items:center; justify-content:initial; width:50vw; max-width:640px; min-height:58px; gap:14px; padding:14px 20px; }
+.show-actions-stacked .show-button svg { width:23px; height:23px; fill:currentColor; }
+.show-actions-stacked .show-button-label { text-align:center; }
+.show-actions-stacked .show-button-arrow { justify-self:end; }
+@media(max-width:760px){ .show-actions-stacked .show-button { width:80vw; max-width:none; } }

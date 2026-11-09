@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Conheça a proposta da Turma do Printy para eventos infantis cristãos: teatro, música, personagens, fantoches e uma mensagem bíblica." />
+  <title>Eventos 2027 | Turma do Printy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body.eventos2027 { padding-bottom: 0; background: #f7f8fc; color: #172c58; }
+    .eventos27-header { display:flex; justify-content:space-between; align-items:center; padding:10px max(24px,calc((100vw - 1160px)/2)); background:#123c91; }
+    .eventos27-header img { width:100px; height:76px; object-fit:contain; }
+    .eventos27-header a { color:white; font-weight:700; text-decoration:none; }
+    .eventos27-wrap { width:min(1160px,calc(100% - 40px)); margin:auto; }
+    .eventos27-hero { padding:48px 0 42px; }
+    .eventos27-kicker { margin:0 0 12px; color:#e74375; font-size:.76rem; font-weight:800; letter-spacing:.15em; text-transform:uppercase; }
+    .eventos27-hero h1 { max-width:900px; margin:0; color:#102f77; font-size:clamp(2.4rem,5vw,4.5rem); line-height:1.05; letter-spacing:-.045em; }
+    .eventos27-lead { max-width:790px; color:#53627c; font-size:1.1rem; line-height:1.8; }
+    .eventos27-carousel { position:relative; overflow:hidden; border-radius:22px; background:#102f77; box-shadow:0 20px 50px #173a771c; }
+    .eventos27-slides { position:relative; aspect-ratio:16/7; min-height:220px; }
+    .eventos27-slide { position:absolute; inset:0; display:grid; place-items:center; padding:24px; opacity:0; transition:opacity .6s ease; background:radial-gradient(ellipse at 76% 25%,#3477c5 0,transparent 36%),linear-gradient(130deg,#102f77,#1a4a99 54%,#102f77); }
+    .eventos27-slide.is-active { opacity:1; }
+    .eventos27-placeholder { display:grid; place-items:center; gap:14px; width:min(420px,90%); min-height:140px; color:#eaf2ff; text-align:center; border:1px dashed #ffffff83; border-radius:18px; background:#ffffff0c; }
+    .eventos27-placeholder svg { width:38px; height:38px; fill:#ffcf44; }
+    .eventos27-placeholder span { font-size:.85rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+    .eventos27-dots { position:absolute; left:50%; bottom:16px; z-index:2; display:flex; gap:8px; transform:translateX(-50%); }
+    .eventos27-dot { width:9px; height:9px; border:0; border-radius:50%; padding:0; background:#ffffff80; cursor:pointer; }
+    .eventos27-dot.is-active { width:25px; border-radius:8px; background:#ffcf44; }
+    .eventos27-section { padding:66px 0 0; }
+    .eventos27-section h2 { margin:0 0 15px; color:#102f77; font-size:clamp(1.8rem,3vw,2.7rem); letter-spacing:-.035em; }
+    .eventos27-section > p { max-width:780px; color:#53627c; line-height:1.8; }
+    .eventos27-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-top:24px; }
+    .eventos27-card { padding:22px; border:1px solid #e1e8f3; border-radius:16px; background:white; }
+    .eventos27-card b { display:block; margin-bottom:8px; color:#164eb2; }
+    .eventos27-card p { margin:0; color:#5d6b82; line-height:1.65; }
+    .eventos27-steps { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-top:24px; }
+    .eventos27-step { padding:22px; border-radius:16px; background:#102f77; color:white; }
+    .eventos27-step span { color:#ffcf44; font-weight:800; letter-spacing:.1em; }
+    .eventos27-step h3 { margin:12px 0 8px; }
+    .eventos27-step p { margin:0; color:#e2ebff; line-height:1.65; }
+    .eventos27-footer { margin-top:72px; padding:36px 20px; background:#123c91; color:white; text-align:center; }
+    .eventos27-footer a { color:#ffcf44; font-weight:800; }
+    @media(max-width:760px) { .eventos27-wrap{width:calc(100% - 32px)} .eventos27-header{padding:8px 16px} .eventos27-header img{width:84px;height:64px} .eventos27-hero{padding-top:34px} .eventos27-slides{aspect-ratio:4/3;min-height:240px} .eventos27-grid,.eventos27-steps{grid-template-columns:1fr 1fr} .eventos27-section{padding-top:48px} }
+    @media(max-width:420px) { .eventos27-grid,.eventos27-steps{grid-template-columns:1fr} }
+  </style>
+</head>
+<body class="eventos2027">
+  <header class="eventos27-header"><a href="/" aria-label="Voltar à home"><img src="/logo.png" alt="Turma do Printy"></a><a href="/">Voltar para a home</a></header>
+  <main class="eventos27-wrap">
+    <section class="eventos27-hero"><p class="eventos27-kicker">Teatro · música · fé</p><h1>Uma experiência infantil que fica no coração.</h1><p class="eventos27-lead">A Turma do Printy une personagens, fantoches, humor e música a uma mensagem bíblica clara. Uma programação pensada para envolver as crianças e servir a igreja com alegria, cuidado e propósito.</p></section>
+    <section class="eventos27-carousel" aria-label="Galeria da Turma do Printy"><div class="eventos27-slides" id="eventos27-slides"></div><div class="eventos27-dots" id="eventos27-dots" aria-label="Escolher imagem"></div></section>
+    <section class="eventos27-section"><p class="eventos27-kicker">Uma missão com propósito</p><h2>Arte que abre espaço para a Palavra.</h2><p>Imprimir o Evangelho no coração da criança com uma linguagem lúdica, bíblica e memorável. Cada parte da apresentação ajuda a criar proximidade, atenção e um ambiente acolhedor para a mensagem.</p><div class="eventos27-grid"><article class="eventos27-card"><b>Teatro e personagens</b><p>Figurinos, humor e encenação tornam a história viva e próxima da realidade infantil.</p></article><article class="eventos27-card"><b>Música e participação</b><p>Canções animadas convidam as crianças a participar e ajudam a guardar o que viveram.</p></article><article class="eventos27-card"><b>Fantoches e humor</b><p>Bonecos criam identificação, descontração e momentos de alegria ao longo do encontro.</p></article><article class="eventos27-card"><b>Mensagem bíblica</b><p>Uma história das Escrituras apresentada com clareza, emoção e aplicação para a vida.</p></article></div></section>
+    <section class="eventos27-section"><p class="eventos27-kicker">Como acontece</p><h2>Uma experiência em capítulos.</h2><p>A programação combina momentos diferentes para manter o ritmo e conduzir as crianças da diversão à escuta da Palavra.</p><div class="eventos27-steps"><article class="eventos27-step"><span>01</span><h3>Abertura musical</h3><p>Música interativa, personagens e movimento dão as boas-vindas.</p></article><article class="eventos27-step"><span>02</span><h3>Oração</h3><p>Um momento sensível que apresenta o propósito do encontro.</p></article><article class="eventos27-step"><span>03</span><h3>Fantoches</h3><p>Humor e conversa preparam o coração para a história.</p></article><article class="eventos27-step"><span>04</span><h3>Teatro e Palavra</h3><p>A mensagem bíblica chega com beleza, participação e significado.</p></article></div></section>
+    <section class="eventos27-section"><p class="eventos27-kicker">Feito para a igreja</p><h2>Um encontro que se adapta à programação.</h2><p>Congressos infantis, cultos especiais, escola bíblica de férias, retiros, programações evangelísticas e encontros de famílias. A equipe conversa com a igreja para entender o contexto e indicar o formato mais adequado.</p><p>Com trajetória iniciada em 1989, a Turma do Printy serve crianças e comunidades por meio da arte, da música e da fé cristã.</p></section>
+  </main>
+  <footer class="eventos27-footer">Quer conversar sobre uma data? <a href="https://wa.me/551233515318" target="_blank" rel="noopener noreferrer">Fale com a Turma do Printy</a></footer>
+  <script>
+    const track=document.getElementById('eventos27-slides'), dots=document.getElementById('eventos27-dots'); let active=0;
+    for(let i=0;i<6;i++){const slide=document.createElement('div');slide.className='eventos27-slide'+(i===0?' is-active':'');slide.setAttribute('aria-hidden',i===0?'false':'true');slide.innerHTML='<div class="eventos27-placeholder"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2ZM8.5 8A1.5 1.5 0 1 1 7 9.5 1.5 1.5 0 0 1 8.5 8ZM5 19l4.5-6 3.5 4.5 2.5-3 3.5 4.5Z"/></svg><span>Espaço para imagem '+(i+1)+'</span></div>';track.appendChild(slide);const dot=document.createElement('button');dot.type='button';dot.className='eventos27-dot'+(i===0?' is-active':'');dot.setAttribute('aria-label','Mostrar imagem '+(i+1));dot.addEventListener('click',()=>show(i));dots.appendChild(dot)}
+    function show(next){const slides=track.children,buttons=dots.children;slides[active].classList.remove('is-active');slides[active].setAttribute('aria-hidden','true');buttons[active].classList.remove('is-active');active=next;slides[active].classList.add('is-active');slides[active].setAttribute('aria-hidden','false');buttons[active].classList.add('is-active')}
+    window.setInterval(()=>show((active+1)%6),2500);
+  </script>
+</body>
+</html>
