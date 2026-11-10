@@ -3,6 +3,7 @@ import { getApiUrl } from "./api.js";
 
 const usersStatus = document.getElementById("users-status");
 const usersTableBody = document.getElementById("users-table-body");
+const usersNameSearchInput = document.getElementById("users-name-search-input");
 const userDetailModal = document.getElementById("user-detail-modal");
 const userDetailPanel = document.getElementById("user-detail-panel");
 const userDetailClose = document.getElementById("user-detail-close");
@@ -34,6 +35,7 @@ const userMessageCounter = document.getElementById("user-message-counter");
 const userMessageSendButton = document.getElementById("user-message-send-button");
 
 let users = [];
+let usersNameSearchQuery = "";
 let plans = [];
 let schedule = [];
 let albums = [];
@@ -51,6 +53,14 @@ function redirectToAuth() {
 
 function formatTextTokens(value) {
   return new Intl.NumberFormat("pt-BR").format(Number(value) || 0);
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .trim();
 }
 
 function formatNarrationDuration(totalSeconds) {
@@ -413,12 +423,18 @@ function renderDetailPanel() {
 function renderUsersTable() {
   usersTableBody.innerHTML = "";
 
-  if (!users.length) {
-    usersTableBody.innerHTML = "<p class=\"section-muted\">Nenhum usuario encontrado.</p>";
+  const searchTerm = normalizeSearchText(usersNameSearchQuery);
+  const filteredUsers = searchTerm
+    ? users.filter((user) => normalizeSearchText(`${user.name || ""} ${user.username || ""}`).includes(searchTerm))
+    : users;
+
+  if (!filteredUsers.length) {
+    const message = searchTerm ? "Nenhum cliente encontrado com esse nome." : "Nenhum usuario encontrado.";
+    usersTableBody.innerHTML = `<p class="section-muted">${message}</p>`;
     return;
   }
 
-  users.forEach((user) => {
+  filteredUsers.forEach((user) => {
     const hasUnreadUserReply = Boolean(
       user.activeMessage?.id &&
       user.activeMessage?.userReplyBody &&
@@ -824,6 +840,10 @@ if (!currentUser) {
 } else if (!currentUser.isAdmin || !allowedAdminUsernames.has(String(currentUser.username || "").trim().toLowerCase())) {
   window.location.href = "/index.html";
 } else {
+  usersNameSearchInput?.addEventListener("input", () => {
+    usersNameSearchQuery = usersNameSearchInput.value;
+    renderUsersTable();
+  });
   userContractorSelect.addEventListener("change", syncContractorEventVisibility);
   userMessageBody.addEventListener("input", updateMessageCounter);
   userMessageSendButton.addEventListener("click", sendMessageToSelectedUser);

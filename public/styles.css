@@ -4070,6 +4070,52 @@ body[data-page="users"] .users-admin-shell {
   gap: 20px;
 }
 
+.users-name-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 420px);
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(27, 83, 187, 0.16);
+  border-radius: 999px;
+  background: rgba(47, 124, 255, 0.045);
+  color: rgba(27, 83, 187, 0.68);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.users-name-search:focus-within {
+  border-color: rgba(47, 124, 255, 0.52);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(47, 124, 255, 0.08);
+}
+
+.users-name-search svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.users-name-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.users-name-search input::placeholder {
+  color: rgba(27, 83, 187, 0.56);
+}
+
 body[data-page="meusplanos"] .subscriptions-page {
   padding-bottom: 36px;
 }
