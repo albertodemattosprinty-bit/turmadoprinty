@@ -5159,6 +5159,7 @@ async function handleProject200CatalogExerciseCreate(request, response) {
   try {
     const body = await readJsonBody(request);
     const exerciseName = String(body?.exerciseName || "").trim().replace(/\s+/g, " ").slice(0, 160);
+    const forceNew = body?.forceNew === true;
     const nameKey = project200ExerciseNameKey(exerciseName);
     if (nameKey.length < 2) throw new Error("Digite o nome do exercício para criar.");
     await ensureProject200WellnessSchema();
@@ -5168,7 +5169,7 @@ async function handleProject200CatalogExerciseCreate(request, response) {
         .map(project200ExerciseNameKey).filter(Boolean);
       return names.some((candidate) => candidate === nameKey || candidate.includes(nameKey) || nameKey.includes(candidate));
     });
-    if (similar) {
+    if (similar && !forceNew) {
       sendJson(response, 200, { ok: true, definition: similar, existing: true });
       return;
     }
@@ -5178,7 +5179,9 @@ async function handleProject200CatalogExerciseCreate(request, response) {
     const raw = generated[0];
     if (!raw) throw new Error("A Luna não conseguiu criar esse exercício agora.");
     const definition = normalizeProject200ExerciseDefinition({
-      ...raw, exerciseId: project200AiExerciseId(exerciseName), exerciseName,
+      ...raw, exerciseId: forceNew
+        ? `${project200AiExerciseId(exerciseName)}-${crypto.randomUUID().slice(0, 8)}`
+        : project200AiExerciseId(exerciseName), exerciseName,
       source: "luna"
     });
     if (!definition.muscles.length) throw new Error("A Luna não conseguiu definir os músculos desse exercício.");
