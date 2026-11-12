@@ -906,26 +906,34 @@ export async function setProject200ExerciseLoad(userId, payload = {}) {
   if (!exerciseId) throw new Error("Escolha um exercício válido.");
   const loadKg = normalizeProject200StrengthLoadKg(payload.loadKg);
   const result = await query(
-    `with current as (
-       select load_kg from project200_exercise_library
-        where user_id = $1 and assigned_profile = $2 and exercise_id = $3 and category = 'strength'
-        for update
-     ), updated as (
-       update project200_exercise_library library
-          set load_kg = $4, updated_at = now()
-         from current
-        where library.user_id = $1 and library.assigned_profile = $2 and library.exercise_id = $3
-          and library.category = 'strength'
-       returning library.*, current.load_kg as previous_load_kg
-     ), recorded as (
-       insert into project200_exercise_load_history (user_id, assigned_profile, exercise_id, load_kg)
-       select $1, $2, $3, $4 from updated where updated.previous_load_kg is distinct from $4
-       returning id
-     )
-     select updated.*, (select count(*)::integer from recorded) as history_inserted from updated`,
+    `update project200_exercise_library
+        set load_kg = $4, updated_at = now()
+      where user_id = $1 and assigned_profile = $2 and exercise_id = $3 and category = 'strength'
+      returning *, 0::integer as today_total_reps, 0::numeric as today_duration_minutes, 0::integer as today_distance_meters`,
     [userId, profile, exerciseId, loadKg]
   );
   if (!result.rows[0]) throw new Error("A carga pode ser definida somente em exercícios de musculação do seu plano.");
+  return normalizeExerciseLibraryRow(result.rows[0]);
+}
+
+export async function setProject200ExerciseLoadScale(userId, payload = {}) {
+  await ensureProject200WellnessSchema();
+  const profile = normalizeProfileName(payload.profileName);
+  const exerciseId = String(payload.exerciseId || "").trim().slice(0, 80);
+  if (!exerciseId) throw new Error("Escolha um exercício válido.");
+  const loadScaleKg = (Array.isArray(payload.loadScaleKg) ? payload.loadScaleKg : []).slice(0, 100)
+    .map((value) => normalizeProject200StrengthLoadKg(value));
+  if (!loadScaleKg.length) throw new Error("Informe a carga de pelo menos uma série.");
+  const result = await query(
+    `update project200_exercise_library
+        set schedule_config = coalesce(schedule_config, '{}'::jsonb) || jsonb_build_object(
+          'trainingPlan', coalesce(schedule_config->'trainingPlan', '{}'::jsonb) || jsonb_build_object('loadScaleKg', $4::jsonb)
+        ), updated_at = now()
+      where user_id = $1 and assigned_profile = $2 and exercise_id = $3 and category = 'strength'
+      returning *, 0::integer as today_total_reps, 0::numeric as today_duration_minutes, 0::integer as today_distance_meters`,
+    [userId, profile, exerciseId, JSON.stringify(loadScaleKg)]
+  );
+  if (!result.rows[0]) throw new Error("A escala pode ser definida somente em exercícios de musculação do seu plano.");
   return normalizeExerciseLibraryRow(result.rows[0]);
 }
 
