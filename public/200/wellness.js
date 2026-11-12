@@ -2,7 +2,7 @@ import { getApiUrl } from "../api.js";
 import { normalizeExerciseRir, mechanicalStrengthPoints, muscleGainMinutesForWorkout, workoutRestSeconds } from "./exercise-series-scoring.js?v=20261015-mechanical-rir-0-5-v2";
 import { PROJECT200_MUSCLE_BY_ID, normalizeProject200MuscleSelections, project200MuscleIdsFor } from "./exercise-muscles.js";
 import { PROJECT200_MUSCLE_MAPS } from "./exercise-muscle-maps.js";
-import { calculateProject200TimedMuscleGains, project200CurrentMuscleProgress, project200DecayedMusclePoints } from "./exercise-muscle-progress.js?v=20260915-performance-v1";
+import { calculateProject200TimedMuscleGains, project200CurrentMuscleProgress, project200DecayedMusclePoints } from "./exercise-muscle-progress.js?v=20261112-zero-blue-fade-v1";
 import { exerciseCatalogSearchScore, sortExerciseCatalog } from "./exercise-catalog-search.js?v=20260911-v1";
 import { calculateProject200ExerciseMetricGains, defaultProject200ExerciseMetrics, defaultProject200ExerciseMuscleLoads, formatProject200Distance, normalizeProject200ExerciseMetrics, project200ExerciseDurationMinutes, project200MetricColor, project200SeriesWorkSeconds } from "./exercise-performance.js?v=20260915-v1";
 
@@ -466,12 +466,10 @@ function renderDailyExerciseProgress(){ const items=selectedDayExerciseLibrary()
 function muscleMapDisplayTitle(map,index){ const title=String(map?.title||"").toLowerCase(); if(title.includes("perna")||index===1)return "Pernas"; if(title.includes("costa")||title.includes("poster")||index===2)return "Costas"; return "Frente"; }
 function muscleMapHeadingMarkup(map,index){ return `<header class="wellness-muscle-map-heading"><strong>${escapeHtml(muscleMapDisplayTitle(map,index))}</strong><small>Toque no músculo para treinar</small></header>`; }
 function currentMuscleProgress(){
-  const now=Date.now(),totals=new Map();
-  (Array.isArray(state.dashboard?.muscleProgress)?state.dashboard.muscleProgress:[]).forEach((entry)=>{ const item=project200CurrentMuscleProgress(entry,now); if(item.muscleId)totals.set(item.muscleId,Number(item.points||0)); });
-  state.provisionalMuscleProgress.forEach((entry,muscleId)=>{ const item=project200CurrentMuscleProgress({...entry,muscleId},now); totals.set(muscleId,Number(totals.get(muscleId)||0)+Number(item.points||0)); });
-  return [...totals.entries()]
-    .map(([muscleId,points])=>project200CurrentMuscleProgress({muscleId,points,measuredAt:new Date(now).toISOString()},now))
-    .sort((left,right)=>right.points-left.points);
+  const now=Date.now(),nowIso=new Date(now).toISOString(),progress=new Map();
+  (Array.isArray(state.dashboard?.muscleProgress)?state.dashboard.muscleProgress:[]).forEach((entry)=>{ const item=project200CurrentMuscleProgress(entry,now); if(item.muscleId)progress.set(item.muscleId,item); });
+  state.provisionalMuscleProgress.forEach((entry,muscleId)=>{ const item=project200CurrentMuscleProgress({...entry,muscleId},now),previous=progress.get(muscleId),points=Number(previous?.points||0)+Number(item.points||0);progress.set(muscleId,project200CurrentMuscleProgress({muscleId,points,basePoints:points,updatedAt:nowIso,measuredAt:nowIso},now)); });
+  return [...progress.values()].sort((left,right)=>right.points-left.points);
 }
 function applyLocalMuscleSeriesProgress(workout,repetitions){
   if(workout?.trackingType!=="series")return;
@@ -511,10 +509,10 @@ function syncHomeMuscleViewer(progress=currentMuscleProgress()){
   const byMuscle=new Map(progress.map((item)=>[item.muscleId,item])),lifetime=lifetimeMusclePoints(),groups=new Map();
   Object.entries(WORKOUT_COMPLETION_3D_MUSCLE_BY_ID).forEach(([muscleId,target])=>{
     const key=`${target.id}:${target.view}`,item=byMuscle.get(muscleId),bucket=groups.get(key)||{id:target.id,view:target.view,points:0,heat:item||null};
-    bucket.points+=Number(lifetime.get(muscleId)||0);if(item&&(!bucket.heat||item.percent>bucket.heat.percent))bucket.heat=item;groups.set(key,bucket);
+    bucket.points+=Number(lifetime.get(muscleId)||0);if(item&&(!bucket.heat||item.percent>bucket.heat.percent||(item.percent===bucket.heat.percent&&item.points===0&&bucket.heat.points===0&&item.minutesSinceZero<bucket.heat.minutesSinceZero)))bucket.heat=item;groups.set(key,bucket);
   });
-  const strongestHeatByGroup=new Map();groups.forEach((bucket)=>{const previous=strongestHeatByGroup.get(bucket.id);if(bucket.heat&&(!previous||bucket.heat.percent>previous.percent))strongestHeatByGroup.set(bucket.id,bucket.heat);});
-  viewer.getMuscles().forEach(({id})=>viewer.setMuscleColor(id,completionMuscleHeatHex(strongestHeatByGroup.get(id))));
+  const strongestHeatByGroup=new Map();groups.forEach((bucket)=>{const previous=strongestHeatByGroup.get(bucket.id);if(bucket.heat&&(!previous||bucket.heat.percent>previous.percent||(bucket.heat.percent===previous.percent&&bucket.heat.points===0&&previous.points===0&&bucket.heat.minutesSinceZero<previous.minutesSinceZero)))strongestHeatByGroup.set(bucket.id,bucket.heat);});
+  viewer.getMuscles().forEach(({id})=>viewer.setMuscleColor(id,strongestHeatByGroup.has(id)?completionMuscleHeatHex(strongestHeatByGroup.get(id)):"#3b82f6"));
   viewer.setMuscleLabels([...groups.values()].map((bucket)=>({id:bucket.id,view:bucket.view,value:completionDisplayPoints(bucket.points).toLocaleString("pt-BR")})));
 }
 function refreshMuscleProgressMap(){

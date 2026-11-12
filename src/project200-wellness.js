@@ -661,7 +661,7 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
     query(`select * from project200_exercise_assets order by exercise_name asc`),
     query(`select * from project200_exercise_definitions order by exercise_name asc`),
     query(
-      `select muscle_id,
+      `select muscle_id, points as base_points,
          greatest(0::numeric, points - greatest(0, floor(extract(epoch from (now() - updated_at)) / 1500)) * $3::numeric) as current_points,
          updated_at, now() as measured_at
        from project200_exercise_muscle_state
@@ -721,6 +721,7 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
     muscleProgress: muscleProgressResult.rows.map((row) => ({
       muscleId: String(row.muscle_id || ""),
       points: Math.max(0, Number(row.current_points || 0)),
+      basePoints: Math.max(0, Number(row.base_points || 0)),
       updatedAt: new Date(row.updated_at).toISOString(),
       measuredAt: new Date(row.measured_at).toISOString()
     })),

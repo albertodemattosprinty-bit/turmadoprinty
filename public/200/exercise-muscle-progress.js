@@ -3,7 +3,7 @@ export const PROJECT200_MUSCLE_DECAY_MINUTES = 25;
 export const PROJECT200_MUSCLE_POINTS_PER_PERCENT = PROJECT200_MUSCLE_POINTS_AT_100 / 100;
 
 const COLOR_ANCHORS = Object.freeze([
-  [0, [148, 163, 184]],
+  [0, [59, 130, 246]],
   [10, [255, 255, 255]],
   [30, [34, 197, 94]],
   [40, [250, 204, 21]],
@@ -85,16 +85,35 @@ export function project200MuscleProgressColor(percent) {
   return `rgb(${rgb.join(" ")})`;
 }
 
+function project200MusclePostZeroColor(minutesSinceZero) {
+  const blue = [59, 130, 246];
+  const gray = [148, 163, 184];
+  const blueWindowMinutes = 18 * 60;
+  const fadeMinutes = 18 * 60;
+  const ratio = clamp((Number(minutesSinceZero || 0) - blueWindowMinutes) / fadeMinutes, 0, 1);
+  const rgb = blue.map((channel, index) => Math.round(channel + ((gray[index] - channel) * ratio)));
+  return `rgb(${rgb.join(" ")})`;
+}
+
 export function project200CurrentMuscleProgress(entry, nowMs = Date.now()) {
   const measuredAt = new Date(entry?.measuredAt || nowMs).getTime();
   const elapsedMinutes = Number.isFinite(measuredAt) ? Math.max(0, nowMs - measuredAt) / 60000 : 0;
   const points = project200DecayedMusclePoints(entry?.points, elapsedMinutes);
   const percent = project200MuscleProgressPercent(points);
+  const basePoints = Math.max(0, Number(entry?.basePoints ?? entry?.points ?? 0));
+  const updatedAt = new Date(entry?.updatedAt || entry?.measuredAt || nowMs).getTime();
+  let stepsUntilZero = Math.max(0, Math.ceil(basePoints / PROJECT200_MUSCLE_POINTS_PER_PERCENT));
+  while (stepsUntilZero > 0 && project200DecayedMusclePoints(basePoints, (stepsUntilZero - 1) * PROJECT200_MUSCLE_DECAY_MINUTES) === 0) stepsUntilZero -= 1;
+  const zeroAt = Number.isFinite(updatedAt)
+    ? updatedAt + (stepsUntilZero * PROJECT200_MUSCLE_DECAY_MINUTES * 60000)
+    : nowMs;
+  const minutesSinceZero = Math.max(0, nowMs - zeroAt) / 60000;
   return {
     muscleId: String(entry?.muscleId || ""),
     points,
     percent,
+    minutesSinceZero,
     stage: project200MuscleProgressStage(percent),
-    color: project200MuscleProgressColor(percent)
+    color: points > 0 ? project200MuscleProgressColor(percent) : project200MusclePostZeroColor(minutesSinceZero)
   };
 }
