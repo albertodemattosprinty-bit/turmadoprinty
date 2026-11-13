@@ -1,0 +1,187 @@
+{
+  "album": "Vitória na pré-escola",
+  "albumZipUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/album-zips/vitoria-na-pre-escola.zip",
+  "lyricsZipUrl": "[none]",
+  "tracks": [
+    {
+      "number": 1,
+      "code": "001",
+      "title": "Soldadinho",
+      "type": "full",
+      "durationSeconds": 226.72,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/001.mp3",
+      "playbackTrackNumber": 11,
+      "playbackTrackCode": "011"
+    },
+    {
+      "number": 2,
+      "code": "002",
+      "title": "Sonho ecológico",
+      "type": "full",
+      "durationSeconds": 208.93,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/002.mp3",
+      "playbackTrackNumber": 12,
+      "playbackTrackCode": "012"
+    },
+    {
+      "number": 3,
+      "code": "003",
+      "title": "Jeito de louvar",
+      "type": "full",
+      "durationSeconds": 202.48,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/003.mp3",
+      "playbackTrackNumber": 13,
+      "playbackTrackCode": "013"
+    },
+    {
+      "number": 4,
+      "code": "004",
+      "title": "Cinco sentidos",
+      "type": "full",
+      "durationSeconds": 176.56,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/004.mp3",
+      "playbackTrackNumber": 14,
+      "playbackTrackCode": "014"
+    },
+    {
+      "number": 5,
+      "code": "005",
+      "title": "Alfabeto",
+      "type": "full",
+      "durationSeconds": 176.98,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/005.mp3",
+      "playbackTrackNumber": 15,
+      "playbackTrackCode": "015"
+    },
+    {
+      "number": 6,
+      "code": "006",
+      "title": "Salmo das crianças",
+      "type": "full",
+      "durationSeconds": 166.03,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/006.mp3",
+      "playbackTrackNumber": 16,
+      "playbackTrackCode": "016"
+    },
+    {
+      "number": 7,
+      "code": "007",
+      "title": "Senhor Jesus",
+      "type": "full",
+      "durationSeconds": 278.83,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/007.mp3",
+      "playbackTrackNumber": 17,
+      "playbackTrackCode": "017"
+    },
+    {
+      "number": 8,
+      "code": "008",
+      "title": "Os doze meses",
+      "type": "full",
+      "durationSeconds": 228.13,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/008.mp3",
+      "playbackTrackNumber": 18,
+      "playbackTrackCode": "018"
+    },
+    {
+      "number": 9,
+      "code": "009",
+      "title": "22 de abril de 1500",
+      "type": "full",
+      "durationSeconds": 178.81,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/009.mp3",
+      "playbackTrackNumber": 19,
+      "playbackTrackCode": "019"
+    },
+    {
+      "number": 10,
+      "code": "010",
+      "title": "Melo da tabuada (faixa bônus)",
+      "type": "full",
+      "durationSeconds": 364.98,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/010.mp3",
+      "playbackTrackNumber": 20,
+      "playbackTrackCode": "020"
+    },
+    {
+      "number": 11,
+      "code": "011",
+      "title": "Soldadinho",
+      "type": "playback",
+      "durationSeconds": 226.72,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/011.mp3"
+    },
+    {
+      "number": 12,
+      "code": "012",
+      "title": "Sonho ecológico",
+      "type": "playback",
+      "durationSeconds": 207.36,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/012.mp3"
+    },
+    {
+      "number": 13,
+      "code": "013",
+      "title": "Jeito de louvar",
+      "type": "playback",
+      "durationSeconds": 202.11,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/013.mp3"
+    },
+    {
+      "number": 14,
+      "code": "014",
+      "title": "Cinco sentidos",
+      "type": "playback",
+      "durationSeconds": 176.38,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/014.mp3"
+    },
+    {
+      "number": 15,
+      "code": "015",
+      "title": "Alfabeto",
+      "type": "playback",
+      "durationSeconds": 176.93,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/015.mp3"
+    },
+    {
+      "number": 16,
+      "code": "016",
+      "title": "Salmo das crianças",
+      "type": "playback",
+      "durationSeconds": 165.85,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/016.mp3"
+    },
+    {
+      "number": 17,
+      "code": "017",
+      "title": "Senhor Jesus",
+      "type": "playback",
+      "durationSeconds": 277.81,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/017.mp3"
+    },
+    {
+      "number": 18,
+      "code": "018",
+      "title": "Os doze meses",
+      "type": "playback",
+      "durationSeconds": 227.94,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/018.mp3"
+    },
+    {
+      "number": 19,
+      "code": "019",
+      "title": "22 de abril de 1500",
+      "type": "playback",
+      "durationSeconds": 178.76,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/019.mp3"
+    },
+    {
+      "number": 20,
+      "code": "020",
+      "title": "Melo da tabuada (faixa bônus)",
+      "type": "playback",
+      "durationSeconds": 361.01,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Vit%C3%B3ria%20na%20pr%C3%A9-escola/mp3/020.mp3"
+    }
+  ]
+}

@@ -45,6 +45,7 @@ export const albums = [
   { name: "Um presente para todos", tracks: 24 },
   { name: "Um sonho de Páscoa", tracks: 24 },
   { name: "Uma lição de Páscoa", tracks: 18 },
+  { name: "Vitória na pré-escola", tracks: 20 },
   { name: "Zero a seis anos", tracks: 18 },
   { name: "É Natal", tracks: 28 }
 ];
