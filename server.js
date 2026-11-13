@@ -12711,87 +12711,113 @@ async function handleStripeWebhook(request, response) {
 
   const payload = event || {};
   const resource = getEventObject(payload);
-  const referenceId = getMetadataReferenceId(resource) || getStripeInvoiceReferenceId(resource);
+  const referenceId = getMetadataReferenceId(resource)
+    || resource?.client_reference_id
+    || getStripeInvoiceReferenceId(resource);
 
-  if (hasDatabase()) {
-    try {
-      await recordPaymentWebhookEvent({
-        eventType: payload?.type || "unknown",
-        resourceId: resource?.id || null,
-        referenceId,
-        payload
-      });
+  if (!hasDatabase()) {
+    sendJson(response, 503, { error: "Banco de dados indisponivel para processar a confirmacao do pagamento." });
+    return;
+  }
 
-      if (referenceId) {
-        if (referenceId.startsWith("printy-plan-")) {
-          let nextStatus = "PENDING";
-          let activatedAt = null;
-          let canceledAt = null;
-          let subscriptionId = null;
-          let cancelAtPeriodEnd = null;
-          let currentPeriodEnd = null;
+  try {
+    await recordPaymentWebhookEvent({
+      eventType: payload?.type || "unknown",
+      resourceId: resource?.id || null,
+      referenceId,
+      payload
+    });
 
-          if (payload?.type === "checkout.session.completed") {
-            nextStatus = resource?.mode === "subscription"
-              ? normalizeStripeSubscriptionStatus(resource?.payment_status === "paid" ? "active" : "incomplete")
-              : normalizeStripePaymentStatus(resource?.payment_status);
-            activatedAt = isActiveSubscriptionStatus(nextStatus) ? new Date().toISOString() : null;
-            subscriptionId = resource?.subscription || null;
-          } else if (payload?.type === "checkout.session.async_payment_succeeded") {
-            nextStatus = "ACTIVE";
-            activatedAt = new Date().toISOString();
-            subscriptionId = resource?.subscription || null;
-          } else if (payload?.type === "checkout.session.async_payment_failed") {
-            nextStatus = "DECLINED";
-            canceledAt = new Date().toISOString();
-            subscriptionId = resource?.subscription || null;
-          } else if (payload?.type === "invoice.paid") {
-            nextStatus = "ACTIVE";
-            activatedAt = toIsoDateFromUnix(resource?.status_transitions?.paid_at) || new Date().toISOString();
-            subscriptionId = resource?.subscription || null;
-          } else if (payload?.type === "invoice.payment_failed") {
-            nextStatus = "OVERDUE";
-            canceledAt = new Date().toISOString();
-            subscriptionId = resource?.subscription || null;
-          } else if (payload?.type === "customer.subscription.updated" || payload?.type === "customer.subscription.deleted") {
-            nextStatus = normalizeStripeSubscriptionStatus(resource?.status);
-            activatedAt = isActiveSubscriptionStatus(nextStatus) ? getStripeSubscriptionPeriodDate(resource, "current_period_start") : null;
-            canceledAt = isInactiveSubscriptionStatus(nextStatus)
-              ? toIsoDateFromUnix(resource?.ended_at) || toIsoDateFromUnix(resource?.canceled_at) || new Date().toISOString()
-              : null;
-            subscriptionId = resource?.id || null;
-            cancelAtPeriodEnd = Boolean(resource?.cancel_at_period_end);
-            currentPeriodEnd = getStripeSubscriptionPeriodDate(resource, "current_period_end");
-          }
+    if (referenceId) {
+      if (referenceId.startsWith("printy-plan-")) {
+        let nextStatus = "PENDING";
+        let activatedAt = null;
+        let canceledAt = null;
+        let subscriptionId = null;
+        let cancelAtPeriodEnd = null;
+        let currentPeriodEnd = null;
 
-          await markPlanSubscriptionStatus({
-            referenceId,
-            status: nextStatus,
-            subscriptionId,
-            payload,
-            activatedAt,
-            canceledAt,
-            cancelAtPeriodEnd,
-            currentPeriodEnd
-          });
-        } else {
-          const paymentStatus = payload?.type === "checkout.session.async_payment_failed"
-            ? "DECLINED"
+        if (payload?.type === "checkout.session.completed") {
+          nextStatus = resource?.mode === "subscription"
+            ? normalizeStripeSubscriptionStatus(resource?.payment_status === "paid" ? "active" : "incomplete")
             : normalizeStripePaymentStatus(resource?.payment_status);
+          activatedAt = isActiveSubscriptionStatus(nextStatus) ? new Date().toISOString() : null;
+          subscriptionId = resource?.subscription || null;
+        } else if (payload?.type === "checkout.session.async_payment_succeeded") {
+          nextStatus = "ACTIVE";
+          activatedAt = new Date().toISOString();
+          subscriptionId = resource?.subscription || null;
+        } else if (payload?.type === "checkout.session.async_payment_failed") {
+          nextStatus = "DECLINED";
+          canceledAt = new Date().toISOString();
+          subscriptionId = resource?.subscription || null;
+        } else if (payload?.type === "invoice.paid") {
+          nextStatus = "ACTIVE";
+          activatedAt = toIsoDateFromUnix(resource?.status_transitions?.paid_at) || new Date().toISOString();
+          subscriptionId = resource?.subscription || null;
+        } else if (payload?.type === "invoice.payment_failed") {
+          nextStatus = "OVERDUE";
+          canceledAt = new Date().toISOString();
+          subscriptionId = resource?.subscription || null;
+        } else if (payload?.type === "customer.subscription.updated" || payload?.type === "customer.subscription.deleted") {
+          nextStatus = normalizeStripeSubscriptionStatus(resource?.status);
+          activatedAt = isActiveSubscriptionStatus(nextStatus) ? getStripeSubscriptionPeriodDate(resource, "current_period_start") : null;
+          canceledAt = isInactiveSubscriptionStatus(nextStatus)
+            ? toIsoDateFromUnix(resource?.ended_at) || toIsoDateFromUnix(resource?.canceled_at) || new Date().toISOString()
+            : null;
+          subscriptionId = resource?.id || null;
+          cancelAtPeriodEnd = Boolean(resource?.cancel_at_period_end);
+          currentPeriodEnd = getStripeSubscriptionPeriodDate(resource, "current_period_end");
+        }
 
-          await markAlbumPurchaseStatus({
+        await markPlanSubscriptionStatus({
+          referenceId,
+          status: nextStatus,
+          subscriptionId,
+          payload,
+          activatedAt,
+          canceledAt,
+          cancelAtPeriodEnd,
+          currentPeriodEnd
+        });
+      } else {
+        const paymentStatus = payload?.type === "checkout.session.async_payment_failed"
+          ? "DECLINED"
+          : normalizeStripePaymentStatus(resource?.payment_status);
+        const metadataUserId = String(resource?.metadata?.userId || "").trim();
+        const metadataProductId = String(resource?.metadata?.productId || "").trim();
+
+        if (
+          resource?.mode === "payment"
+          && resource?.metadata?.kind === "album_purchase"
+          && metadataUserId
+          && metadataProductId
+        ) {
+          await createAlbumPurchaseRecord({
+            userId: metadataUserId,
+            productId: metadataProductId,
             referenceId,
-            status: paymentStatus,
-            orderId: resource?.payment_intent || resource?.id || null,
-            chargeId: resource?.payment_intent || null,
-            payload,
-            paidAt: isActivePaymentStatus(paymentStatus) ? new Date().toISOString() : null
+            checkoutId: resource.id,
+            amountCents: Number(resource.amount_total) || 0,
+            environment: getStripeEnvironment(),
+            payload: resource
           });
         }
+
+        await markAlbumPurchaseStatus({
+          referenceId,
+          status: paymentStatus,
+          orderId: resource?.payment_intent || resource?.id || null,
+          chargeId: resource?.payment_intent || null,
+          payload,
+          paidAt: isActivePaymentStatus(paymentStatus) ? new Date().toISOString() : null
+        });
       }
-    } catch (error) {
-      console.error("[Stripe webhook error]", error);
     }
+  } catch (error) {
+    console.error("[Stripe webhook error]", error);
+    sendJson(response, 500, { error: "Falha ao processar a confirmacao do pagamento. A Stripe pode tentar novamente." });
+    return;
   }
 
   console.log("[Stripe webhook]", JSON.stringify(payload));
