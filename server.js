@@ -1756,7 +1756,8 @@ function getStripeClient() {
 }
 
 function buildCoverUrl(albumName) {
-  return `${CONTENT_BASE_URL}/Capas/${encodeURIComponent(albumName)}.avif`;
+  const extension = albumName === "Vitória na pré-escola" ? "webp" : "avif";
+  return `${CONTENT_BASE_URL}/Capas/${encodeURIComponent(albumName)}.${extension}`;
 }
 
 function buildTrackUrl(albumName, trackNumber) {
