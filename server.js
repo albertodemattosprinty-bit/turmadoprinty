@@ -12684,29 +12684,21 @@ async function handleStripeCheckoutConfirmationRequest(request, response) {
 async function handleStripeWebhook(request, response) {
   const rawBody = await readRawTextBody(request);
   let event = null;
+  const signature = request.headers["stripe-signature"];
+
+  if (!STRIPE_WEBHOOK_SECRET || typeof signature !== "string" || !signature || !rawBody) {
+    sendJson(response, 400, { error: "Assinatura do webhook Stripe ausente ou nao configurada." });
+    return;
+  }
 
   try {
     const stripe = getStripeClient();
-    const signature = request.headers["stripe-signature"];
-
-    if (STRIPE_WEBHOOK_SECRET && typeof signature === "string" && rawBody) {
-      event = stripe.webhooks.constructEvent(rawBody, signature, STRIPE_WEBHOOK_SECRET);
-    } else if (rawBody) {
-      event = JSON.parse(rawBody);
-    }
+    event = stripe.webhooks.constructEvent(rawBody, signature, STRIPE_WEBHOOK_SECRET);
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Webhook Stripe invalido."
     });
     return;
-  }
-
-  if (!event && rawBody) {
-    try {
-      event = JSON.parse(rawBody);
-    } catch {
-      event = null;
-    }
   }
 
   const payload = event || {};
