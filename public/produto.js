@@ -841,7 +841,7 @@ function isPlusPlaybackAlbumName(albumName) {
     return true;
   }
 
-  return ["favoritas", "favoritas 1", "favoritas 2", "ebd", "zero a seis anos"].includes(normalized);
+  return ["favoritas", "favoritas 1", "favoritas 2", "ebd", "zero a seis anos", "o nascimento do rei"].includes(normalized);
 }
 
 function canStreamTrack(albumId, albumName, track) {

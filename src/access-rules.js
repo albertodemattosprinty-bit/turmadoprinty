@@ -31,7 +31,8 @@ function isPlusPlaybackAlbumName(albumName) {
     "favoritas 1",
     "favoritas 2",
     "ebd",
-    "zero a seis anos"
+    "zero a seis anos",
+    "o nascimento do rei"
   ].includes(normalized);
 }
 
