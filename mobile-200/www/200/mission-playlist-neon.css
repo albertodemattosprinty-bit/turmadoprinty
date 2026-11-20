@@ -60,7 +60,9 @@ body[data-background-theme="neon"] .mission-playlist-footer {
   position: fixed;
   inset: 0;
   width: 100vw;
+  height: 100vh;
   height: 100dvh;
+  min-height: 100vh;
   min-height: 100dvh;
   padding: 0;
   border-radius: 0;
@@ -73,10 +75,50 @@ body[data-background-theme="neon"] .mission-playlist-footer {
   display: block;
 }
 
+.mission-variants-modal.is-playlist-mode .mission-variant-immersive-icon,
+.mission-variants-modal.is-playlist-mode .mission-variants-kicker,
+.mission-variants-modal.is-playlist-mode .mission-variants-title {
+  display: none !important;
+}
+
+.mission-playlist-visibility-toggle {
+  display: none;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, .22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .08);
+  color: rgba(255, 255, 255, .88);
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 850;
+}
+
+.mission-variants-modal.is-playlist-mode .mission-playlist-visibility-toggle {
+  display: inline-flex;
+}
+
+.mission-playlist-visibility-toggle[aria-pressed="true"] {
+  border-color: rgba(75, 165, 255, .7);
+  background: rgba(23, 105, 232, .24);
+  color: #fff;
+}
+
+.mission-playlist-visibility-toggle svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
 .mission-variants-modal.is-playlist-mode .mission-variants-panel {
   width: 100%;
   max-width: none;
+  height: 100vh;
   height: 100dvh;
+  min-height: 100vh;
   min-height: 100dvh;
   max-height: none;
   margin: 0;
@@ -92,6 +134,8 @@ body[data-background-theme="neon"] .mission-playlist-footer {
   min-height: 0;
   align-content: start;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   overscroll-behavior: contain;
   padding-bottom: 8px;
 }
