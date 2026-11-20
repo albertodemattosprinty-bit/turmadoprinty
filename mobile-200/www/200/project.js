@@ -17742,13 +17742,9 @@ function renderMissionRunState() {
     missionRunStatus.textContent = durationMs > 0 ? "" : "Esta missão não tem tempo definido.";
   }
   syncRunningMinuteCueSchedule(
-    state.missionRun?.playlistMode
-      ? `mission:${goalId}:playlist:${Number(state.missionRun?.sessionStartedAtMs || 0)}`
-      : `mission:${goalId}:cycle:${normalizeMissionRunCycleTarget(state.missionRun?.cycleIndex)}`,
+    `mission:${goalId}:cycle:${normalizeMissionRunCycleTarget(state.missionRun?.cycleIndex)}`,
     String(goal.title || "Missão"),
-    state.missionRun?.playlistMode
-      ? remainingSeconds + getMissionRunCycleDurationsSeconds().slice(normalizeMissionRunCycleTarget(state.missionRun?.cycleIndex)).reduce((total, seconds) => total + seconds, 0)
-      : remainingSeconds
+    remainingSeconds
   );
   renderMissionRunCycleCount();
   const announced = new Set(Array.isArray(state.missionRun.announcedCueSeconds) ? state.missionRun.announcedCueSeconds : []);
