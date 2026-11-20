@@ -131,13 +131,36 @@ body[data-background-theme="neon"] .mission-playlist-footer {
 }
 
 .mission-variants-modal.is-playlist-mode .mission-variants-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: 78px;
   min-height: 0;
   align-content: start;
-  overflow-y: auto;
+  overflow-y: scroll;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
   overscroll-behavior: contain;
   padding-bottom: 8px;
+}
+
+.mission-variants-modal.is-playlist-mode .mission-variant-card {
+  width: 100%;
+  min-width: 0;
+  height: 78px;
+  min-height: 78px;
+}
+
+.mission-variants-modal.is-playlist-mode .mission-variant-main {
+  min-height: 0;
+  height: 100%;
+  padding: 10px 14px;
+}
+
+.mission-variants-modal.is-playlist-mode .mission-variant-main strong,
+.mission-variants-modal.is-playlist-mode .mission-variant-main small {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mission-variants-modal.is-playlist-mode .mission-playlist-footer {
