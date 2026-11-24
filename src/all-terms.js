@@ -33,6 +33,9 @@ const QUESTION_ORDER = [
   { key: "localEvento", label: "Tipo de local do evento" },
   { key: "publicoEstimado", label: "Público estimado" },
   { key: "elementosEvento", label: "Elementos escolhidos para o evento" },
+  { key: "proposalInstallments", label: "Parcelas escolhidas na proposta" },
+  { key: "proposalFinancedTotalCents", label: "Total estimado parcelado" },
+  { key: "proposalInstallmentCents", label: "Valor estimado de cada parcela" },
   { key: "presentationName", label: "Apresentacao escolhida" },
   { key: "eventCount", label: "Quantidade de eventos" },
   { key: "unitPrice", label: "Valor por evento" },
@@ -60,11 +63,13 @@ export async function ensureAllTermsSchema() {
       event_time text not null,
       event_time_sort smallint not null default 0,
       accepted_terms jsonb not null default '[]'::jsonb,
+      is_draft boolean not null default false,
       created_at timestamptz not null default now()
     );
   `);
   await query(`alter table "all-terms" add column if not exists user_id uuid references users(id) on delete set null;`);
   await query(`alter table "all-terms" add column if not exists accepted_terms jsonb not null default '[]'::jsonb;`);
+  await query(`alter table "all-terms" add column if not exists is_draft boolean not null default false;`);
   await query(`create index if not exists idx_all_terms_event_date_time on "all-terms"(event_date asc, event_time_sort asc, created_at asc);`);
   await query(`create index if not exists idx_all_terms_user_id_created_at on "all-terms"(user_id, created_at desc);`);
   await query(`alter table "all-terms" add column if not exists claim_token_hash text;`);
@@ -142,7 +147,7 @@ function parseEventTimeSort(eventTime) {
   return (hour * 60) + minute;
 }
 
-export function sanitizeTermAnswers(input) {
+export function sanitizeTermAnswers(input, { allowDraft = false } = {}) {
   const answers = {};
 
   for (const item of QUESTION_ORDER) {
@@ -156,8 +161,8 @@ export function sanitizeTermAnswers(input) {
   if (!answers.endereco) throw new Error("Endereço é obrigatório.");
   if (!answers.cidade) throw new Error("Cidade é obrigatória.");
   if (!/^\d{8}$/.test(answers.cep)) throw new Error("CEP inválido. Use exatamente 8 dígitos.");
-  if (!answers.assinatura) throw new Error("Assinatura é obrigatória.");
-  if (!/^\d{11}$/.test(answers.assinaturaCpf)) throw new Error("CPF da assinatura inválido. Use 11 dígitos.");
+  if (!allowDraft && !answers.assinatura) throw new Error("Assinatura é obrigatória.");
+  if (!allowDraft && !/^\d{11}$/.test(answers.assinaturaCpf)) throw new Error("CPF da assinatura inválido. Use 11 dígitos.");
 
   return answers;
 }
@@ -178,14 +183,14 @@ async function buildCommercialAnswers(rawAnswers) {
   });
   if (!pricing.couponCode && rawAnswers?.transportAmountCents !== undefined) {
     const transportAmountCents = Math.max(0, Math.trunc(Number(rawAnswers.transportAmountCents) || 0));
-    const freeTransport = Boolean(rawAnswers.freeTransport) || transportAmountCents === 0;
+    const freeTransport = rawAnswers.freeTransport === true || /^(sim|true|1)$/i.test(String(rawAnswers.freeTransport || "")) || transportAmountCents === 0;
     pricing.transportAmountCents = freeTransport ? 0 : transportAmountCents;
     pricing.transportTripType = String(rawAnswers.transportTripType || "").trim();
     pricing.transportCityA = String(rawAnswers.transportCityA || "").trim();
     pricing.transportCityB = String(rawAnswers.transportCityB || "").trim();
     pricing.transportDescription = String(rawAnswers.transportDescription || "").trim();
     pricing.freeTransport = freeTransport;
-    pricing.freeLodging = Boolean(rawAnswers.freeLodging);
+    pricing.freeLodging = rawAnswers.freeLodging === true || /^(sim|true|1)$/i.test(String(rawAnswers.freeLodging || ""));
     pricing.finalPriceCents = Math.max(0, pricing.basePriceCents - pricing.couponDiscountCents + pricing.transportAmountCents);
   }
   return {
@@ -207,10 +212,10 @@ async function buildCommercialAnswers(rawAnswers) {
   };
 }
 
-export async function createAllTermEntry(rawAnswers, userId = null, rawAcceptedTerms = [], claimToken = "") {
+export async function createAllTermEntry(rawAnswers, userId = null, rawAcceptedTerms = [], claimToken = "", { isDraft = false } = {}) {
   await ensureAllTermsSchema();
   const commercial = await buildCommercialAnswers(rawAnswers);
-  const answers = sanitizeTermAnswers({ ...rawAnswers, ...commercial.values });
+  const answers = sanitizeTermAnswers({ ...rawAnswers, ...commercial.values }, { allowDraft: isDraft });
   const eventPagePath = String(rawAnswers?.eventPagePath || "").trim().toLowerCase();
   if (/^\/[a-z0-9][a-z0-9-]{2,39}$/.test(eventPagePath)) {
     answers.eventPagePath = eventPagePath;
@@ -237,11 +242,11 @@ export async function createAllTermEntry(rawAnswers, userId = null, rawAcceptedT
 
   const result = await query(
     `
-      insert into "all-terms" (user_id, answers, event_date, event_time, event_time_sort, accepted_terms, claim_token_hash)
-      values ($1, $2::jsonb, $3::date, $4, $5, $6::jsonb, $7)
+      insert into "all-terms" (user_id, answers, event_date, event_time, event_time_sort, accepted_terms, claim_token_hash, is_draft)
+      values ($1, $2::jsonb, $3::date, $4, $5, $6::jsonb, $7, $8)
       returning id, user_id, answers, event_date, event_time, event_time_sort, accepted_terms, created_at;
     `,
-    [userId || null, JSON.stringify(answers), eventDate, answers.horario, eventTimeSort, JSON.stringify(acceptedTerms), claimToken ? crypto.createHash("sha256").update(claimToken).digest("hex") : null]
+    [userId || null, JSON.stringify(answers), eventDate, answers.horario, eventTimeSort, JSON.stringify(acceptedTerms), claimToken ? crypto.createHash("sha256").update(claimToken).digest("hex") : null, Boolean(isDraft)]
   );
 
   return result.rows[0];
@@ -253,6 +258,7 @@ export async function listAllTermDates() {
     `
       select to_char(event_date, 'YYYY-MM-DD') as date
       from "all-terms"
+      where is_draft = false
       group by event_date
       order by event_date asc;
     `
@@ -267,7 +273,7 @@ export async function listAllTermsByDate(dateIso) {
     `
       select id, user_id, answers, accepted_terms, event_date, event_time, created_at
       from "all-terms"
-      where event_date = $1::date
+      where event_date = $1::date and is_draft = false
       order by event_time_sort asc, created_at asc;
     `,
     [dateIso]
@@ -303,7 +309,7 @@ export async function getAllTermById(termId) {
   await ensureAllTermsSchema();
   const result = await query(
     `
-      select id, user_id, answers, accepted_terms, event_date, event_time, created_at
+      select id, user_id, answers, accepted_terms, event_date, event_time, created_at, is_draft
       from "all-terms"
       where id = $1
       limit 1;
@@ -323,7 +329,8 @@ export async function getAllTermById(termId) {
     acceptedTerms: row.accepted_terms || [],
     eventDate: row.event_date,
     eventTime: row.event_time,
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    isDraft: Boolean(row.is_draft)
   };
 }
 
@@ -335,7 +342,7 @@ export async function getLatestTermByUserId(userId) {
   await ensureAllTermsSchema();
   const result = await query(
     `
-      select id, user_id, answers, accepted_terms, event_date, event_time, created_at
+      select id, user_id, answers, accepted_terms, event_date, event_time, created_at, is_draft
       from "all-terms"
       where user_id = $1
       order by created_at desc
@@ -356,7 +363,8 @@ export async function getLatestTermByUserId(userId) {
     acceptedTerms: row.accepted_terms || [],
     eventDate: row.event_date,
     eventTime: row.event_time,
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    isDraft: Boolean(row.is_draft)
   };
 }
 
@@ -367,9 +375,10 @@ export async function getTermByEventPageSlug(slug, { userId = null } = {}) {
   await ensureAllTermsSchema();
   const result = await query(
     `
-      select id, user_id, answers, accepted_terms, event_date, event_time, created_at
+      select id, user_id, answers, accepted_terms, event_date, event_time, created_at, is_draft
       from "all-terms"
       where user_id is not null
+        and is_draft = false
         and (
           lower(coalesce(answers->>'eventPagePath', '')) = $1
           or upper(coalesce(answers->>'couponCode', '')) = $2
@@ -390,7 +399,8 @@ export async function getTermByEventPageSlug(slug, { userId = null } = {}) {
     acceptedTerms: row.accepted_terms || [],
     eventDate: row.event_date,
     eventTime: row.event_time,
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    isDraft: Boolean(row.is_draft)
   };
 }
 

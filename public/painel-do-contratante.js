@@ -88,8 +88,21 @@ function renderCountdown(eventDate) {
   }
 }
 
-function renderPayments(workflow) {
+function renderPayments(workflow, answers = {}, isDraft = false) {
   const payments = workflow.payments || [];
+  if (isDraft) {
+    const estimateCents = Number(answers.proposalFinancedTotalCents || answers.finalPriceCents || 0);
+    const installmentCount = Math.max(1, Number(answers.proposalInstallments) || 1);
+    const installmentCents = Number(answers.proposalInstallmentCents) || Math.round(estimateCents / installmentCount);
+    $("payments").innerHTML = `<article class="item-card"><div class="item-card__top"><div><h3>Estimativa da proposta</h3><p>Aguardando finaliza\u00e7\u00e3o do termo</p></div><span class="status-pill status-pill--pending">Rascunho</span></div><strong class="item-card__value">${money(estimateCents)}</strong><small>${installmentCount}x estimadas de ${money(installmentCents)}. Nenhuma cobran\u00e7a foi criada.</small></article>`;
+    $("financeTotal").previousElementSibling.textContent = "Total estimado";
+    $("financePaid").previousElementSibling.textContent = "Pago";
+    $("financeRemaining").previousElementSibling.textContent = "Saldo estimado";
+    $("financeTotal").textContent = money(estimateCents);
+    $("financePaid").textContent = money(0);
+    $("financeRemaining").textContent = money(estimateCents);
+    return;
+  }
   $("payments").innerHTML = payments.map((payment) => {
     const [statusClass, statusLabel] = statusMeta(payment.status);
     const title = payment.order === 1 ? "Sinal do evento" : "Pagamento final";
@@ -189,15 +202,24 @@ function renderMaterials(workflow) {
     ? video.fileName || "Seu vídeo personalizado está pronto."
     : "Use o botão abaixo para criar automaticamente o vídeo personalizado do evento.";
   $("videoLink").dataset.videoFile = videoUrl;
-  $("pdfLink").href = term.pdfUrl || "/termo";
-}
+  $("pdfLink").href = term?.isDraft ? "/termo" : term.pdfUrl || "/termo";
+  $("pdfLink").textContent = term?.isDraft ? "Finalizar termo" : "Baixar termo em PDF";
+  if (term?.isDraft && !$("pdfLink").dataset.draftHandler) {
+    $("pdfLink").dataset.draftHandler = "true";
+    $("pdfLink").addEventListener("click", (event) => {
+      event.preventDefault();
+      sessionStorage.setItem("eventProposalTermPrefill", JSON.stringify(term?.answers || {}));
+      window.location.href = "/termo";
+    });
+  }
 
+}
 function applyGeneratedPromoVideo(video) {
   if (!video?.url || !term) return false;
   const workflow = { ...(term.workflow || {}), promoVideo: video };
   term = { ...term, workflow };
   renderMaterials(workflow);
-  renderReadiness(term.answers || {}, workflow);
+  renderReadiness(term.answers || {}, workflow, Boolean(term.isDraft));
   return true;
 }
 
@@ -225,12 +247,12 @@ function renderLogistics(answers, workflow) {
       : "Enviar dados do hotel";
 }
 
-function renderReadiness(answers, workflow) {
+function renderReadiness(answers, workflow, isDraft = false) {
   const payments = workflow.payments || [];
   const lodging = workflow.lodging || {};
   const freeLodging = answers.freeLodging === "Sim" || answers.freeLodging === true;
   const checkpoints = [
-    true,
+    !isDraft,
     payments[0]?.status === "CONFIRMED",
     payments[1]?.status === "CONFIRMED",
     Boolean(workflow.promoVideo),
@@ -243,7 +265,17 @@ function renderReadiness(answers, workflow) {
 
   const paymentInReview = payments.find((payment) => payment.status === "REVIEW");
   const pendingPayment = payments.find((payment) => payment.status === "PENDING");
-  if (pendingPayment) {
+  if (isDraft) {
+    $("nextActionTitle").textContent = "Finalize o termo do evento";
+    $("nextActionText").textContent = "Seu painel j\u00e1 est\u00e1 preenchido. Revise e assine o termo para confirmar a contrata\u00e7\u00e3o.";
+    $("nextActionLink").href = "/termo";
+    $("nextActionLink").textContent = "Revisar e finalizar termo";
+    $("nextActionLink").onclick = (event) => {
+      event.preventDefault();
+      sessionStorage.setItem("eventProposalTermPrefill", JSON.stringify(term?.answers || {}));
+      window.location.href = "/termo";
+    };
+  } else if (pendingPayment) {
     $("nextActionTitle").textContent = pendingPayment.order === 1 ? "Informe o pagamento do sinal" : "Prepare o pagamento final";
     $("nextActionText").textContent = `A parcela vence em ${date(pendingPayment.dueDate)}. Você pode informar qualquer valor até o saldo restante.`;
     $("nextActionLink").href = "#financeiro";
@@ -271,7 +303,8 @@ function renderReadiness(answers, workflow) {
   }
 
   const allPaid = payments.length > 0 && payments.every((payment) => payment.status === "CONFIRMED");
-  if (percentage === 100) setStatus($("overallStatus"), "CONFIRMED", "Preparação concluída");
+  if (isDraft) setStatus($("overallStatus"), "PENDING", "Rascunho");
+  else if (percentage === 100) setStatus($("overallStatus"), "CONFIRMED", "Preparação concluída");
   else if (paymentInReview || lodging.status === "REVIEW") setStatus($("overallStatus"), "REVIEW", "Aguardando conferência");
   else setStatus($("overallStatus"), allPaid ? "CONFIRMED" : "PENDING", allPaid ? "Financeiro confirmado" : "Preparação em andamento");
 }
@@ -288,15 +321,50 @@ function render(data) {
   $("pixLabel").textContent = workflow.pixLabel || "CNPJ";
 
   renderCountdown(term.eventDate);
-  renderPayments(workflow);
+  renderPayments(workflow, answers, Boolean(term.isDraft));
   renderMaterials(workflow);
   renderExpenses(workflow);
   renderLogistics(answers, workflow);
-  renderReadiness(answers, workflow);
+  renderReadiness(answers, workflow, Boolean(term.isDraft));
+  renderContractorContactDetails(answers);
+  if (term.isDraft) showProposalDraftNotice(answers);
 
   $("contractorLoading").classList.add("hidden");
   $("emptyState").classList.add("hidden");
   $("contractorApp").classList.remove("hidden");
+}
+
+function renderContractorContactDetails(answers) {
+  let card = document.getElementById("contractorContactDetails");
+  if (!card) {
+    card = document.createElement("div");
+    card.id = "contractorContactDetails";
+    card.className = "inline-notice";
+    card.style.marginTop = "14px";
+    document.querySelector(".contractor-hero")?.appendChild(card);
+  }
+  card.textContent = `Contratante: ${answers.contratante || "-"} \u00b7 WhatsApp: ${answers.whatsapp || "-"} \u00b7 Local: ${answers.localEvento || "-"} \u00b7 Endere\u00e7o: ${answers.endereco || "-"}, ${answers.cidade || "-"} \u00b7 CEP: ${answers.cep || "-"}`;
+}
+
+function showProposalDraftNotice(answers) {
+  if (document.getElementById("proposalDraftNotice")) return;
+  const notice = document.createElement("div");
+  notice.id = "proposalDraftNotice";
+  notice.className = "inline-notice";
+  notice.style.marginTop = "18px";
+  notice.textContent = "Sua proposta est\u00e1 salva como rascunho. Finalize o termo para confirmar o evento. ";
+  const link = document.createElement("a");
+  link.className = "button button--primary";
+  link.href = "/termo";
+  link.textContent = "Finalizar termo";
+  link.style.marginLeft = "10px";
+  link.addEventListener("click", (event) => {
+    event.preventDefault();
+    sessionStorage.setItem("eventProposalTermPrefill", JSON.stringify(answers || {}));
+    window.location.href = "/termo";
+  });
+  notice.appendChild(link);
+  document.querySelector(".contractor-hero")?.appendChild(notice);
 }
 
 async function load() {

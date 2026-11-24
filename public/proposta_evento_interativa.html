@@ -82,6 +82,7 @@
   .route-total{font-size:22px;color:var(--navy);font-weight:900;margin-top:14px}
   .route-status{width:min(100%,760px);margin:14px auto 0;text-align:center;color:#a33;font-weight:700}
   .route-status:empty{display:none}
+  .dark .route-status{color:#ffd0c9}
   .route-attribution a{color:inherit}
   .event-field-wrap{width:min(100%,600px);margin:38px auto 0}
   .event-field-wrap label{display:block;text-align:left;margin-bottom:8px;color:var(--navy);font-size:13px;font-weight:800}
@@ -488,12 +489,32 @@
           <label class="contract-field" for="eventCityReadonly">Cidade do evento<input id="eventCityReadonly" readonly aria-readonly="true" /></label>
         </div>
         <div class="route-status" id="addressStatus" role="status" aria-live="polite"></div>
-        <button class="primary" onclick="continueToProposal()">VER PROPOSTA &nbsp;›</button>
+        <button class="primary" onclick="continueToProposal()">PRÓXIMO &nbsp;›</button>
         <button class="back-button" onclick="go(10)">VOLTAR AOS DADOS DO CONTRATANTE</button>
       </div>
     </section>
 
-    <section class="screen dark" data-screen="12">
+    <section class="screen" data-screen="12">
+      <div class="screen-inner">
+        <header class="top">
+          <div class="progress" data-progress></div>
+          <div class="step-label"></div>
+          <h1>Crie seu acesso ao painel</h1>
+          <p class="sub">Escolha um login e uma senha para acompanhar os dados do evento no site.</p>
+        </header>
+        <div class="stage-empty-art" aria-hidden="true"></div>
+        <div class="contract-fields">
+          <label class="contract-field full" for="siteUsername">Login do site<input id="siteUsername" autocomplete="username" placeholder="Escolha seu login" maxlength="24" /></label>
+          <label class="contract-field" for="sitePassword">Senha<input id="sitePassword" type="password" autocomplete="new-password" placeholder="Mínimo de 6 caracteres" /></label>
+          <label class="contract-field" for="sitePasswordConfirm">Confirme a senha<input id="sitePasswordConfirm" type="password" autocomplete="new-password" placeholder="Digite a senha novamente" /></label>
+        </div>
+        <div class="route-status" id="accountStatus" role="status" aria-live="polite"></div>
+        <button class="primary" onclick="continueToProposal()">VER PROPOSTA &nbsp;›</button>
+        <button class="back-button" onclick="go(11)">VOLTAR AO ENDEREÇO</button>
+      </div>
+    </section>
+
+    <section class="screen dark" data-screen="13">
       <div class="screen-inner">
         <header class="top">
           <div class="progress" data-progress></div>
@@ -518,6 +539,7 @@
           <div class="inc transport-inc"><div class="icon"><img src="/midia/icons/transporte.svg" alt="" aria-hidden="true"></div><div><b>Transporte</b><p><strong class="transport-amount" id="proposalTransportPrice">—</strong></p></div></div>
           <div class="inc"><div class="icon"><img src="/midia/icons/alimentacao.svg" alt="" aria-hidden="true"></div><div><b>Alimentação</b><p>Todas as refeições durante o evento.</p></div></div>
           <button class="gold-btn" onclick="reserveEvent()">▣ &nbsp; QUERO RESERVAR UMA DATA</button>
+          <div class="route-status" id="reserveStatus" role="status" aria-live="polite"></div>
           <div class="secondary-row"><button class="secondary">Falar com a equipe</button><button class="secondary">Ver datas disponíveis</button></div>
         </div>
       </div>
@@ -528,13 +550,13 @@
 
 <script>
   let current = 0;
-  const stageNames=['','Local do evento','Tamanho do público','O que vai ter','Cidade do evento','Dia do evento','Horário do evento','Tipo de evento','Transporte','História','Dados do contratante','Endereço do evento','Proposta final'];
+  const stageNames=['','Local do evento','Tamanho do público','O que vai ter','Cidade do evento','Dia do evento','Horário do evento','Tipo de evento','Transporte','História','Dados do contratante','Endereço do evento','Acesso ao painel','Proposta final'];
   function renderProgress(){
     document.querySelectorAll('[data-progress]').forEach((progress)=>{
       const stage=Number(progress.closest('[data-screen]').dataset.screen);
-      progress.innerHTML=Array.from({length:12},(_,index)=>`${index?'<span></span>':''}<i class="${index<stage?'on':''}"></i>`).join('');
+      progress.innerHTML=Array.from({length:13},(_,index)=>`${index?'<span></span>':''}<i class="${index<stage?'on':''}"></i>`).join('');
       const label=progress.parentElement.querySelector('.step-label');
-      if(label) label.textContent=`${stage} de 12 · ${stageNames[stage]}`;
+      if(label) label.textContent=`${stage} de 13 · ${stageNames[stage]}`;
     });
   }
   function go(index){
@@ -542,7 +564,7 @@
     document.querySelector('[data-screen="'+index+'"]').classList.add('active');
     current=index;
     if(index===11) document.getElementById('eventCityReadonly').value=document.getElementById('city').value.trim();
-    if(index===12) renderProposal();
+    if(index===13) renderProposal();
     window.scrollTo({top:0,behavior:'smooth'});
   }
 
@@ -623,13 +645,25 @@
     go(11);
   }
   function continueToProposal(){
-    const address=document.getElementById('eventAddress').value.trim();
-    const cep=document.getElementById('eventCep').value.replace(/\D/g,'');
-    const status=document.getElementById('addressStatus');
-    if(!address||cep.length!==8){status.textContent='Informe o endereço completo e um CEP com 8 dígitos.';return}
-    document.getElementById('eventCep').value=cep;
+    if(current===11){
+      const address=document.getElementById('eventAddress').value.trim();
+      const cep=document.getElementById('eventCep').value.replace(/\D/g,'');
+      const status=document.getElementById('addressStatus');
+      if(!address||cep.length!==8){status.textContent='Informe o endereço completo e um CEP com 8 dígitos.';return}
+      document.getElementById('eventCep').value=cep;
+      status.textContent='';
+      go(12);
+      return;
+    }
+    const username=document.getElementById('siteUsername').value.trim();
+    const password=document.getElementById('sitePassword').value;
+    const confirmation=document.getElementById('sitePasswordConfirm').value;
+    const status=document.getElementById('accountStatus');
+    if(!/^[\p{L}\p{M}\p{N} ._-]{3,24}$/u.test(username)){status.textContent='Escolha um login de 3 a 24 caracteres: letras, números, espaço, ponto, traço ou underline.';return}
+    if(password.length<6){status.textContent='A senha precisa ter pelo menos 6 caracteres.';return}
+    if(password!==confirmation){status.textContent='As senhas não conferem.';return}
     status.textContent='';
-    go(12);
+    go(13);
   }
   async function calculateTravel(){
     const city=document.getElementById('city').value.trim();
@@ -674,7 +708,7 @@
     updateInstallmentDisplay();
     document.getElementById('proposalTransportPrice').textContent=formatMoney(transportCents);
   }
-  function reserveEvent(){
+  async function reserveEvent(){
     if(!travelQuote)return;
     const dateValue=document.getElementById('eventDate').value;
     const [year,month,day]=dateValue.split('-');
@@ -686,6 +720,9 @@
     const storyToTerm={'Samuel':'História de Samuel','Fábrica de Heróis':'Fábrica de heróis','História de Davi':'Davi e Golias'};
     const city=document.getElementById('city').value.trim();
     const event=eventTypes.find((item)=>item.id===selectedEventTypeId)||eventTypes[0];
+    const transportCents=Math.max(0,Number(travelQuote.transportCents)||0);
+    const interestRate=selectedInstallments===1?0:0.02+((selectedInstallments-2)/10)*0.22;
+    const financedTotalCents=Math.round((event.priceCents+transportCents)*(1+interestRate));
     const prefill={
       igreja:document.getElementById('churchName').value.trim(),
       contratante:document.getElementById('contractorName').value.trim(),
@@ -698,11 +735,28 @@
       horario:`${hour12}h${minute}${period}`,pais:'Brasil',
       endereco:document.getElementById('eventAddress').value.trim(),cidade,cep:document.getElementById('eventCep').value.replace(/\D/g,''),
       presentationKey:eventToPresentation[event.id]||'teatro-fantoches',eventCount:'1',couponCode:'',
-      transportAmountCents:String(Math.max(0,Number(travelQuote.transportCents)||0)),transportTripType:'ROUND_TRIP',transportCityA:'Jacareí-SP',transportCityB:travelQuote.destinationLabel||city,
+      proposalInstallments:String(selectedInstallments),
+      proposalFinancedTotalCents:String(financedTotalCents),
+      proposalInstallmentCents:String(Math.round(financedTotalCents/selectedInstallments)),
+      transportAmountCents:String(transportCents),transportTripType:'ROUND_TRIP',transportCityA:'Jacareí-SP',transportCityB:travelQuote.destinationLabel||city,
       freeTransport:false,freeLodging:false
     };
-    try{sessionStorage.setItem('eventProposalTermPrefill',JSON.stringify(prefill));window.location.href='/termo'}
-    catch(error){window.location.href='/termo'}
+    const button=document.querySelector('.gold-btn');
+    const status=document.getElementById('reserveStatus');
+    button.disabled=true;
+    button.textContent='CRIANDO SEU PAINEL...';
+    status.textContent='';
+    try{
+      const response=await fetch('/api/contractor-panel/proposal-draft',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:prefill.contratante,username:document.getElementById('siteUsername').value.trim(),password:document.getElementById('sitePassword').value,answers:prefill})});
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok||!payload.token)throw new Error(payload.error||'Não foi possível criar seu acesso agora.');
+      localStorage.setItem('turma_do_printy_token',payload.token);
+      window.location.href='/painel-do-contratante';
+    }catch(error){
+      status.textContent=error.message||'Não foi possível criar seu acesso agora. Tente novamente.';
+      button.disabled=false;
+      button.textContent='▣  QUERO RESERVAR UMA DATA';
+    }
   }
 
   const capacities=[100,300,500,'1000+']; let capIndex=1;

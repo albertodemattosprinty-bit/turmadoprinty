@@ -11411,6 +11411,48 @@ async function handleCreateTerm(request, response) {
   }
 }
 
+async function handleCreateContractorPanelProposalDraft(request, response) {
+  if (!hasDatabase()) {
+    sendJson(response, 503, { error: "DATABASE_URL nao configurada." });
+    return;
+  }
+
+  let body;
+  try { body = await readJsonBody(request); }
+  catch (error) { sendJson(response, 400, { error: error.message }); return; }
+
+  const name = String(body?.name || body?.answers?.contratante || "").trim();
+  const username = String(body?.username || "").trim();
+  const password = String(body?.password || "");
+  if (name.length < 2) { sendJson(response, 400, { error: "Informe o nome do contratante." }); return; }
+  if (!isValidUsername(username)) { sendJson(response, 400, { error: "Use um login com 3 a 24 caracteres." }); return; }
+  if (password.length < 6) { sendJson(response, 400, { error: "A senha precisa ter pelo menos 6 caracteres." }); return; }
+
+  let user = null;
+  let term = null;
+  try {
+    if (await findUserByUsername(username)) {
+      sendJson(response, 409, { error: "Esse login já está em uso. Escolha outro." });
+      return;
+    }
+    user = await createUser({ name, username, password });
+    term = await createAllTermEntry(body?.answers || {}, user.id, [], "", { isDraft: true });
+    const session = await createSession(user.id);
+    sendJson(response, 201, {
+      ok: true,
+      token: session.token,
+      expiresAt: session.expiresAt.toISOString(),
+      user: sanitizeUser(user),
+      termId: term.id,
+      isDraft: true
+    });
+  } catch (error) {
+    if (term?.id) await deleteTermById(term.id).catch(() => {});
+    if (user?.id) await deleteUserById(user.id).catch(() => {});
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel criar o painel agora." });
+  }
+}
+
 async function handleClaimTermAccount(request, response, termId) {
   if (!hasDatabase()) { sendJson(response, 503, { error: "DATABASE_URL nao configurada." }); return; }
   let body;
@@ -11489,6 +11531,7 @@ async function handleGetContractorPanel(request, response) {
           ? {
               id: term.id,
               answers: term.answers || {},
+              isDraft: Boolean(term.isDraft),
               acceptedTerms: term.acceptedTerms || [],
               eventDate: term.eventDate,
               eventTime: term.eventTime,
@@ -16210,6 +16253,11 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/terms") {
     await handleCreateTerm(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/contractor-panel/proposal-draft") {
+    await handleCreateContractorPanelProposalDraft(request, response);
     return;
   }
 

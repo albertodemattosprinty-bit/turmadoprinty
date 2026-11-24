@@ -191,6 +191,16 @@ async function ensureRows(term) {
 
 export async function getEventContractWorkflow(term) {
   if (!term?.id || !term?.userId) return null;
+  if (term.isDraft) {
+    return {
+      pixKey: "36.442.785/0001-00",
+      pixLabel: "CNPJ",
+      payments: [],
+      lodging: null,
+      promoVideo: null,
+      expenseNotes: []
+    };
+  }
   await ensureRows(term);
   const [paymentResult, lodgingResult, assetResult, expenseNoteResult] = await Promise.all([
     query(`select * from event_contract_payments where term_id = $1 order by payment_order`, [term.id]),
