@@ -83,6 +83,16 @@
   .route-distance{font-size:clamp(30px,4vw,46px);font-weight:1000;color:var(--blue);margin:14px 0 4px}
   .route-formula{font-size:13px;color:var(--muted);line-height:1.5}
   .route-total{font-size:22px;color:var(--navy);font-weight:900;margin-top:14px}
+  .travel-summary{margin:22px auto 0;text-align:left;border-top:1px solid #dce8f4;padding-top:20px}
+  .travel-summary h2{margin:0 0 12px;font-size:18px;color:var(--navy)}
+  .travel-stats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+  .travel-stat{padding:7px 10px;border-radius:10px;background:#eaf4ff;color:#27466f;font-size:12px;font-weight:800}
+  .travel-timeline{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+  .travel-timeline li{display:grid;grid-template-columns:26px 72px minmax(0,1fr);gap:8px;align-items:center;color:#34435a;font-size:13px}
+  .travel-timeline svg{width:22px;height:22px;color:#187bd2}
+  .travel-timeline time{font-weight:900;color:var(--navy)}
+  .meal-summary{margin-top:16px;padding:12px;border-radius:14px;background:#fff;color:#34435a;font-size:13px;line-height:1.55}
+  .meal-summary strong{color:var(--navy)}
   .route-status{width:min(100%,760px);margin:14px auto 0;text-align:center;color:#a33;font-weight:700}
   .route-status:empty{display:none}
   .dark .route-status{color:#ffd0c9}
@@ -449,6 +459,12 @@
           <div class="route-distance" id="routeDistance"></div>
           <div class="route-formula" id="routeFormula"></div>
           <div class="route-total" id="routeTotal"></div>
+          <div class="travel-summary" id="travelSummary" hidden>
+            <h2>Resumo da viagem</h2>
+            <div class="travel-stats" id="travelStats"></div>
+            <ul class="travel-timeline" id="travelTimeline"></ul>
+            <div class="meal-summary" id="mealSummary"></div>
+          </div>
         </div>
         <button class="primary" onclick="go(9)">CONTINUAR &nbsp;›</button>
         <button class="back-button" onclick="go(7)">VOLTAR AO TIPO DE EVENTO</button>
@@ -572,7 +588,7 @@
           </div>
           <div class="inc"><div class="icon"><img src="/midia/icons/hospedagem.svg" alt="" aria-hidden="true"></div><div><b>Hospedagem</b><p>Incluída para toda a equipe.</p></div></div>
           <div class="inc transport-inc"><div class="icon"><img src="/midia/icons/transporte.svg" alt="" aria-hidden="true"></div><div><b>Transporte</b><p><strong class="transport-amount" id="proposalTransportPrice">—</strong></p></div></div>
-          <div class="inc"><div class="icon"><img src="/midia/icons/alimentacao.svg" alt="" aria-hidden="true"></div><div><b>Alimentação</b><p>Todas as refeições durante o evento.</p></div></div>
+          <div class="inc"><div class="icon"><img src="/midia/icons/alimentacao.svg" alt="" aria-hidden="true"></div><div><b>Refeições previstas</b><p id="proposalMeals">Veja os horários e locais no resumo do percurso.</p></div></div>
           <button class="gold-btn" onclick="reserveEvent()">▣ &nbsp; QUERO RESERVAR UMA DATA</button>
           <div class="route-status" id="reserveStatus" role="status" aria-live="polite"></div>
           <div class="secondary-row"><button class="secondary">Falar com a equipe</button><button class="secondary">Ver datas disponíveis</button></div>
@@ -791,8 +807,121 @@
     const displayKm=(value)=>new Intl.NumberFormat('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}).format(value);
     document.getElementById('routePath').textContent=`Jacareí-SP → ${travelQuote.destinationLabel||document.getElementById('city').value.trim()}`;
     document.getElementById('routeDistance').textContent=`${displayKm(roundTrip)} km · ida e volta`;
-    document.getElementById('routeFormula').textContent=`${displayKm(roundTrip)} km × R$ 1,15/km`;
+    const plan=buildTravelPlan(oneWay);
+    document.getElementById('routeFormula').textContent=`${displayKm(roundTrip)} km × R$ 1,15/km · ${formatDuration(plan.oneWayMinutes)} por trecho a 75 km/h`;
     document.getElementById('routeTotal').textContent=`Transporte: ${money}`;
+    renderTravelSummary(plan);
+  }
+  const mealTimes=[{time:'08:00',name:'Café'},{time:'12:30',name:'Almoço'},{time:'16:00',name:'Café'},{time:'21:30',name:'Janta'}];
+  function eventStartDate(){
+    const [year,month,day]=document.getElementById('eventDate').value.split('-').map(Number);
+    const [hour,minute]=document.getElementById('eventTime').value.split(':').map(Number);
+    return new Date(year,month-1,day,hour,minute,0,0);
+  }
+  function addMinutes(date,minutes){return new Date(date.getTime()+minutes*60000)}
+  function formatDateTime(date){return new Intl.DateTimeFormat('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).format(date).replace(',',' ·')}
+  function formatDuration(minutes){const h=Math.floor(minutes/60),m=minutes%60;return h?`${h}h${m?String(m).padStart(2,'0'):''}`:`${m} min`}
+  function clockDate(day,time){const [hour,minute]=time.split(':').map(Number);return new Date(day.getFullYear(),day.getMonth(),day.getDate(),hour,minute)}
+  function iconForTravel(kind,mealName=''){
+    const icons={
+      depart:'<path d="M4 12h14M13 6l6 6-6 6"/><path d="M5 5v14"/>',
+      arrive:'<path d="M20 12H6m5-6-6 6 6 6"/><path d="M19 5v14"/>',
+      church:'<path d="M12 3v18M5 9l7-5 7 5M6 10h12v11H6z"/><path d="M10 21v-6h4v6"/>',
+      meal:'<path d="M5 9h12v6a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5zM17 11h2a2 2 0 1 1 0 4h-2M7 5c0-1 1-1 1-2m4 2c0-1 1-1 1-2"/>',
+      lunch:'<path d="M4 3v8m4-8v8M6 3v18M17 3v18m0-18c-3 3-3 8 0 10"/>',
+      dinner:'<path d="M5 11a7 7 0 0 0 14 0H5zM7 15v4h10v-4M12 4v3m-4-2 1 2m7-2-1 2"/>',
+      hotel:'<path d="M3 20V5m0 11h18v4M3 12h6a4 4 0 0 1 4 4m0 0V9h4a4 4 0 0 1 4 4v3"/>'
+    };
+    const icon=kind==='meal'?(mealName==='Almoço'?'lunch':mealName==='Janta'?'dinner':'meal'):kind;
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[icon]||icons.meal}</svg>`;
+  }
+  function buildTravelPlan(oneWayKm){
+    const event=eventTypes.find((item)=>item.id===selectedEventTypeId)||eventTypes[0];
+    const oneWayMinutes=Math.max(0,Math.ceil(oneWayKm/75*60));
+    const start=eventStartDate();
+    const venueArrival=addMinutes(start,-120);
+    const eventEnd=addMinutes(start,eventDurationMinutes(event.duration));
+    const venueDeparture=addMinutes(eventEnd,120);
+    const sameDayDeparture=addMinutes(venueArrival,-oneWayMinutes);
+    const sameDayHome=addMinutes(venueDeparture,oneWayMinutes);
+    const minDeparture=new Date(start.getFullYear(),start.getMonth(),start.getDate(),4,0);
+    const nextDay=new Date(start.getFullYear(),start.getMonth(),start.getDate()+1);
+    const sameDay=!Number.isNaN(start.getTime())&&sameDayDeparture>=minDeparture&&sameDayHome<nextDay;
+    const items=[],segments=[];
+    let lodging=!sameDay, outboundArrival, outboundDeparture, returnDeparture, homeArrival;
+    if(sameDay){
+      outboundDeparture=sameDayDeparture;outboundArrival=venueArrival;returnDeparture=venueDeparture;homeArrival=sameDayHome;
+      segments.push({start:outboundDeparture,end:outboundArrival,kind:'road',label:'Estrada — ida'});
+      segments.push({start:venueArrival,end:venueDeparture,kind:'church',label:'Permanência na igreja / evento'});
+      segments.push({start:returnDeparture,end:homeArrival,kind:'road',label:'Estrada — volta'});
+    }else{
+      const previousDay=new Date(start.getFullYear(),start.getMonth(),start.getDate()-1);
+      if(oneWayMinutes>720){
+        let remaining=oneWayMinutes;
+        outboundDeparture=new Date(start.getFullYear(),start.getMonth(),start.getDate()-Math.ceil(oneWayMinutes/720),6,0);
+        let cursor=outboundDeparture;
+        while(remaining>0){
+          const drive=Math.min(720,remaining),end=addMinutes(cursor,drive);
+          segments.push({start:cursor,end,kind:'road',label:'Estrada — ida'});
+          if(remaining>drive){const next=new Date(end.getFullYear(),end.getMonth(),end.getDate()+1,6,0);segments.push({start:end,end:next,kind:'city',label:'Parada para descanso na estrada'});items.push({at:end,kind:'hotel',text:'Pernoite durante o trajeto'});items.push({at:next,kind:'depart',text:'Retomada da viagem às 06:00'});cursor=next}
+          else outboundArrival=end;
+          remaining-=drive;
+        }
+      }else{
+        const targetArrival=clockDate(previousDay,`${String(venueArrival.getHours()).padStart(2,'0')}:${String(venueArrival.getMinutes()).padStart(2,'0')}`);
+        outboundDeparture=addMinutes(targetArrival,-oneWayMinutes);
+        const minOutbound=new Date(previousDay.getFullYear(),previousDay.getMonth(),previousDay.getDate(),4,0);
+        if(outboundDeparture<minOutbound)outboundDeparture=minOutbound;
+        outboundArrival=addMinutes(outboundDeparture,oneWayMinutes);
+        segments.push({start:outboundDeparture,end:outboundArrival,kind:'road',label:'Estrada — ida'});
+      }
+      returnDeparture=new Date(start.getFullYear(),start.getMonth(),start.getDate()+1,6,0);
+      if(oneWayMinutes>720){
+        let remaining=oneWayMinutes,cursor=returnDeparture;
+        while(remaining>0){
+          const drive=Math.min(720,remaining),end=addMinutes(cursor,drive);
+          segments.push({start:cursor,end,kind:'road',label:'Estrada — volta'});
+          if(remaining>drive){const next=new Date(end.getFullYear(),end.getMonth(),end.getDate()+1,6,0);segments.push({start:end,end:next,kind:'city',label:'Parada para descanso na estrada'});items.push({at:end,kind:'hotel',text:'Pernoite durante o retorno'});items.push({at:next,kind:'depart',text:'Retomada do retorno às 06:00'});cursor=next}
+          else homeArrival=end;
+          remaining-=drive;
+        }
+      }else{homeArrival=addMinutes(returnDeparture,oneWayMinutes);segments.push({start:returnDeparture,end:homeArrival,kind:'road',label:'Estrada — volta'})}
+      segments.push({start:outboundArrival,end:venueArrival,kind:'city',label:'Hospedagem na cidade'});
+      segments.push({start:venueArrival,end:venueDeparture,kind:'church',label:'Permanência na igreja / evento'});
+      segments.push({start:venueDeparture,end:returnDeparture,kind:'city',label:'Hospedagem na cidade'});
+    }
+    items.push({at:outboundDeparture,kind:'depart',text:'Saída de Jacareí'});
+    items.push({at:outboundArrival,kind:'arrive',text:lodging?'Chegada à cidade do evento':'Chegada ao local do evento'});
+    if(lodging)items.push({at:outboundArrival,kind:'hotel',text:'Hospedagem na cidade até o evento'});
+    items.push({at:venueArrival,kind:'church',text:'Chegada à igreja / local (2h antes)'});
+    items.push({at:start,kind:'church',text:`Início do evento · ${event.name}`});
+    items.push({at:venueDeparture,kind:'depart',text:'Saída após desmontagem (2h)'});
+    if(lodging)items.push({at:returnDeparture,kind:'depart',text:'Saída da cidade às 06:00'});
+    items.push({at:homeArrival,kind:'arrive',text:'Chegada a Jacareí'});
+    const meals=[];
+    for(const segment of segments){
+      for(let day=new Date(segment.start.getFullYear(),segment.start.getMonth(),segment.start.getDate());day<=segment.end;day.setDate(day.getDate()+1)){
+        for(const meal of mealTimes){const at=clockDate(day,meal.time);if(at>=segment.start&&at<segment.end)meals.push({...meal,at,category:segment.kind==='road'?'Estrada':segment.kind==='church'?'Igreja':'Cidade'})}
+      }
+    }
+    meals.sort((a,b)=>a.at-b.at);
+    for(const meal of meals)items.push({at:meal.at,kind:'meal',mealName:meal.name,text:`${meal.name} · ${meal.category}`,meal:true});
+    items.sort((a,b)=>a.at-b.at);
+    return {items,meals,lodging,oneWayMinutes,days:Math.max(1,Math.ceil(oneWayMinutes/720))};
+  }
+  function eventDurationMinutes(duration){const text=String(duration).trim().toLowerCase();const compact=text.match(/^(\d+)h(\d{1,2})$/);if(compact)return Number(compact[1])*60+Number(compact[2]);const match=text.match(/(?:(\d+)h)?\s*(?:(\d+)\s*min)?/i);return (Number(match?.[1])||0)*60+(Number(match?.[2])||0)}
+  function renderTravelSummary(plan){
+    const summary=document.getElementById('travelSummary');summary.hidden=false;
+    const team=(eventTypes.find((item)=>item.id===selectedEventTypeId)||eventTypes[0]).team;
+    document.getElementById('travelStats').innerHTML=[
+      `Estrada: ${formatDuration(plan.oneWayMinutes)} por trecho`,
+      plan.lodging?'Hospedagem necessária':'Viagem de ida e volta no mesmo dia',
+      `Equipe: ${team} integrantes`
+    ].map((text)=>`<span class="travel-stat">${text}</span>`).join('');
+    document.getElementById('travelTimeline').innerHTML=plan.items.map((item)=>`<li>${iconForTravel(item.kind,item.mealName)}<time>${formatDateTime(item.at)}</time><span>${item.text}</span></li>`).join('');
+    const counts={Estrada:0,Cidade:0,Igreja:0};for(const meal of plan.meals)counts[meal.category]+=1;
+    const total=plan.meals.length*team;
+    document.getElementById('mealSummary').innerHTML=`<strong>Refeições previstas</strong><br>${plan.meals.length?plan.meals.map((meal)=>`${formatDateTime(meal.at)} · ${meal.name} (${meal.category})`).join('<br>'):'Nenhuma refeição coincide com os horários previstos durante o trajeto ou a permanência do evento.'}<br><strong>Equipe: ${total} refeições</strong> (${counts.Estrada*team} estrada, ${counts.Cidade*team} cidade, ${counts.Igreja*team} igreja).`;
   }
   function renderProposal(){
     if(!travelQuote)return;
@@ -807,6 +936,11 @@
     document.getElementById('installmentSlider').value=String(selectedInstallments);
     updateInstallmentDisplay();
     document.getElementById('proposalTransportPrice').textContent=formatMoney(transportCents);
+    const plan=buildTravelPlan(Number(travelQuote.oneWayKm)||0);
+    const mealCount=plan.meals.length*event.team;
+    document.getElementById('proposalMeals').textContent=mealCount
+      ? `${mealCount} refeições previstas para ${event.team} integrantes; horários e locais no resumo do percurso.`
+      : `Nenhuma refeição prevista para ${event.team} integrantes nos horários definidos.`;
   }
   let reserveEventInFlight=false;
   function showReserveFeedback({kind='error',title='Não foi possível abrir o painel',message='Tente novamente em instantes.',code='',primaryLabel='Tentar novamente',primaryAction='retry'}={}){
@@ -907,6 +1041,13 @@
       const selectedInstallmentCount=Math.max(1,Math.min(12,Number(document.getElementById('installmentSlider').value)||12));
       if(!event.id||!event.name||!Number.isFinite(event.priceCents))throw makeReserveError('Não consegui identificar o tipo de evento selecionado. Volte e escolha uma opção.','EVENT_TYPE_DATA_INVALID','stage=event-type');
       const transportCents=Math.max(0,Number(travelQuote.transportCents)||0);
+      const travelPlan=buildTravelPlan(Number(travelQuote.oneWayKm)||0);
+      const travelSummary=[
+        `Tempo de estrada estimado: ${formatDuration(travelPlan.oneWayMinutes)} por trecho, média de 75 km/h.`,
+        travelPlan.lodging?'Hospedagem necessária na cidade do evento.':'Ida e volta no mesmo dia, sem hospedagem.',
+        ...travelPlan.items.map((item)=>`${formatDateTime(item.at)} — ${item.text}`),
+        `Refeições para ${event.team} integrantes: ${travelPlan.meals.length*event.team} no total (${travelPlan.meals.filter((meal)=>meal.category==='Estrada').length*event.team} estrada, ${travelPlan.meals.filter((meal)=>meal.category==='Cidade').length*event.team} cidade, ${travelPlan.meals.filter((meal)=>meal.category==='Igreja').length*event.team} igreja).`
+      ].join('\n');
       const interestRate=selectedInstallmentCount===1?0:0.02+((selectedInstallmentCount-2)/10)*0.22;
       const financedTotalCents=Math.round((event.priceCents+transportCents)*(1+interestRate));
       const prefill={
@@ -924,7 +1065,7 @@
         proposalInstallments:String(selectedInstallmentCount),
         proposalFinancedTotalCents:String(financedTotalCents),
         proposalInstallmentCents:String(Math.round(financedTotalCents/selectedInstallmentCount)),
-        transportAmountCents:String(transportCents),transportTripType:'ROUND_TRIP',transportCityA:'Jacareí-SP',transportCityB:travelQuote.destinationLabel||eventCityName,
+        transportAmountCents:String(transportCents),transportTripType:'ROUND_TRIP',transportCityA:'Jacareí-SP',transportCityB:travelQuote.destinationLabel||eventCityName,transportDescription:travelSummary,
         freeTransport:false,freeLodging:false
       };
 
