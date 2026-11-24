@@ -67,7 +67,8 @@
   .event-type-card:hover{transform:translateY(-2px)}
   .event-type-card:disabled{opacity:.6;cursor:wait;transform:none}
   .event-type-card.selected{border-color:var(--blue);box-shadow:0 0 0 3px rgba(22,140,242,.14),0 12px 28px rgba(27,53,94,.12)}
-  .event-art{height:150px;display:grid;place-items:center;overflow:hidden}
+  .event-art{width:100%;height:auto;aspect-ratio:1 / 1;display:grid;place-items:center;overflow:hidden}
+  .event-art.event-art-photo{background-position:center;background-repeat:no-repeat;background-size:cover}
   .event-art svg{width:100%;height:100%;display:block}
   .event-team{display:flex;align-items:center;gap:7px;padding:9px 14px 0;color:#69748b;font-size:11px;font-weight:700}
   .event-team svg{width:27px;height:18px;flex:none;color:#52688c}
@@ -206,7 +207,7 @@
     .arrow.left{left:4px}.arrow.right{right:4px}
     .feature-list{grid-template-columns:1fr;gap:12px}
     .event-type-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-    .event-art{height:112px}
+    .event-art{height:auto;aspect-ratio:1 / 1}
     .event-type-card{border-radius:17px}
     .event-type-card strong{font-size:14px;padding-left:10px;padding-right:10px}
     .event-team{padding:8px 10px 0;font-size:10px}
@@ -511,11 +512,11 @@
   function changeVenue(delta){venueIndex=(venueIndex+delta+venues.length)%venues.length;renderVenue()}
 
   const eventTypes=[
-    {id:'puppets',name:'Teatrinho e Fantoches',duration:'50 min',team:2,priceCents:180000,art:'<svg viewBox="0 0 320 180" aria-hidden="true"><defs><linearGradient id="puppetBg" x2="0" y2="1"><stop stop-color="#fbe7ff"/><stop offset="1" stop-color="#ffd9b5"/></linearGradient></defs><rect width="320" height="180" fill="url(#puppetBg)"/><path d="M0 0h70v180H0zm250 0h70v180h-70z" fill="#e85c82"/><path d="M0 0h320v24H0z" fill="#c63e6d"/><path d="M62 146h196v34H62z" fill="#77438e"/><path d="M103 146v-44q0-25 23-25t23 25v44m44 0v-44q0-25 23-25t23 25v44" fill="#f4b52f" stroke="#643a70" stroke-width="5"/><circle cx="126" cy="97" r="5" fill="#26304d"/><circle cx="230" cy="97" r="5" fill="#26304d"/><path d="M120 110q7 8 14 0m89 0q7 8 14 0" fill="none" stroke="#26304d" stroke-width="3"/></svg>'},
-    {id:'theater-music',name:'Teatro e músicas',duration:'1h15',team:3,priceCents:260000,art:'<svg viewBox="0 0 320 180" aria-hidden="true"><defs><linearGradient id="musicBg" x2="0" y2="1"><stop stop-color="#b8e5ff"/><stop offset="1" stop-color="#d8c2ff"/></linearGradient></defs><rect width="320" height="180" fill="url(#musicBg)"/><path d="M0 0h55v180H0zm265 0h55v180h-55z" fill="#5660c9"/><path d="M0 18q36 30 0 67m320-67q-36 30 0 67" fill="none" stroke="#ff78a5" stroke-width="18"/><path d="M45 145h230v35H45z" fill="#414b96"/><path d="M129 47v66m0-66 39-9v62" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round"/><ellipse cx="117" cy="117" rx="14" ry="9" fill="#ffbf45"/><ellipse cx="156" cy="108" rx="14" ry="9" fill="#ffbf45"/><path d="M212 66q30-27 40 7-27-2-40-7zm-10 24q28-17 33 13-25-7-33-13z" fill="#ff6687"/></svg>'},
-    {id:'children-congress',name:'Congresso Infantil',duration:'1h15',team:4,priceCents:340000,art:'<svg viewBox="0 0 320 180" aria-hidden="true"><defs><linearGradient id="congressBg" x2="0" y2="1"><stop stop-color="#c8f3ff"/><stop offset="1" stop-color="#fff1b5"/></linearGradient></defs><rect width="320" height="180" fill="url(#congressBg)"/><circle cx="160" cy="48" r="26" fill="#ffcf53"/><path d="M78 145h164v35H78z" fill="#4385db"/><rect x="137" y="102" width="46" height="43" rx="7" fill="#fff" stroke="#4385db" stroke-width="4"/><circle cx="83" cy="82" r="16" fill="#ef8e63"/><circle cx="124" cy="68" r="16" fill="#c476d7"/><circle cx="196" cy="68" r="16" fill="#56b9a3"/><circle cx="237" cy="82" r="16" fill="#f0739b"/><path d="M60 131q2-31 23-31t23 31m-2-17q2-31 23-31t23 31m21 0q2-31 23-31t23 31m-2 17q2-31 23-31t23 31" fill="#fff" stroke="#334d83" stroke-width="4"/><path d="M151 120h18" stroke="#ffad36" stroke-width="4" stroke-linecap="round"/><path d="m42 37 7 13 14 2-10 10 3 14-14-7-13 7 3-14-10-10 14-2zm236 10 6 10 12 2-9 8 2 12-11-6-11 6 2-12-9-8 12-2z" fill="#fff"/></svg>'},
+    {id:'puppets',name:'Teatrinho e Fantoches',duration:'50 min',team:2,priceCents:180000},
+    {id:'theater-music',name:'Teatro e músicas',duration:'1h15',team:3,priceCents:260000},
+    {id:'children-congress',name:'Congresso Infantil',duration:'1h15',team:4,priceCents:340000},
     {id:'complete-show',name:'Show Completo',duration:'1h30',team:4,priceCents:450000,art:'<svg viewBox="0 0 320 180" aria-hidden="true"><defs><linearGradient id="showBg" x2="0" y2="1"><stop stop-color="#333d91"/><stop offset="1" stop-color="#bf57b6"/></linearGradient></defs><rect width="320" height="180" fill="url(#showBg)"/><path d="m65 0 76 0-48 106zm190 0-76 0 48 106z" fill="#fff3a5" opacity=".55"/><path d="M0 145h320v35H0z" fill="#242b65"/><rect x="22" y="72" width="40" height="72" rx="5" fill="#151a3f"/><rect x="258" y="72" width="40" height="72" rx="5" fill="#151a3f"/><circle cx="42" cy="111" r="13" fill="#7076bc"/><circle cx="278" cy="111" r="13" fill="#7076bc"/><path d="M135 44v67m0-67 40-10v61" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round"/><ellipse cx="123" cy="114" rx="14" ry="9" fill="#ffd45a"/><ellipse cx="163" cy="105" rx="14" ry="9" fill="#ffd45a"/><path d="m206 40 8 16 18 3-13 13 3 18-16-9-16 9 3-18-13-13 18-3z" fill="#ffdf73"/></svg>'},
-    {id:'full-congress',name:'Congresso Completo',duration:'3h',team:5,priceCents:600000,art:'<svg viewBox="0 0 320 180" aria-hidden="true"><defs><linearGradient id="fullBg" x2="0" y2="1"><stop stop-color="#a6e7ff"/><stop offset="1" stop-color="#ffc7e2"/></linearGradient></defs><rect width="320" height="180" fill="url(#fullBg)"/><path d="M0 26h320v18H0z" fill="#ff78a5"/><path d="M0 26 32 68 64 26 96 68 128 26 160 68 192 26 224 68 256 26 288 68 320 26" fill="#ffdb58"/><path d="M35 147h250v33H35z" fill="#5646a0"/><rect x="137" y="111" width="46" height="36" rx="5" fill="#fff"/><circle cx="78" cy="88" r="13" fill="#f39a70"/><circle cx="119" cy="77" r="13" fill="#f6c64d"/><circle cx="160" cy="72" r="13" fill="#70bfae"/><circle cx="201" cy="77" r="13" fill="#d580c9"/><circle cx="242" cy="88" r="13" fill="#f07f89"/><path d="M61 129q1-24 17-24t17 24m8-12q1-24 16-24t17 24m8-5q1-24 16-24t16 24m8 5q1-24 17-24t17 24m8 12q1-24 17-24t17 24" fill="#fff" stroke="#514a8e" stroke-width="4"/><path d="m26 76 6 11 13 2-9 9 2 13-12-6-11 6 2-13-9-9 13-2zm268 0 6 11 13 2-9 9 2 13-12-6-11 6 2-13-9-9 13-2z" fill="#fff"/></svg>'}
+    {id:'full-congress',name:'Congresso Completo',duration:'3h',team:5,priceCents:600000}
   ];
   let selectedEventTypeId='puppets';
   let travelQuote=null;
@@ -532,8 +533,18 @@
     document.getElementById('installmentValue').textContent=`${selectedInstallments}x de ${formatMoney(Math.round(financedTotalCents/selectedInstallments))}`;
     document.getElementById('totalPrice').textContent=formatMoney(financedTotalCents);
   }
+  const eventTypeImages={
+    puppets:'/midia/tipos-evento/teatrinho-fantoches.webp',
+    'theater-music':'/midia/tipos-evento/teatro-musicas.webp',
+    'children-congress':'/midia/tipos-evento/congresso-infantil.webp',
+    'full-congress':'/midia/tipos-evento/congresso-completo.webp'
+  };
   function renderEventTypes(){
-    document.getElementById('eventTypeGrid').innerHTML=eventTypes.map((event)=>`<button class="event-type-card ${event.id===selectedEventTypeId?'selected':''}" type="button" data-event-type="${event.id}" aria-pressed="${event.id===selectedEventTypeId}" onclick="selectEventType('${event.id}')"><div class="event-art">${event.art}</div><div class="event-team">${teamIcon}<span>${event.team} integrantes</span></div><strong>${event.name}</strong><div class="event-type-meta"><span>${event.duration}</span><b>${formatMoney(event.priceCents)}</b></div></button>`).join('');
+    document.getElementById('eventTypeGrid').innerHTML=eventTypes.map((event)=>{
+      const image=eventTypeImages[event.id];
+      const art=image?`<div class="event-art event-art-photo" style="background-image:url('${image}')"></div>`:`<div class="event-art">${event.art}</div>`;
+      return `<button class="event-type-card ${event.id===selectedEventTypeId?'selected':''}" type="button" data-event-type="${event.id}" aria-pressed="${event.id===selectedEventTypeId}" onclick="selectEventType('${event.id}')">${art}<div class="event-team">${teamIcon}<span>${event.team} integrantes</span></div><strong>${event.name}</strong><div class="event-type-meta"><span>${event.duration}</span><b>${formatMoney(event.priceCents)}</b></div></button>`;
+    }).join('');
   }
   function selectEventType(id){selectedEventTypeId=id;renderEventTypes()}
   function continueToDate(){
