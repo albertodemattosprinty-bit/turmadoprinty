@@ -86,9 +86,9 @@
   .event-field-wrap label{display:block;text-align:left;margin-bottom:8px;color:var(--navy);font-size:13px;font-weight:800}
   .event-field-wrap .input{font-size:18px}
   .back-button{display:block;margin:12px auto 0;padding:8px 14px;border:0;background:transparent;color:var(--muted);font-size:12px;font-weight:800;cursor:pointer}
-  .transport-inc{grid-template-columns:64px minmax(0,1fr) auto}
+  .transport-inc{grid-template-columns:64px minmax(0,1fr)}
   .transport-inc .icon svg{width:30px;height:30px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-  .transport-inc .transport-amount{font-size:16px;font-weight:900;white-space:nowrap}
+  .transport-inc .transport-amount{font-size:16px;font-weight:900;white-space:nowrap;color:#38250e}
 
   .hero-art{display:block;width:min(100%,720px);height:clamp(220px,38vh,420px);object-fit:cover;object-position:center;border-radius:30px;margin:6px auto 24px}
   h1{margin:0;font-size:clamp(34px,4.6vw,64px);line-height:1.02;letter-spacing:-1.6px;color:var(--navy)}
@@ -177,11 +177,10 @@
   .price-card small{color:#f5f5f5;font-weight:700}
   .base-price-label,.total-price-label{color:#f0e4c4;font-size:13px;margin-top:10px}
   .base-price-label strong{display:block;color:#fff;font-size:18px;margin-top:3px}
-  .total-price-label{margin-top:18px}
+  .total-price-label{margin-top:18px;color:#fff}
   .event-schedule-summary{margin-top:14px;padding:14px;border-radius:14px;background:rgba(255,255,255,.08);color:#f5f5f5;font-size:13px;line-height:1.5}
-  .installment{color:var(--gold);font-weight:1000;font-size:24px;margin-top:8px}
-  .price{color:var(--gold);font-weight:1000;font-size:clamp(42px,6vw,66px);letter-spacing:-2px;line-height:1}
-  .cash{margin-top:7px;color:#f0f0f0;font-size:13px}
+  .installment{color:var(--gold);font-weight:1000;font-size:clamp(34px,5vw,52px);letter-spacing:-1px;line-height:1.08;margin-top:20px}
+  .price{color:#fff;font-weight:900;font-size:clamp(20px,2.5vw,28px);letter-spacing:0;line-height:1.2;margin-top:4px}
   .inc{display:grid;grid-template-columns:64px 1fr;gap:14px;align-items:center;background:linear-gradient(180deg,#fff8e8,#f5e1b0);color:#38250e;border-radius:17px;padding:10px 14px}
   .inc .icon{width:54px;height:54px;border-radius:14px;background:#ffefc4;border:1px solid #e8ca79;display:grid;place-items:center;font-size:27px}
   .inc b{display:block;font-size:17px}.inc p{margin:3px 0 0;font-size:12px;color:#5a4b38}
@@ -452,14 +451,13 @@
           <div class="price-card">
             <small id="selectedEventName">Investimento</small>
             <div class="base-price-label">Valor base <strong id="basePrice">—</strong></div>
-            <div class="total-price-label">Total com transporte</div>
-            <div class="price" id="totalPrice">—</div>
             <div class="installment" id="installmentValue">12x de —</div>
-            <div class="cash">ou <span id="cashPrice">—</span> à vista</div>
+            <div class="total-price-label">Total à vista com transporte</div>
+            <div class="price" id="totalPrice">—</div>
           </div>
           <div class="event-schedule-summary" id="eventScheduleSummary"></div>
           <div class="inc"><div class="icon">⌂</div><div><b>Hospedagem</b><p>Incluída para toda a equipe.</p></div></div>
-          <div class="inc transport-inc"><div class="icon"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 18.5 6.3 11a3 3 0 0 1 2.9-2.2h13.6a3 3 0 0 1 2.9 2.2l2.3 7.5v7h-3v-3H7v3H4z"/><path d="M7 18.5h18M9 13h14M10 21.5h.1M22 21.5h.1"/></svg></div><div><b>Transporte</b><p id="proposalRouteDetail">Ida e volta desde Jacareí-SP.</p></div><strong class="transport-amount" id="proposalTransportPrice">—</strong></div>
+          <div class="inc transport-inc"><div class="icon"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 18.5 6.3 11a3 3 0 0 1 2.9-2.2h13.6a3 3 0 0 1 2.9 2.2l2.3 7.5v7h-3v-3H7v3H4z"/><path d="M7 18.5h18M9 13h14M10 21.5h.1M22 21.5h.1"/></svg></div><div><b>Transporte</b><p><strong class="transport-amount" id="proposalTransportPrice">—</strong></p></div></div>
           <div class="inc"><div class="icon">☕</div><div><b>Alimentação</b><p>Todas as refeições durante o evento.</p></div></div>
           <button class="gold-btn">▣ &nbsp; QUERO RESERVAR UMA DATA</button>
           <div class="secondary-row"><button class="secondary">Falar com a equipe</button><button class="secondary">Ver datas disponíveis</button></div>
@@ -573,8 +571,6 @@
     document.getElementById('basePrice').textContent=formatMoney(baseCents);
     document.getElementById('totalPrice').textContent=formatMoney(totalCents);
     document.getElementById('installmentValue').textContent=`12x de ${formatMoney(Math.round(totalCents/12))}`;
-    document.getElementById('cashPrice').textContent=formatMoney(totalCents);
-    document.getElementById('proposalRouteDetail').textContent=`${new Intl.NumberFormat('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}).format(Number(travelQuote.roundTripKm)||0)} km estimados de ida e volta · R$ 1,15/km.`;
     document.getElementById('proposalTransportPrice').textContent=formatMoney(transportCents);
     const eventDate=new Date(`${document.getElementById('eventDate').value}T12:00:00`).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});
     const eventTime=document.getElementById('eventTime').value;
