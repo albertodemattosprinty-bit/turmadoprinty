@@ -14823,7 +14823,7 @@ async function handleEventProposalDistanceRequest(request, response) {
     const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
     if (!apiKey) throw new Error("A estimativa de transporte está indisponível no momento.");
 
-    const model = String(process.env.EVENT_PROPOSAL_DISTANCE_MODEL || OPENAI_MODEL || OPENAI_INSTANT_MODEL || "gpt-4.1-nano").trim();
+    const model = String(process.env.EVENT_PROPOSAL_DISTANCE_MODEL || "gpt-5.6-luna").trim();
     const aiResponse = await createChatCompletion(apiKey, {
       model,
       messages: [
@@ -14837,7 +14837,8 @@ async function handleEventProposalDistanceRequest(request, response) {
         }
       ],
       response_format: { type: "json_object" },
-      max_completion_tokens: 180
+      reasoning_effort: "low",
+      max_completion_tokens: 260
     }, { timeoutMs: 20000, timeoutMessage: "A estimativa de transporte demorou demais. Tente novamente." });
     const content = aiResponse?.choices?.[0]?.message?.content;
     let estimate;
@@ -14862,6 +14863,7 @@ async function handleEventProposalDistanceRequest(request, response) {
       rateCentsPerKm: 115,
       transportCents,
       provider: "OpenAI",
+      model,
       estimateConfidence: ["baixa", "média", "alta"].includes(estimate.confidence) ? estimate.confidence : "baixa",
       isEstimate: true
     };
