@@ -79,12 +79,24 @@
   .event-type-meta b{color:var(--navy);font-size:14px}
   .event-type-center .arrow{top:42%}
   .route-card{width:min(100%,760px);margin:34px auto 0;padding:28px;border:1px solid #dce8f4;border-radius:24px;background:#f7fbff;box-shadow:var(--shadow);text-align:center}
-  .route-path{font-size:clamp(18px,2.4vw,26px);font-weight:900;color:var(--navy)}
-  .route-distance{font-size:clamp(30px,4vw,46px);font-weight:1000;color:var(--blue);margin:14px 0 4px}
-  .route-formula{font-size:13px;color:var(--muted);line-height:1.5}
-  .route-total{font-size:22px;color:var(--navy);font-weight:900;margin-top:14px}
+  .route-cities{display:grid;gap:10px;width:min(100%,520px);margin:0 auto;text-align:left}
+  .route-city-row{display:flex;align-items:center;gap:12px;color:var(--navy);font-size:clamp(18px,2.4vw,24px);font-weight:900}
+  .route-city-row img,.route-city-row svg{width:42px;height:42px;flex:none;object-fit:contain}
+  .route-departure-icon{color:#18a957}
+  .route-city-copy{display:flex;flex-direction:column;gap:1px}
+  .route-city-copy small{color:#718096;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+  .route-city-copy strong{font-size:clamp(18px,2.4vw,24px)}
+  .route-distance{font-size:clamp(34px,4.5vw,50px);font-weight:1000;color:var(--blue);margin:16px 0 0}
+  .route-roundtrip{margin:0;color:#e88922;font-size:16px;font-weight:900}
+  .cost-breakdown{display:flex;flex-wrap:wrap;justify-content:center;gap:18px;margin:22px auto 0}
+  .cost-card{display:flex;flex:0 1 180px;min-width:145px;flex-direction:column;align-items:center;gap:8px;padding:14px 12px;border:1px solid #e1eaf4;border-radius:18px;background:#fff;color:var(--navy);text-align:center}
+  .cost-card img{display:block;width:68px;height:68px;object-fit:contain}
+  .cost-card strong{font-size:15px;font-weight:900}
+  .cost-card b{font-size:19px;font-weight:950;color:#2259a3}
+  .dark .cost-card{border-color:rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff}
+  .dark .cost-card b{color:var(--gold)}
   .travel-summary{margin:22px auto 0;text-align:left;border-top:1px solid #dce8f4;padding-top:20px}
-  .travel-summary h2{margin:0 0 12px;font-size:18px;color:var(--navy)}
+  .travel-summary h2,.meal-summary h2{margin:0 0 12px;font-size:18px;color:var(--navy);text-align:center}
   .travel-stats{display:grid;gap:10px;margin-bottom:18px}
   .travel-stat{display:flex;align-items:center;gap:13px;min-height:44px;padding:2px 0;color:#27466f;font-size:17px;font-weight:850;line-height:1.25}
   .travel-stat .travel-icon{width:40px;height:40px;flex:none}
@@ -103,6 +115,32 @@
   .meal-summary strong{color:var(--navy)}
   .meal-list{display:grid;gap:9px;margin:10px 0 0;padding:0;list-style:none}
   .meal-list li{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;align-items:center}
+  .meal-group{margin-top:18px}
+  .meal-group h3{margin:0;color:var(--navy);font-size:17px;font-weight:950}
+  .meal-group p{margin:3px 0 8px;color:#68758b;font-size:12px;font-weight:700}
+  .meal-pay-button{display:flex;align-items:center;justify-content:center;gap:10px;width:min(100%,460px);margin:18px auto 0;padding:14px 18px;border:0;border-radius:14px;background:linear-gradient(180deg,#1dbb61,#11974a);color:#fff;font:inherit;font-size:16px;font-weight:900;box-shadow:0 10px 22px rgba(14,137,65,.2);cursor:pointer}
+  .meal-pay-button img{width:26px;height:26px;object-fit:contain;filter:brightness(0) invert(1)}
+  .meal-payment-backdrop{position:fixed;inset:0;z-index:1100;display:grid;place-items:center;padding:18px;background:rgba(12,20,37,.72);backdrop-filter:blur(5px)}
+  .meal-payment-backdrop[hidden]{display:none}
+  .meal-payment-dialog{display:flex;flex-direction:column;width:min(100%,560px);max-height:min(88vh,760px);overflow:hidden;border:1px solid #e3eaf4;border-radius:24px;background:#fff;color:var(--navy);box-shadow:0 24px 80px rgba(0,0,0,.3)}
+  .meal-payment-head{padding:23px 24px 12px;text-align:center}
+  .meal-payment-head h2{margin:0;font-size:23px}
+  .meal-payment-head p{margin:7px 0 0;color:#65728a;font-size:13px}
+  .meal-payment-options{overflow:auto;padding:8px 20px 14px}
+  .meal-payment-options:empty::after{content:'Não há refeições na cidade previstas neste roteiro.';display:block;padding:18px 8px;color:#65728a;text-align:center}
+  .meal-payment-option{display:grid;grid-template-columns:24px 34px minmax(0,1fr) auto;gap:10px;align-items:center;margin:0 0 9px;padding:12px;border:1px solid #dce5f0;border-radius:14px;background:#fff;cursor:pointer}
+  .meal-payment-option:has(input:checked){border-color:#14984d;background:#f1fff6}
+  .meal-payment-option input{width:18px;height:18px;accent-color:#15994f}
+  .meal-payment-option .travel-icon{width:30px;height:30px}
+  .meal-payment-option strong{display:block;font-size:14px}
+  .meal-payment-option small{display:block;margin-top:2px;color:#69758a;font-size:11px}
+  .meal-payment-option b{color:#175b33;font-size:13px;white-space:nowrap}
+  .meal-payment-total{position:sticky;bottom:0;margin-top:auto;padding:16px 22px calc(16px + env(safe-area-inset-bottom));border-top:1px solid #dce5f0;background:#fff;box-shadow:0 -8px 22px rgba(23,50,86,.08)}
+  .meal-payment-total-row{display:flex;justify-content:space-between;gap:12px;margin:4px 0;color:#56647a;font-size:13px}
+  .meal-payment-total-row.final{margin-top:9px;color:var(--navy);font-size:17px;font-weight:950}
+  .meal-payment-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:13px}
+  .meal-payment-actions button{min-height:44px;border:0;border-radius:12px;background:#158d49;color:#fff;font:inherit;font-size:13px;font-weight:900;cursor:pointer}
+  .meal-payment-actions button.secondary{border:1px solid #d9e2ed;background:#fff;color:#30445f}
   .route-status{width:min(100%,760px);margin:14px auto 0;text-align:center;color:#a33;font-weight:700}
   .route-status:empty{display:none}
   .dark .route-status{color:#ffd0c9}
@@ -460,13 +498,13 @@
         <header class="top">
           <div class="progress" data-progress></div>
           <div class="step-label"></div>
-          <h1>Estimativa de transporte</h1>
+          <h1>Custos de viagem</h1>
         </header>
         <div class="route-card">
           <div class="route-path" id="routePath"></div>
           <div class="route-distance" id="routeDistance"></div>
-          <div class="route-formula" id="routeFormula"></div>
-          <div class="route-total" id="routeTotal"></div>
+          <div class="route-roundtrip" id="routeRoundTrip">ida e volta</div>
+          <div class="cost-breakdown" id="routeCostCards"></div>
           <div class="travel-summary" id="travelSummary" hidden>
             <h2>Resumo da viagem</h2>
             <div class="travel-stats" id="travelStats"></div>
@@ -594,9 +632,7 @@
             <input class="installment-slider" id="installmentSlider" type="range" min="1" max="12" step="1" value="12" aria-label="Número de parcelas" oninput="updateInstallmentDisplay()">
             <div class="installment-range-labels" aria-hidden="true"><span>1x</span><span>12x</span></div>
           </div>
-          <div class="inc"><div class="icon"><img src="/midia/icons/hospedagem.svg" alt="" aria-hidden="true"></div><div><b>Hospedagem</b><p>Incluída para toda a equipe.</p></div></div>
-          <div class="inc transport-inc"><div class="icon"><img src="/midia/icons/transporte.svg" alt="" aria-hidden="true"></div><div><b>Transporte</b><p><strong class="transport-amount" id="proposalTransportPrice">—</strong></p></div></div>
-          <div class="inc"><div class="icon"><img src="/midia/icons/alimentacao.svg" alt="" aria-hidden="true"></div><div><b>Refeições previstas</b><p id="proposalMeals">Veja os horários e locais no resumo do percurso.</p></div></div>
+          <div class="cost-breakdown" id="proposalCostCards"></div>
           <button class="gold-btn" onclick="reserveEvent()">▣ &nbsp; QUERO RESERVAR UMA DATA</button>
           <div class="route-status" id="reserveStatus" role="status" aria-live="polite"></div>
           <div class="secondary-row"><button class="secondary">Falar com a equipe</button><button class="secondary">Ver datas disponíveis</button></div>
@@ -605,6 +641,25 @@
     </section>
 
   </main>
+</div>
+
+<div class="meal-payment-backdrop" id="mealPaymentModal" hidden>
+  <section class="meal-payment-dialog" role="dialog" aria-modal="true" aria-labelledby="mealPaymentTitle">
+    <header class="meal-payment-head">
+      <h2 id="mealPaymentTitle">Quais refeições você quer pagar?</h2>
+      <p>As refeições na estrada já estão consideradas. Toque nas refeições na cidade que deseja incluir.</p>
+    </header>
+    <div class="meal-payment-options" id="mealPaymentOptions"></div>
+    <footer class="meal-payment-total">
+      <div class="meal-payment-total-row"><span>Refeições na estrada</span><strong id="mealMandatoryTotal">R$ 0,00</strong></div>
+      <div class="meal-payment-total-row"><span>Refeições escolhidas na cidade</span><strong id="mealSelectedTotal">R$ 0,00</strong></div>
+      <div class="meal-payment-total-row final"><span>Total das refeições</span><strong id="mealGrandTotal">R$ 0,00</strong></div>
+      <div class="meal-payment-actions">
+        <button class="secondary" type="button" onclick="closeMealPaymentModal()">Voltar</button>
+        <button type="button" onclick="confirmMealPaymentSelection()">Confirmar seleção</button>
+      </div>
+    </footer>
+  </section>
 </div>
 
 <div class="feedback-backdrop" id="reserveFeedbackModal" hidden>
@@ -669,6 +724,8 @@
   let travelQuoteCity='';
   let travelQuoteRequest=null;
   let travelQuoteRequestId=0;
+  const selectedCityMealIds=new Set();
+  const mealPricesPerPersonCents={cafe:2500,'cafe-da-tarde':2500,almoco:5000,jantar:5000};
   function isValidProposalCity(city){return String(city||'').trim().length>=2}
   function prefetchTravelQuote(){
     const city=document.getElementById('city').value.trim();
@@ -811,13 +868,11 @@
     if(!travelQuote)return;
     const oneWay=Number(travelQuote.oneWayKm)||0;
     const roundTrip=Number(travelQuote.roundTripKm)||oneWay*2;
-    const money=formatMoney(Number(travelQuote.transportCents)||0);
-    const displayKm=(value)=>new Intl.NumberFormat('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}).format(value);
-    document.getElementById('routePath').textContent=`Jacareí-SP → ${travelQuote.destinationLabel||document.getElementById('city').value.trim()}`;
-    document.getElementById('routeDistance').textContent=`${displayKm(roundTrip)} km · ida e volta`;
+    const destination=travelQuote.destinationLabel||document.getElementById('city').value.trim();
+    document.getElementById('routePath').innerHTML=`<div class="route-city-row"><svg class="route-departure-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6"/></svg><span class="route-city-copy"><small>Saída</small><strong>${escapeHtml('Jacareí-SP')}</strong></span></div><div class="route-city-row">${iconForTravel({icon:'destino'})}<span class="route-city-copy"><small>Destino</small><strong>${escapeHtml(destination)}</strong></span></div>`;
+    document.getElementById('routeDistance').textContent=`${new Intl.NumberFormat('pt-BR',{maximumFractionDigits:0}).format(Math.round(roundTrip))} km`;
     const plan=buildTravelPlan(oneWay);
-    document.getElementById('routeFormula').textContent=`${displayKm(roundTrip)} km × R$ 1,15/km · ${formatDuration(plan.oneWayMinutes)} por trecho a 75 km/h`;
-    document.getElementById('routeTotal').textContent=`Transporte: ${money}`;
+    document.getElementById('routeRoundTrip').textContent='ida e volta';
     renderTravelSummary(plan);
   }
   const mealTimes=[
@@ -840,6 +895,11 @@
     for(const item of plan.items){const key=`${item.at.getFullYear()}-${item.at.getMonth()}-${item.at.getDate()}`;if(!days.has(key))days.set(key,{date:item.at,items:[]});days.get(key).items.push(item)}
     return Array.from(days.values()).flatMap((day)=>[formatDayHeading(day.date),formatWeekday(day.date),...day.items.map((item)=>`${formatClock(item.at)} — ${item.text}`)]).join('\n');
   }
+  function formatMealSelectionDescription(plan,amounts=getMealAmounts(plan)){
+    const road=amounts.roadMeals.map((meal)=>`${formatDayHeading(meal.at)} ${formatClock(meal.at)} — ${meal.label}`).join('; ')||'nenhuma refeição prevista';
+    const city=amounts.cityMeals.filter((meal)=>selectedCityMealIds.has(mealId(meal))).map((meal)=>`${formatDayHeading(meal.at)} ${formatClock(meal.at)} — ${meal.label}`).join('; ')||'nenhuma selecionada';
+    return `Refeições na estrada (incluídas): ${road}. Refeições na cidade escolhidas para pagamento: ${city}. Valor de refeições incluído: ${formatMoney(amounts.totalCents)}.`;
+  }
   function formatDuration(minutes){const h=Math.floor(minutes/60),m=minutes%60;return h?`${h}h${m?String(m).padStart(2,'0'):''}`:`${m} min`}
   function clockDate(day,time){const [hour,minute]=time.split(':').map(Number);return new Date(day.getFullYear(),day.getMonth(),day.getDate(),hour,minute)}
   const travelIconPaths={
@@ -852,12 +912,42 @@
     igreja:'/midia/icons/viagem/igreja.svg',
     evento:'/midia/icons/viagem/inicio-evento.svg',
     estrada:'/midia/icons/viagem/estrada.svg',
-    equipe:'/midia/icons/viagem/equipe.svg'
+    equipe:'/midia/icons/viagem/equipe.svg',
+    dinheiro:'/midia/icons/viagem/dinheiro.svg',
+    destino:'/midia/icons/viagem/destino.svg'
   };
   function iconForTravel(item){
     const src=travelIconPaths[item.icon]||travelIconPaths.carro;
     const directionClass=item.direction==='return'?' return':'';
     return `<img class="travel-icon${directionClass}" src="${src}" alt="" aria-hidden="true">`;
+  }
+  function escapeHtml(value){return String(value||'').replace(/[&<>"']/g,(character)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]))}
+  function mealId(meal){return `${meal.at.getTime()}-${meal.icon}-${meal.category}`}
+  function getMealAmounts(plan,{pruneSelection=true}={}){
+    const event=eventTypes.find((item)=>item.id===selectedEventTypeId)||eventTypes[0];
+    const roadMeals=plan.meals.filter((meal)=>meal.category==='Estrada');
+    const cityMeals=plan.meals.filter((meal)=>meal.category!=='Estrada');
+    const validIds=new Set(cityMeals.map(mealId));
+    if(pruneSelection)for(const key of selectedCityMealIds)if(!validIds.has(key))selectedCityMealIds.delete(key);
+    const mealCost=(meal)=>mealPricesPerPersonCents[meal.icon]||0;
+    const mandatoryRoadCents=roadMeals.reduce((sum,meal)=>sum+mealCost(meal)*event.team,0);
+    const selectedCityCents=cityMeals.filter((meal)=>selectedCityMealIds.has(mealId(meal))).reduce((sum,meal)=>sum+mealCost(meal)*event.team,0);
+    return {roadMeals,cityMeals,mandatoryRoadCents,selectedCityCents,totalCents:mandatoryRoadCents+selectedCityCents};
+  }
+  function renderCostCards(plan,amounts=getMealAmounts(plan)){
+    const cards=[{icon:'/midia/icons/transporte.svg',title:'Transporte',value:formatMoney(Number(travelQuote?.transportCents)||0)}];
+    if(plan.lodging)cards.push({icon:'/midia/icons/hospedagem.svg',title:'Hospedagem',value:'A definir'});
+    if(plan.meals.length)cards.push({icon:'/midia/icons/alimentacao.svg',title:'Alimentação',value:formatMoney(amounts.totalCents)});
+    const html=cards.map((card)=>`<article class="cost-card"><img src="${card.icon}" alt="" aria-hidden="true"><strong>${card.title}</strong><b>${card.value}</b></article>`).join('');
+    ['routeCostCards','proposalCostCards'].forEach((id)=>{const target=document.getElementById(id);if(target)target.innerHTML=html});
+  }
+  function refreshProposalAmount(plan){
+    const event=eventTypes.find((item)=>item.id===selectedEventTypeId)||eventTypes[0];
+    const mealAmounts=getMealAmounts(plan);
+    currentProposalTotalCents=event.priceCents+(Number(travelQuote?.transportCents)||0)+mealAmounts.totalCents;
+    renderCostCards(plan,mealAmounts);
+    if(current===13)updateInstallmentDisplay();
+    return mealAmounts;
   }
   function buildTravelPlan(oneWayKm){
     const event=eventTypes.find((item)=>item.id===selectedEventTypeId)||eventTypes[0];
@@ -959,29 +1049,62 @@
     const summary=document.getElementById('travelSummary');summary.hidden=false;
     const team=(eventTypes.find((item)=>item.id===selectedEventTypeId)||eventTypes[0]).team;
     document.getElementById('travelStats').innerHTML=[
-      {icon:'estrada',text:`${formatDuration(plan.oneWayMinutes)} por trecho`},
+      {icon:'estrada',text:`${formatDuration(plan.oneWayMinutes*2)} ida e volta`},
       {icon:'hospedagem',text:plan.lodging?'Hospedagem necessária':'Sem hospedagem necessária · ida e volta no mesmo dia'},
       {icon:'equipe',text:`${team} integrantes`}
     ].map((item)=>`<div class="travel-stat">${iconForTravel(item)}<span>${item.text}</span></div>`).join('');
     const days=new Map();
     for(const item of plan.items){const key=`${item.at.getFullYear()}-${item.at.getMonth()}-${item.at.getDate()}`;if(!days.has(key))days.set(key,{date:item.at,items:[]});days.get(key).items.push(item)}
     document.getElementById('travelTimeline').innerHTML=Array.from(days.values()).map((day)=>`<li class="travel-day-group"><h3>${formatDayHeading(day.date)}<span>${formatWeekday(day.date)}</span></h3><ul class="travel-day-items">${day.items.map((item)=>`<li>${iconForTravel(item)}<span class="travel-item-copy"><strong>${item.text}</strong><time>${formatClock(item.at)}</time></span></li>`).join('')}</ul></li>`).join('');
-    document.getElementById('mealSummary').innerHTML=`<strong>Refeições previstas</strong>${plan.meals.length?`<ul class="meal-list">${plan.meals.map((meal)=>`<li>${iconForTravel({icon:meal.icon})}<span class="travel-item-copy"><strong>${meal.label}</strong><time>${formatClock(meal.at)}</time></span></li>`).join('')}</ul>`:'<p>Nenhuma refeição prevista para os horários calculados.</p>'}`;
+    const renderMealRows=(meals)=>meals.length?`<ul class="meal-list">${meals.map((meal)=>`<li>${iconForTravel({icon:meal.icon})}<span class="travel-item-copy"><strong>${meal.label}</strong><time>${formatClock(meal.at)}</time></span></li>`).join('')}</ul>`:'<p>Nenhuma refeição prevista neste grupo.</p>';
+    const roadMeals=plan.meals.filter((meal)=>meal.category==='Estrada');
+    const cityMeals=plan.meals.filter((meal)=>meal.category!=='Estrada');
+    document.getElementById('mealSummary').innerHTML=`<h2>Refeições previstas</h2><section class="meal-group"><h3>Refeições na estrada</h3><p>Igreja paga as refeições na estrada</p>${renderMealRows(roadMeals)}</section><section class="meal-group"><h3>Refeições na cidade</h3><p>Igreja pode providenciar as refeições</p>${renderMealRows(cityMeals)}</section>${cityMeals.length?'<button class="meal-pay-button" type="button" onclick="openMealPaymentModal()"><img src="/midia/icons/viagem/dinheiro.svg" alt="" aria-hidden="true">Prefiro pagar as refeições</button>':''}`;
+    refreshProposalAmount(plan);
   }
+  function openMealPaymentModal(){
+    if(!travelQuote)return;
+    const plan=buildTravelPlan(Number(travelQuote.oneWayKm)||0);
+    const event=eventTypes.find((item)=>item.id===selectedEventTypeId)||eventTypes[0];
+    const amounts=getMealAmounts(plan);
+    document.getElementById('mealPaymentOptions').innerHTML=amounts.cityMeals.map((meal)=>{
+      const key=mealId(meal),unit=mealPricesPerPersonCents[meal.icon]||0,checked=selectedCityMealIds.has(key);
+      return `<label class="meal-payment-option"><input type="checkbox" data-meal-id="${key}" ${checked?'checked':''} onchange="toggleCityMeal(this.dataset.mealId,this.checked)">${iconForTravel({icon:meal.icon})}<span><strong>${meal.label}</strong><small>${formatDayHeading(meal.at)} · ${formatWeekday(meal.at)} · ${formatClock(meal.at)}</small></span><b>${formatMoney(unit*event.team)}</b></label>`;
+    }).join('');
+    updateMealPaymentTotals(plan);
+    document.getElementById('mealPaymentModal').hidden=false;
+    document.querySelector('#mealPaymentModal input[type="checkbox"]')?.focus();
+  }
+  function updateMealPaymentTotals(plan=buildTravelPlan(Number(travelQuote?.oneWayKm)||0)){
+    if(!travelQuote)return;
+    const amounts=refreshProposalAmount(plan);
+    document.getElementById('mealMandatoryTotal').textContent=formatMoney(amounts.mandatoryRoadCents);
+    document.getElementById('mealSelectedTotal').textContent=formatMoney(amounts.selectedCityCents);
+    document.getElementById('mealGrandTotal').textContent=formatMoney(amounts.totalCents);
+  }
+  function toggleCityMeal(key,selected){
+    if(selected)selectedCityMealIds.add(key);else selectedCityMealIds.delete(key);
+    updateMealPaymentTotals();
+  }
+  function closeMealPaymentModal(){document.getElementById('mealPaymentModal').hidden=true}
+  function confirmMealPaymentSelection(){closeMealPaymentModal()}
+  document.getElementById('mealPaymentModal').addEventListener('click',(event)=>{if(event.target.id==='mealPaymentModal')closeMealPaymentModal()});
+  document.addEventListener('keydown',(event)=>{if(event.key==='Escape'&&!document.getElementById('mealPaymentModal').hidden)closeMealPaymentModal()});
   function renderProposal(){
     if(!travelQuote)return;
     const event=eventTypes.find((item)=>item.id===selectedEventTypeId)||eventTypes[0];
     const baseCents=event.priceCents;
     const transportCents=Number(travelQuote.transportCents)||0;
-    const totalCents=baseCents+transportCents;
+    const plan=buildTravelPlan(Number(travelQuote.oneWayKm)||0);
+    const mealAmounts=getMealAmounts(plan);
+    const totalCents=baseCents+transportCents+mealAmounts.totalCents;
     currentProposalTotalCents=totalCents;
     document.getElementById('selectedEventName').textContent=event.name;
     document.getElementById('basePrice').textContent=formatMoney(baseCents);
     document.getElementById('totalPrice').textContent=formatMoney(totalCents);
     document.getElementById('installmentSlider').value=String(selectedInstallments);
     updateInstallmentDisplay();
-    document.getElementById('proposalTransportPrice').textContent=formatMoney(transportCents);
-    document.getElementById('proposalMeals').textContent='Veja os horários e locais no resumo do percurso.';
+    renderCostCards(plan,mealAmounts);
   }
   let reserveEventInFlight=false;
   function showReserveFeedback({kind='error',title='Não foi possível abrir o painel',message='Tente novamente em instantes.',code='',primaryLabel='Tentar novamente',primaryAction='retry'}={}){
@@ -1083,13 +1206,15 @@
       if(!event.id||!event.name||!Number.isFinite(event.priceCents))throw makeReserveError('Não consegui identificar o tipo de evento selecionado. Volte e escolha uma opção.','EVENT_TYPE_DATA_INVALID','stage=event-type');
       const transportCents=Math.max(0,Number(travelQuote.transportCents)||0);
       const travelPlan=buildTravelPlan(Number(travelQuote.oneWayKm)||0);
+      const mealAmounts=getMealAmounts(travelPlan);
       const travelSummary=[
-        `Tempo de estrada estimado: ${formatDuration(travelPlan.oneWayMinutes)} por trecho, média de 75 km/h.`,
+        `Tempo de estrada estimado: ${formatDuration(travelPlan.oneWayMinutes*2)} ida e volta, média de 75 km/h.`,
         travelPlan.lodging?'Hospedagem necessária na cidade do evento.':'Ida e volta no mesmo dia, sem hospedagem.',
         formatTravelPlanText(travelPlan)
       ].join('\n');
       const interestRate=selectedInstallmentCount===1?0:0.02+((selectedInstallmentCount-2)/10)*0.22;
-      const financedTotalCents=Math.round((event.priceCents+transportCents)*(1+interestRate));
+      const proposalTotalCents=event.priceCents+transportCents+mealAmounts.totalCents;
+      const financedTotalCents=Math.round(proposalTotalCents*(1+interestRate));
       const prefill={
         igreja:church,
         contratante:contractor,
@@ -1105,6 +1230,7 @@
         proposalInstallments:String(selectedInstallmentCount),
         proposalFinancedTotalCents:String(financedTotalCents),
         proposalInstallmentCents:String(Math.round(financedTotalCents/selectedInstallmentCount)),
+        mealAmountCents:String(mealAmounts.totalCents),mealSelectionDescription:formatMealSelectionDescription(travelPlan,mealAmounts),
         transportAmountCents:String(transportCents),transportTripType:'ROUND_TRIP',transportCityA:'Jacareí-SP',transportCityB:travelQuote.destinationLabel||eventCityName,transportDescription:travelSummary,
         freeTransport:false,freeLodging:false
       };

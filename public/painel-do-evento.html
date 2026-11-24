@@ -149,8 +149,9 @@
         ['Valor total antes do parcelamento',answers.finalPrice],
         ['Parcelas',installmentCount?`${installmentCount}x de ${formatMoney(installmentAmount)}`:''],
         ['Total parcelado',answers.proposalFinancedTotalCents?formatMoney(answers.proposalFinancedTotalCents):''],
-        ['Alimentação incluída','Sim'],
-        ['Hospedagem incluída',answers.freeLodging==='Sim'?'Sim':'Incluída']
+        ['Refeições',answers.mealAmount|| (answers.mealAmountCents?formatMoney(answers.mealAmountCents):'R$ 0,00')],
+        ['Refeições selecionadas',answers.mealSelectionDescription,true],
+        ['Hospedagem',answers.freeLodging==='Sim'?'Sem custo':'A definir']
       ]);
       $('loadingState').hidden=true;
       $('errorState').hidden=true;

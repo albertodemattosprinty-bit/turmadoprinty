@@ -36,6 +36,9 @@ const QUESTION_ORDER = [
   { key: "proposalInstallments", label: "Parcelas escolhidas na proposta" },
   { key: "proposalFinancedTotalCents", label: "Total estimado parcelado" },
   { key: "proposalInstallmentCents", label: "Valor estimado de cada parcela" },
+  { key: "mealAmount", label: "Valor das refeições" },
+  { key: "mealAmountCents", label: "Valor das refeições em centavos" },
+  { key: "mealSelectionDescription", label: "Refeições selecionadas para pagamento" },
   { key: "presentationName", label: "Apresentacao escolhida" },
   { key: "eventCount", label: "Quantidade de eventos" },
   { key: "unitPrice", label: "Valor por evento" },
@@ -193,6 +196,8 @@ async function buildCommercialAnswers(rawAnswers) {
     pricing.freeLodging = rawAnswers.freeLodging === true || /^(sim|true|1)$/i.test(String(rawAnswers.freeLodging || ""));
     pricing.finalPriceCents = Math.max(0, pricing.basePriceCents - pricing.couponDiscountCents + pricing.transportAmountCents);
   }
+  pricing.mealAmountCents = Math.max(0, Math.trunc(Number(rawAnswers?.mealAmountCents) || 0));
+  pricing.finalPriceCents = Math.max(0, Number(pricing.finalPriceCents || 0) + pricing.mealAmountCents);
   return {
     pricing,
     values: {
@@ -207,6 +212,8 @@ async function buildCommercialAnswers(rawAnswers) {
       transportAmount: pricing.transportAmountCents ? formatEventMoney(pricing.transportAmountCents) : (pricing.freeTransport ? "Livre de cobranca" : "Nao definido"),
       transportRoute: pricing.transportCityA && pricing.transportCityB ? (pricing.transportTripType === "ROUND_TRIP" ? `${pricing.transportCityA} para ${pricing.transportCityB} e volta para ${pricing.transportCityA}` : `${pricing.transportCityA} para ${pricing.transportCityB}`) : "Nao definida",
       transportDescription: pricing.transportDescription || (pricing.freeTransport ? "Transporte sem cobranca" : "Transporte nao definido"),
+      mealAmount: formatEventMoney(pricing.mealAmountCents),
+      mealSelectionDescription: String(rawAnswers?.mealSelectionDescription || "").trim(),
       freeLodging: pricing.freeLodging ? "Sim" : "Nao"
     }
   };
@@ -224,6 +231,7 @@ export async function createAllTermEntry(rawAnswers, userId = null, rawAcceptedT
   answers.unitPriceCents = String(commercial.pricing.unitPriceCents);
   answers.basePriceCents = String(commercial.pricing.basePriceCents);
   answers.transportAmountCents = String(commercial.pricing.transportAmountCents || 0);
+  answers.mealAmountCents = String(commercial.pricing.mealAmountCents || 0);
   answers.transportTripType = commercial.pricing.transportTripType || "";
   answers.transportCityA = commercial.pricing.transportCityA || "";
   answers.transportCityB = commercial.pricing.transportCityB || "";
