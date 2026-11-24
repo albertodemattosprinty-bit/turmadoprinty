@@ -14833,12 +14833,12 @@ const EVENT_PROPOSAL_STATE_NAMES = {
 function normalizeEventProposalPlace(value) {
   const normalized = String(value || "").trim().replace(/\s+/g, " ");
   const match = normalized.match(/^(.*?)\s*(?:,|-)\s*([A-Za-z]{2})$/);
-  if (!match) return null;
-  const city = match[1].trim();
-  const stateCode = match[2].toUpperCase();
-  const stateName = EVENT_PROPOSAL_STATE_NAMES[stateCode];
-  if (!city || !stateName || city.length > 80) return null;
-  return { city, stateCode, stateName, key: `${city},${stateCode}` };
+  const city = (match ? match[1] : normalized).trim();
+  const stateCode = match ? match[2].toUpperCase() : "";
+  const stateName = stateCode ? EVENT_PROPOSAL_STATE_NAMES[stateCode] : "";
+  if (!city || city.length < 2 || city.length > 80 || (stateCode && !stateName)) return null;
+  const key = `${city.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()},${stateCode}`;
+  return { city, stateCode, stateName, key };
 }
 
 async function handleEventProposalDistanceRequest(request, response) {
@@ -14852,7 +14852,7 @@ async function handleEventProposalDistanceRequest(request, response) {
 
   const place = normalizeEventProposalPlace(body.city);
   if (!place) {
-    sendJson(response, 400, { error: "Informe a cidade e a sigla do estado, por exemplo: Taubaté-SP." });
+    sendJson(response, 400, { error: "Informe o nome da cidade do evento." });
     return;
   }
 
@@ -14872,11 +14872,11 @@ async function handleEventProposalDistanceRequest(request, response) {
       messages: [
         {
           role: "system",
-          content: "Você estima distâncias rodoviárias entre centros de municípios brasileiros. Responda apenas JSON válido no formato {\"oneWayKm\": número ou null, \"confidence\": \"baixa\"|\"média\"|\"alta\"}. Estime a distância por estrada em uma rota rodoviária típica, nunca a distância em linha reta. Se não tiver base suficiente para uma estimativa razoável, retorne oneWayKm como null. Arredonde a distância de ida para o quilômetro inteiro mais próximo."
+          content: "Você identifica municípios brasileiros e estima distâncias rodoviárias entre centros de municípios. Responda apenas JSON válido no formato {\"resolvedCity\": string, \"stateCode\": sigla de UF, \"oneWayKm\": número ou null, \"confidence\": \"baixa\"|\"média\"|\"alta\"}. Se o texto do usuário já trouxer uma UF válida, respeite-a. Se trouxer apenas o nome da cidade, escolha o município brasileiro mais provável pelo nome e contexto; se houver homônimos, escolha a ocorrência mais provável e reduza confidence. Informe nome e UF oficiais. Estime distância por estrada em uma rota típica de carro, nunca em linha reta. Se não conseguir identificar um município brasileiro com segurança suficiente ou estimar uma rota razoável, retorne oneWayKm como null. Arredonde a distância de ida ao quilômetro inteiro mais próximo."
         },
         {
           role: "user",
-          content: `Estime a distância rodoviária de ida entre o centro de Jacareí-SP e o centro de ${place.city}-${place.stateCode}, no Brasil. Considere uma rota de carro típica. Retorne somente o JSON solicitado.`
+          content: `Identifique a cidade informada pelo usuário: "${place.city}${place.stateCode ? `-${place.stateCode}` : ""}". Estime a distância rodoviária de ida entre o centro de Jacareí-SP e o centro desse município no Brasil. Considere uma rota de carro típica. Retorne somente o JSON solicitado.`
         }
       ],
       response_format: { type: "json_object" },
@@ -14888,11 +14888,20 @@ async function handleEventProposalDistanceRequest(request, response) {
     try {
       estimate = JSON.parse(content || "{}");
     } catch {
-      throw new Error("Não consegui estimar a distância para essa cidade. Confira o nome e a sigla do estado.");
+      throw new Error("Não consegui estimar o transporte. Confira o nome da cidade e tente novamente.");
     }
     const rawOneWayKm = estimate?.oneWayKm == null ? Number.NaN : Number(estimate.oneWayKm);
     if (!Number.isFinite(rawOneWayKm) || rawOneWayKm < 0 || rawOneWayKm > 5000) {
-      throw new Error("Não consegui estimar a distância para essa cidade. Confira o nome e a sigla do estado.");
+      throw new Error("Não consegui identificar a cidade e estimar o transporte. Confira o nome da cidade.");
+    }
+
+    const resolvedCity = String(estimate?.resolvedCity || place.city).trim().replace(/\s+/g, " ");
+    const inferredStateCode = String(estimate?.stateCode || place.stateCode).trim().toUpperCase();
+    if (!resolvedCity || resolvedCity.length > 80 || !EVENT_PROPOSAL_STATE_NAMES[inferredStateCode]) {
+      throw new Error("Não consegui identificar a cidade e o estado. Confira o nome da cidade.");
+    }
+    if (place.stateCode && inferredStateCode !== place.stateCode) {
+      throw new Error("Não consegui confirmar essa cidade no estado informado. Confira os dados.");
     }
 
     const oneWayKm = Math.round(rawOneWayKm);
@@ -14900,7 +14909,7 @@ async function handleEventProposalDistanceRequest(request, response) {
     const transportCents = Math.round(roundTripKm * 1.15 * 100);
     const result = {
       originLabel: "Jacareí-SP",
-      destinationLabel: `${place.city}-${place.stateCode}`,
+      destinationLabel: `${resolvedCity}-${inferredStateCode}`,
       oneWayKm,
       roundTripKm,
       rateCentsPerKm: 115,

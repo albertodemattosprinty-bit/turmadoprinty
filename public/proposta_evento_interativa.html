@@ -62,11 +62,13 @@
   .venue-photo[data-venue-image="Teatro"]{background-position:0 100%}
   .venue-photo[data-venue-image="Evento externo"]{background-position:100% 100%}
 
-  .event-type-grid{width:min(100%,1040px);margin:20px auto 0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-  .event-type-card{padding:0;overflow:hidden;border:2px solid #e3eaf4;border-radius:22px;background:#fff;color:var(--navy);text-align:left;cursor:pointer;box-shadow:0 10px 26px rgba(27,53,94,.08);transition:border-color .2s,transform .2s,box-shadow .2s}
-  .event-type-card:hover{transform:translateY(-2px)}
-  .event-type-card:disabled{opacity:.6;cursor:wait;transform:none}
-  .event-type-card.selected{border-color:var(--blue);box-shadow:0 0 0 3px rgba(22,140,242,.14),0 12px 28px rgba(27,53,94,.12)}
+  .event-type-carousel{width:min(100%,980px);margin:18px auto 0;display:grid;grid-template-columns:minmax(70px,.38fr) minmax(240px,1fr) minmax(70px,.38fr);gap:18px;align-items:center}
+  .event-type-peek{height:clamp(250px,42vh,430px);border-radius:28px;opacity:.38;overflow:hidden;transform:scale(.92);background:#fff;box-shadow:var(--shadow)}
+  .event-type-peek .event-art{height:100%;aspect-ratio:auto}
+  .event-type-center{position:relative;min-width:0;width:min(100%,560px);margin:auto}
+  .event-type-grid{width:100%;margin:0}
+  .event-type-card{overflow:hidden;border:1px solid #e3eaf4;border-radius:26px;background:#fff;color:var(--navy);box-shadow:0 10px 26px rgba(27,53,94,.08)}
+  .event-type-card .event-art{width:min(100%,clamp(250px,42vh,430px));margin-inline:auto}
   .event-art{width:100%;height:auto;aspect-ratio:1 / 1;display:grid;place-items:center;overflow:hidden}
   .event-art.event-art-photo{background-position:center;background-repeat:no-repeat;background-size:cover}
   .event-art svg{width:100%;height:100%;display:block}
@@ -75,15 +77,15 @@
   .event-type-card strong{display:block;padding:5px 14px 0;font-size:16px;line-height:1.2}
   .event-type-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 14px 14px;font-size:12px;color:#69748b}
   .event-type-meta b{color:var(--navy);font-size:14px}
+  .event-type-center .arrow{top:42%}
   .route-card{width:min(100%,760px);margin:34px auto 0;padding:28px;border:1px solid #dce8f4;border-radius:24px;background:#f7fbff;box-shadow:var(--shadow);text-align:center}
   .route-path{font-size:clamp(18px,2.4vw,26px);font-weight:900;color:var(--navy)}
   .route-distance{font-size:clamp(30px,4vw,46px);font-weight:1000;color:var(--blue);margin:14px 0 4px}
-  .route-formula,.route-attribution{font-size:13px;color:var(--muted);line-height:1.5}
+  .route-formula{font-size:13px;color:var(--muted);line-height:1.5}
   .route-total{font-size:22px;color:var(--navy);font-weight:900;margin-top:14px}
   .route-status{width:min(100%,760px);margin:14px auto 0;text-align:center;color:#a33;font-weight:700}
   .route-status:empty{display:none}
   .dark .route-status{color:#ffd0c9}
-  .route-attribution a{color:inherit}
   .event-field-wrap{width:min(100%,600px);margin:38px auto 0}
   .event-field-wrap label{display:block;text-align:left;margin-bottom:8px;color:var(--navy);font-size:13px;font-weight:800}
   .event-field-wrap .input{font-size:18px}
@@ -135,6 +137,10 @@
   .choice-title,.capacity{text-align:center;font-size:clamp(22px,2.2vw,30px);font-weight:1000;margin:18px 0 6px;color:var(--navy)}
 
   .capacity-dots{width:min(100%,720px);margin:20px auto 0;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .capacity-photo{background-repeat:no-repeat;background-position:center;background-size:cover;border:0;color:transparent}
+  .capacity-carousel{grid-template-columns:minmax(70px,.38fr) minmax(240px,1fr) minmax(70px,.38fr)}
+  .capacity-carousel .peek.capacity-photo{height:clamp(250px,42vh,430px)}
+  .capacity-carousel .card-main.capacity-photo{width:min(100%,clamp(250px,42vh,430px));height:auto;aspect-ratio:1/1;margin-inline:auto}
   .cap{text-align:center;color:#7b859b;font-size:12px;font-weight:800;cursor:pointer}
   .cap b{width:14px;height:14px;border-radius:50%;display:block;margin:0 auto 8px;background:#cbd4df}
   .cap.selected{color:var(--blue)}
@@ -212,9 +218,15 @@
     .arrow{width:42px;height:42px}
     .arrow.left{left:4px}.arrow.right{right:4px}
     .feature-list{grid-template-columns:1fr;gap:12px}
-    .event-type-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-    .event-art{height:auto;aspect-ratio:1 / 1}
+    .event-type-carousel{grid-template-columns:42px minmax(0,1fr) 42px;gap:4px;width:calc(100% + 20px);margin-left:-10px}
+    .event-type-peek{height:clamp(235px,36vh,330px);border-radius:18px}
+    .event-type-card .event-art{width:min(100%,clamp(235px,36vh,330px))}
+    .event-type-center{width:100%}
     .event-type-card{border-radius:17px}
+    .event-type-center .arrow{width:38px;height:38px}
+    .capacity-carousel{grid-template-columns:42px minmax(0,1fr) 42px;gap:4px;width:calc(100% + 20px);margin-left:-10px}
+    .capacity-carousel .peek.capacity-photo{height:clamp(235px,36vh,330px)}
+    .capacity-carousel .card-main.capacity-photo{width:min(100%,clamp(235px,36vh,330px))}
     .event-type-card strong{font-size:14px;padding-left:10px;padding-right:10px}
     .event-team{padding:8px 10px 0;font-size:10px}
     .event-type-meta{padding:6px 10px 12px;font-size:11px}
@@ -290,14 +302,14 @@
           <h1>Qual o tamanho do público?</h1>
           <p class="sub">Isso nos ajuda a preparar a melhor estrutura para o seu evento.</p>
         </header>
-        <div class="carousel-wrap">
-          <div class="placeholder peek">SVG</div>
+        <div class="carousel-wrap capacity-carousel">
+          <div class="placeholder peek capacity-photo" id="capPrev" role="img" aria-hidden="true"></div>
           <div class="carousel-center">
-            <div class="placeholder card-main">SVG / IMAGEM<br>AUDITÓRIO</div>
+            <div class="placeholder card-main capacity-photo" id="capArt" role="img" aria-label="Auditório para 300 pessoas"></div>
             <button class="arrow left" onclick="prevCap()">‹</button>
             <button class="arrow right" onclick="nextCap()">›</button>
           </div>
-          <div class="placeholder peek">SVG</div>
+          <div class="placeholder peek capacity-photo" id="capNext" role="img" aria-hidden="true"></div>
         </div>
         <div class="capacity" id="capacityText">300 pessoas</div>
         <div class="capacity-dots">
@@ -337,8 +349,8 @@
         </header>
         <div class="city-wrap">
           <div class="city-art" aria-hidden="true"><svg viewBox="0 0 560 300"><path d="M22 74 126 28l98 42 86-36 96 54 108-45M5 210l103-57 105 47 91-61 94 64 147-39M91 4l40 70-48 71 46 68-28 83M289 10l-32 75 56 66-45 70 39 70M457 12l-38 78 53 67-29 62 24 76" fill="none" stroke="#fff" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/><path d="M85 190c63-52 102-16 154-43 54-27 79-69 131-43 51 26 62 61 115 24" fill="none" stroke="#168cf2" stroke-width="9" stroke-linecap="round" stroke-dasharray="2 20"/><circle cx="85" cy="190" r="21" fill="#fff" stroke="#168cf2" stroke-width="7"/><circle cx="485" cy="128" r="21" fill="#ffca45" stroke="#fff" stroke-width="7"/><path d="M84 182a9 9 0 1 0 1 0m400-62a9 9 0 1 0 1 0" fill="#11245a"/></svg></div>
-          <label for="city">Cidade e estado</label>
-          <input id="city" class="input" placeholder="Ex.: Taubaté-SP" autocomplete="address-level2" />
+          <label for="city">Cidade do evento</label>
+          <input id="city" class="input" placeholder="Ex.: Taubaté" autocomplete="address-level2" />
           <div class="route-status" id="cityStatus" role="status" aria-live="polite"></div>
         </div>
         <button class="primary" onclick="continueToDate()">PRÓXIMO &nbsp;›</button>
@@ -391,9 +403,16 @@
           <h1>Qual tipo de evento você quer?</h1>
           <p class="sub">Escolha o formato que combina com a sua programação.</p>
         </header>
-        <div class="step-stage-photo type" role="img" aria-label="Ilustração de teatro para escolher o formato do evento"></div>
-        <div class="event-type-grid" id="eventTypeGrid"></div>
-        <button class="primary" id="eventTypeNext" onclick="calculateTravel()">CALCULAR TRANSPORTE &nbsp;›</button>
+        <div class="event-type-carousel">
+          <div class="event-type-peek" id="eventTypePrev" aria-hidden="true"></div>
+          <div class="event-type-center">
+            <button class="arrow left" type="button" aria-label="Evento anterior" onclick="changeEventType(-1)">‹</button>
+            <div class="event-type-grid" id="eventTypeGrid" aria-live="polite"></div>
+            <button class="arrow right" type="button" aria-label="Próximo evento" onclick="changeEventType(1)">›</button>
+          </div>
+          <div class="event-type-peek" id="eventTypePeekNext" aria-hidden="true"></div>
+        </div>
+        <button class="primary" id="eventTypeNext" onclick="calculateTravel()">CONTINUAR PARA TRANSPORTE &nbsp;›</button>
         <div class="route-status" id="eventTypeStatus" role="status" aria-live="polite"></div>
         <button class="back-button" onclick="go(6)">VOLTAR AO HORÁRIO</button>
       </div>
@@ -413,7 +432,6 @@
           <div class="route-distance" id="routeDistance"></div>
           <div class="route-formula" id="routeFormula"></div>
           <div class="route-total" id="routeTotal"></div>
-          <p class="route-attribution">Distância rodoviária estimada por inteligência artificial entre os centros das cidades. O trajeto real pode variar conforme o endereço do evento.</p>
         </div>
         <button class="primary" onclick="go(9)">CONTINUAR &nbsp;›</button>
         <button class="back-button" onclick="go(7)">VOLTAR AO TIPO DE EVENTO</button>
@@ -591,6 +609,45 @@
   ];
   let selectedEventTypeId='puppets';
   let travelQuote=null;
+  let travelQuoteCity='';
+  let travelQuoteRequest=null;
+  let travelQuoteRequestId=0;
+  function isValidProposalCity(city){return String(city||'').trim().length>=2}
+  function prefetchTravelQuote(){
+    const city=document.getElementById('city').value.trim();
+    if(!isValidProposalCity(city)){
+      travelQuote=null;
+      travelQuoteCity='';
+      travelQuoteRequest=null;
+      travelQuoteRequestId++;
+      return;
+    }
+    if(city===travelQuoteCity&&(travelQuote||travelQuoteRequest))return;
+    travelQuote=null;
+    travelQuoteCity=city;
+    travelQuoteRequest=null;
+    travelQuoteRequestId++;
+    requestTravelQuote(city).catch(()=>{});
+  }
+  async function requestTravelQuote(city){
+    if(travelQuote&&travelQuoteCity===city)return travelQuote;
+    if(travelQuoteRequest?.city===city)return travelQuoteRequest.promise;
+    const requestId=++travelQuoteRequestId;
+    travelQuoteCity=city;
+    const promise=(async()=>{
+      const response=await fetch('/api/event-proposal/distance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({city})});
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(payload.error||'Não foi possível calcular o transporte agora. Tente novamente.');
+      if(requestId!==travelQuoteRequestId||document.getElementById('city').value.trim()!==city)throw new Error('A cidade foi alterada. Aguarde o novo cálculo do transporte.');
+      travelQuote=payload;
+      renderTravelQuote();
+      return payload;
+    })();
+    travelQuoteRequest={city,promise};
+    try{return await promise}
+    finally{if(travelQuoteRequest?.promise===promise)travelQuoteRequest=null}
+  }
+  document.getElementById('city').addEventListener('blur',prefetchTravelQuote);
   let selectedInstallments=12;
   let currentProposalTotalCents=0;
   const teamIcon='<svg viewBox="0 0 44 24" aria-hidden="true"><circle cx="14" cy="7" r="5" fill="currentColor"/><path d="M4 22v-3a10 10 0 0 1 20 0v3z" fill="currentColor"/><circle cx="32" cy="8" r="4" fill="currentColor" opacity=".72"/><path d="M25 22v-3a8 8 0 0 1 15 0v3z" fill="currentColor" opacity=".72"/></svg>';
@@ -610,18 +667,32 @@
     'children-congress':'/midia/tipos-evento/congresso-infantil.webp',
     'full-congress':'/midia/tipos-evento/congresso-completo.webp'
   };
-  function renderEventTypes(){
-    document.getElementById('eventTypeGrid').innerHTML=eventTypes.map((event)=>{
-      const image=eventTypeImages[event.id];
-      const art=image?`<div class="event-art event-art-photo" style="background-image:url('${image}')"></div>`:`<div class="event-art">${event.art}</div>`;
-      return `<button class="event-type-card ${event.id===selectedEventTypeId?'selected':''}" type="button" data-event-type="${event.id}" aria-pressed="${event.id===selectedEventTypeId}" onclick="selectEventType('${event.id}')">${art}<div class="event-team">${teamIcon}<span>${event.team} integrantes</span></div><strong>${event.name}</strong><div class="event-type-meta"><span>${event.duration}</span><b>${formatMoney(event.priceCents)}</b></div></button>`;
-    }).join('');
+  function eventAt(index){return eventTypes[(index+eventTypes.length)%eventTypes.length]}
+  function renderEventArtwork(event){
+    const image=eventTypeImages[event.id];
+    return image
+      ? `<div class="event-art event-art-photo" role="img" aria-label="${event.name}" style="background-image:url('${image}')"></div>`
+      : `<div class="event-art" role="img" aria-label="${event.name}">${event.art||''}</div>`;
   }
-  function selectEventType(id){selectedEventTypeId=id;renderEventTypes()}
+  function renderEventTypes(){
+    const index=Math.max(0,eventTypes.findIndex((item)=>item.id===selectedEventTypeId));
+    const event=eventTypes[index];
+    const previous=eventAt(index-1);
+    const next=eventAt(index+1);
+    document.getElementById('eventTypeGrid').innerHTML=`<article class="event-type-card">${renderEventArtwork(event)}<div class="event-team">${teamIcon}<span>${event.team} integrantes</span></div><strong>${event.name}</strong><div class="event-type-meta"><span>${event.duration}</span><b>${formatMoney(event.priceCents)}</b></div></article>`;
+    document.getElementById('eventTypePrev').innerHTML=renderEventArtwork(previous);
+    document.getElementById('eventTypePeekNext').innerHTML=renderEventArtwork(next);
+  }
+  function changeEventType(delta){
+    const index=eventTypes.findIndex((item)=>item.id===selectedEventTypeId);
+    selectedEventTypeId=eventAt(index+delta).id;
+    renderEventTypes();
+  }
   function continueToDate(){
     const city=document.getElementById('city').value.trim();
-    if(!city||!/(?:,|-)[ ]*[A-Za-z]{2}$/.test(city)){document.getElementById('cityStatus').textContent='Informe a cidade e a sigla do estado (por exemplo: Taubaté-SP).';return}
+    if(!isValidProposalCity(city)){document.getElementById('cityStatus').textContent='Informe o nome da cidade do evento.';return}
     document.getElementById('cityStatus').textContent='';
+    prefetchTravelQuote();
     go(5);
   }
   function continueToTime(){
@@ -669,16 +740,12 @@
     const city=document.getElementById('city').value.trim();
     const status=document.getElementById('eventTypeStatus');
     const button=document.getElementById('eventTypeNext');
-    if(!city||!/(?:,|-)[ ]*[A-Za-z]{2}$/.test(city)){go(4);document.getElementById('cityStatus').textContent='Informe a cidade e a sigla do estado (por exemplo: Taubaté-SP).';return}
+    if(!isValidProposalCity(city)){go(4);document.getElementById('cityStatus').textContent='Informe o nome da cidade do evento.';return}
     button.disabled=true;
-    status.textContent='Estimando a distância rodoviária com inteligência artificial…';
+    status.textContent='';
     try{
-      const response=await fetch('/api/event-proposal/distance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({city})});
-      const payload=await response.json().catch(()=>({}));
-      if(!response.ok)throw new Error(payload.error||'Não foi possível calcular a distância agora.');
-      travelQuote=payload;
+      await requestTravelQuote(city);
       renderTravelQuote();
-      status.textContent='';
       go(8);
     }catch(error){status.textContent=error.message||'Não foi possível calcular a distância agora. Tente novamente.'}
     finally{button.disabled=false}
@@ -709,7 +776,8 @@
     document.getElementById('proposalTransportPrice').textContent=formatMoney(transportCents);
   }
   async function reserveEvent(){
-    if(!travelQuote)return;
+    const status=document.getElementById('reserveStatus');
+    if(!travelQuote){status.textContent='O transporte ainda não foi calculado. Volte à etapa da cidade e tente novamente.';return}
     const dateValue=document.getElementById('eventDate').value;
     const [year,month,day]=dateValue.split('-');
     const [hourText,minute]=document.getElementById('eventTime').value.split(':');
@@ -742,7 +810,6 @@
       freeTransport:false,freeLodging:false
     };
     const button=document.querySelector('.gold-btn');
-    const status=document.getElementById('reserveStatus');
     button.disabled=true;
     button.textContent='CRIANDO SEU PAINEL...';
     status.textContent='';
@@ -759,11 +826,25 @@
     }
   }
 
-  const capacities=[100,300,500,'1000+']; let capIndex=1;
+  const capacities=[100,300,500,'1000+'];
+  const capacityImages=['/midia/auditorio-100.webp','/midia/auditorio-300.webp','/midia/auditorio-500.webp','/midia/auditorio-1000-plus.webp'];
+  let capIndex=1;
+  function renderCapacity(){
+    const current=capacities[capIndex];
+    const previous=capacities[(capIndex-1+capacities.length)%capacities.length];
+    const next=capacities[(capIndex+1)%capacities.length];
+    document.getElementById('capacityText').textContent=current+' pessoas';
+    [['capArt',current],['capPrev',previous],['capNext',next]].forEach(([id,capacity])=>{
+      const element=document.getElementById(id);
+      const image=capacityImages[capacities.indexOf(capacity)];
+      element.style.backgroundImage=`url('${image}')`;
+      if(id==='capArt')element.setAttribute('aria-label',`Auditório para ${capacity} pessoas`);
+    });
+    document.querySelectorAll('.cap').forEach((element)=>element.classList.toggle('selected',String(element.dataset.cap)===String(current)));
+  }
   function selectCap(cap){
     capIndex=capacities.findIndex(v=>String(v)===String(cap));
-    document.getElementById('capacityText').textContent=cap+' pessoas';
-    document.querySelectorAll('.cap').forEach(el=>el.classList.toggle('selected',String(el.dataset.cap)===String(cap)));
+    renderCapacity();
   }
   function prevCap(){capIndex=(capIndex-1+capacities.length)%capacities.length;selectCap(capacities[capIndex])}
   function nextCap(){capIndex=(capIndex+1)%capacities.length;selectCap(capacities[capIndex])}
@@ -790,6 +871,7 @@
   function changeStory(delta){storyIndex=(storyIndex+delta+stories.length)%stories.length;renderStory()}
 
   renderVenue();
+  renderCapacity();
   renderStory();
   renderProgress();
   renderEventTypes();
