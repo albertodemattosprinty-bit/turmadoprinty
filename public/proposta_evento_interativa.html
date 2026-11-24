@@ -896,7 +896,8 @@
       currentStep='montagem-dos-dados-do-evento';
       const eventToPresentation={puppets:'teatro-fantoches','theater-music':'teatro-palco','children-congress':'congresso-infantil','complete-show':'parques-arenas','full-congress':'show-completo-2h'};
       const storyToTerm={'Samuel':'História de Samuel','Fábrica de Heróis':'Fábrica de heróis','História de Davi':'Davi e Golias'};
-      const city=document.getElementById('city').value.trim();
+      const eventCityName=document.getElementById('city').value.trim();
+      if(!eventCityName)throw makeReserveError('Informe a cidade do evento antes de continuar.','EVENT_CITY_MISSING','field=city','city');
       const eventCard=document.querySelector('#eventTypeGrid .event-type-card');
       if(!eventCard)throw makeReserveError('Escolha o tipo de evento antes de reservar.','EVENT_TYPE_NOT_SELECTED','stage=event-type');
       const event={id:eventCard.dataset.eventType,name:eventCard.dataset.eventName,priceCents:Number(eventCard.dataset.priceCents),duration:eventCard.dataset.duration,team:Number(eventCard.dataset.team)};
@@ -918,12 +919,12 @@
         historia:storyToTerm[storyName]||'Fábrica de heróis',
         dia:String(Number(day)),mes:['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][Number(month)-1],ano:year,
         horario:`${hour12}h${minute}${period}`,pais:'Brasil',
-        endereco:address,cidade,cep,
+        endereco:address,cidade:eventCityName,cep,
         presentationKey:eventToPresentation[event.id]||'teatro-fantoches',eventCount:'1',couponCode:'',
         proposalInstallments:String(selectedInstallmentCount),
         proposalFinancedTotalCents:String(financedTotalCents),
         proposalInstallmentCents:String(Math.round(financedTotalCents/selectedInstallmentCount)),
-        transportAmountCents:String(transportCents),transportTripType:'ROUND_TRIP',transportCityA:'Jacareí-SP',transportCityB:travelQuote.destinationLabel||city,
+        transportAmountCents:String(transportCents),transportTripType:'ROUND_TRIP',transportCityA:'Jacareí-SP',transportCityB:travelQuote.destinationLabel||eventCityName,
         freeTransport:false,freeLodging:false
       };
 
