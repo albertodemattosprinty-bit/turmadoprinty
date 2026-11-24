@@ -86,6 +86,11 @@
   .event-field-wrap{width:min(100%,600px);margin:38px auto 0}
   .event-field-wrap label{display:block;text-align:left;margin-bottom:8px;color:var(--navy);font-size:13px;font-weight:800}
   .event-field-wrap .input{font-size:18px}
+  .contract-fields{width:min(100%,760px);margin:0 auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+  .contract-field{display:flex;flex-direction:column;gap:8px;text-align:left;color:var(--navy);font-size:13px;font-weight:800}
+  .contract-field input{width:100%;padding:16px 18px;border:1px solid #d5dfed;border-radius:14px;background:#fff;color:var(--text);font:inherit;font-size:17px;outline-color:var(--blue)}
+  .contract-field.full{grid-column:1/-1}
+  .stage-empty-art{width:min(100%,340px);aspect-ratio:1/1;height:auto;margin:8px auto 18px;border:2px dashed #a8d8ff;border-radius:24px;background:#f2f9ff}
   .back-button{display:block;margin:12px auto 0;padding:8px 14px;border:0;background:transparent;color:var(--muted);font-size:12px;font-weight:800;cursor:pointer}
   .transport-inc{grid-template-columns:64px minmax(0,1fr)}
   .transport-inc .transport-amount{font-size:16px;font-weight:900;white-space:nowrap;color:#fff}
@@ -214,6 +219,9 @@
     .event-type-meta{padding:6px 10px 12px;font-size:11px}
     .event-type-meta b{font-size:12px}
     .route-card{padding:20px 15px;margin-top:24px}
+    .contract-fields{grid-template-columns:1fr;gap:12px}
+    .contract-field.full{grid-column:auto}
+    .stage-empty-art{width:min(100%,280px);border-radius:22px}
     .step-stage-photo{height:auto;aspect-ratio:1 / 1;border-radius:22px;margin:8px auto 14px}
     .transport-inc{grid-template-columns:50px minmax(0,1fr);gap:10px}
     .transport-inc .transport-amount{grid-column:2;font-size:14px}
@@ -366,7 +374,7 @@
         <div class="step-stage-photo time" role="img" aria-label="Ilustração de relógio para escolher o horário"></div>
         <div class="event-field-wrap">
           <label for="eventTime">Horário de início</label>
-          <input id="eventTime" class="input" type="time" />
+          <input id="eventTime" class="input" type="time" step="1800" />
           <div class="route-status" id="timeStatus" role="status" aria-live="polite"></div>
         </div>
         <button class="primary" onclick="continueToEventType()">PRÓXIMO &nbsp;›</button>
@@ -445,7 +453,47 @@
       </div>
     </section>
 
-    <section class="screen dark" data-screen="10">
+    <section class="screen" data-screen="10">
+      <div class="screen-inner">
+        <header class="top">
+          <div class="progress" data-progress></div>
+          <div class="step-label"></div>
+          <h1>Quem será o contratante?</h1>
+          <p class="sub">Esses dados serão usados para preparar o termo e liberar o painel do contratante.</p>
+        </header>
+        <div class="stage-empty-art" aria-hidden="true"></div>
+        <div class="contract-fields">
+          <label class="contract-field full" for="churchName">Nome da igreja ou organização<input id="churchName" autocomplete="organization" placeholder="Ex.: Igreja Comunidade da Fé" /></label>
+          <label class="contract-field" for="contractorName">Nome do contratante<input id="contractorName" autocomplete="name" placeholder="Nome completo" /></label>
+          <label class="contract-field" for="contractorPhone">Telefone / WhatsApp<input id="contractorPhone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="Somente números" maxlength="15" /></label>
+        </div>
+        <div class="route-status" id="contactStatus" role="status" aria-live="polite"></div>
+        <button class="primary" onclick="continueToAddress()">PRÓXIMO &nbsp;›</button>
+        <button class="back-button" onclick="go(9)">VOLTAR À HISTÓRIA</button>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="11">
+      <div class="screen-inner">
+        <header class="top">
+          <div class="progress" data-progress></div>
+          <div class="step-label"></div>
+          <h1>Onde será o evento?</h1>
+          <p class="sub">Complete o endereço para que a equipe prepare o contrato e a logística.</p>
+        </header>
+        <div class="stage-empty-art" aria-hidden="true"></div>
+        <div class="contract-fields">
+          <label class="contract-field full" for="eventAddress">Endereço completo<input id="eventAddress" autocomplete="street-address" placeholder="Rua, número e complemento" /></label>
+          <label class="contract-field" for="eventCep">CEP<input id="eventCep" inputmode="numeric" autocomplete="postal-code" placeholder="00000000" maxlength="8" /></label>
+          <label class="contract-field" for="eventCityReadonly">Cidade do evento<input id="eventCityReadonly" readonly aria-readonly="true" /></label>
+        </div>
+        <div class="route-status" id="addressStatus" role="status" aria-live="polite"></div>
+        <button class="primary" onclick="continueToProposal()">VER PROPOSTA &nbsp;›</button>
+        <button class="back-button" onclick="go(10)">VOLTAR AOS DADOS DO CONTRATANTE</button>
+      </div>
+    </section>
+
+    <section class="screen dark" data-screen="12">
       <div class="screen-inner">
         <header class="top">
           <div class="progress" data-progress></div>
@@ -469,7 +517,7 @@
           <div class="inc"><div class="icon"><img src="/midia/icons/hospedagem.svg" alt="" aria-hidden="true"></div><div><b>Hospedagem</b><p>Incluída para toda a equipe.</p></div></div>
           <div class="inc transport-inc"><div class="icon"><img src="/midia/icons/transporte.svg" alt="" aria-hidden="true"></div><div><b>Transporte</b><p><strong class="transport-amount" id="proposalTransportPrice">—</strong></p></div></div>
           <div class="inc"><div class="icon"><img src="/midia/icons/alimentacao.svg" alt="" aria-hidden="true"></div><div><b>Alimentação</b><p>Todas as refeições durante o evento.</p></div></div>
-          <button class="gold-btn">▣ &nbsp; QUERO RESERVAR UMA DATA</button>
+          <button class="gold-btn" onclick="reserveEvent()">▣ &nbsp; QUERO RESERVAR UMA DATA</button>
           <div class="secondary-row"><button class="secondary">Falar com a equipe</button><button class="secondary">Ver datas disponíveis</button></div>
         </div>
       </div>
@@ -480,20 +528,21 @@
 
 <script>
   let current = 0;
-  const stageNames=['','Local do evento','Tamanho do público','O que vai ter','Cidade do evento','Dia do evento','Horário do evento','Tipo de evento','Transporte','História','Proposta final'];
+  const stageNames=['','Local do evento','Tamanho do público','O que vai ter','Cidade do evento','Dia do evento','Horário do evento','Tipo de evento','Transporte','História','Dados do contratante','Endereço do evento','Proposta final'];
   function renderProgress(){
     document.querySelectorAll('[data-progress]').forEach((progress)=>{
       const stage=Number(progress.closest('[data-screen]').dataset.screen);
-      progress.innerHTML=Array.from({length:10},(_,index)=>`${index?'<span></span>':''}<i class="${index<stage?'on':''}"></i>`).join('');
+      progress.innerHTML=Array.from({length:12},(_,index)=>`${index?'<span></span>':''}<i class="${index<stage?'on':''}"></i>`).join('');
       const label=progress.parentElement.querySelector('.step-label');
-      if(label) label.textContent=`${stage} de 10 · ${stageNames[stage]}`;
+      if(label) label.textContent=`${stage} de 12 · ${stageNames[stage]}`;
     });
   }
   function go(index){
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
     document.querySelector('[data-screen="'+index+'"]').classList.add('active');
     current=index;
-    if(index===10) renderProposal();
+    if(index===11) document.getElementById('eventCityReadonly').value=document.getElementById('city').value.trim();
+    if(index===12) renderProposal();
     window.scrollTo({top:0,behavior:'smooth'});
   }
 
@@ -563,6 +612,25 @@
     document.getElementById('timeStatus').textContent='';
     go(7);
   }
+  function continueToAddress(){
+    const church=document.getElementById('churchName').value.trim();
+    const contractor=document.getElementById('contractorName').value.trim();
+    const phone=document.getElementById('contractorPhone').value.replace(/\D/g,'');
+    const status=document.getElementById('contactStatus');
+    if(!church||!contractor||phone.length<8||phone.length>15){status.textContent='Informe o nome da igreja ou organização, o nome do contratante e um telefone válido.';return}
+    document.getElementById('contractorPhone').value=phone;
+    status.textContent='';
+    go(11);
+  }
+  function continueToProposal(){
+    const address=document.getElementById('eventAddress').value.trim();
+    const cep=document.getElementById('eventCep').value.replace(/\D/g,'');
+    const status=document.getElementById('addressStatus');
+    if(!address||cep.length!==8){status.textContent='Informe o endereço completo e um CEP com 8 dígitos.';return}
+    document.getElementById('eventCep').value=cep;
+    status.textContent='';
+    go(12);
+  }
   async function calculateTravel(){
     const city=document.getElementById('city').value.trim();
     const status=document.getElementById('eventTypeStatus');
@@ -605,6 +673,36 @@
     document.getElementById('installmentSlider').value=String(selectedInstallments);
     updateInstallmentDisplay();
     document.getElementById('proposalTransportPrice').textContent=formatMoney(transportCents);
+  }
+  function reserveEvent(){
+    if(!travelQuote)return;
+    const dateValue=document.getElementById('eventDate').value;
+    const [year,month,day]=dateValue.split('-');
+    const [hourText,minute]=document.getElementById('eventTime').value.split(':');
+    const hour24=Number(hourText);
+    const period=hour24>=12?'pm':'am';
+    const hour12=(hour24%12)||12;
+    const eventToPresentation={puppets:'teatro-fantoches','theater-music':'teatro-palco','children-congress':'congresso-infantil','complete-show':'parques-arenas','full-congress':'show-completo-2h'};
+    const storyToTerm={'Samuel':'História de Samuel','Fábrica de Heróis':'Fábrica de heróis','História de Davi':'Davi e Golias'};
+    const city=document.getElementById('city').value.trim();
+    const event=eventTypes.find((item)=>item.id===selectedEventTypeId)||eventTypes[0];
+    const prefill={
+      igreja:document.getElementById('churchName').value.trim(),
+      contratante:document.getElementById('contractorName').value.trim(),
+      whatsapp:document.getElementById('contractorPhone').value.replace(/\D/g,''),
+      localEvento:venueAt(venueIndex),
+      publicoEstimado:String(capacities[capIndex]),
+      elementosEvento:Array.from(document.querySelectorAll('.feature.selected strong')).map((node)=>node.textContent.trim()).join(', '),
+      historia:storyToTerm[storyAt(storyIndex)]||'Fábrica de heróis',
+      dia:String(Number(day)),mes:['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][Number(month)-1],ano:year,
+      horario:`${hour12}h${minute}${period}`,pais:'Brasil',
+      endereco:document.getElementById('eventAddress').value.trim(),cidade,cep:document.getElementById('eventCep').value.replace(/\D/g,''),
+      presentationKey:eventToPresentation[event.id]||'teatro-fantoches',eventCount:'1',couponCode:'',
+      transportAmountCents:String(Math.max(0,Number(travelQuote.transportCents)||0)),transportTripType:'ROUND_TRIP',transportCityA:'Jacareí-SP',transportCityB:travelQuote.destinationLabel||city,
+      freeTransport:false,freeLodging:false
+    };
+    try{sessionStorage.setItem('eventProposalTermPrefill',JSON.stringify(prefill));window.location.href='/termo'}
+    catch(error){window.location.href='/termo'}
   }
 
   const capacities=[100,300,500,'1000+']; let capIndex=1;

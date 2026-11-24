@@ -962,8 +962,19 @@
       couponDiscountCents: "0",
       finalPriceCents: "340000"
     };
+    let proposalTermPrefill = null;
+    try {
+      proposalTermPrefill = JSON.parse(sessionStorage.getItem("eventProposalTermPrefill") || "null");
+      if (proposalTermPrefill && typeof proposalTermPrefill === "object") Object.assign(answers, proposalTermPrefill);
+      else proposalTermPrefill = null;
+      if (proposalTermPrefill) sessionStorage.removeItem("eventProposalTermPrefill");
+    } catch { proposalTermPrefill = null; }
     const pickerIndexes = {};
-    steps.forEach((s) => { if (s.type === "picker") pickerIndexes[s.key] = 0; });
+    steps.forEach((s) => {
+      if (s.type !== "picker") return;
+      const selectedIndex = proposalTermPrefill ? s.options.indexOf(String(answers[s.key] || "")) : -1;
+      pickerIndexes[s.key] = selectedIndex >= 0 ? selectedIndex : 0;
+    });
 
     const screens = {
       intro: document.querySelector('[data-screen="intro"]'),

@@ -30,6 +30,9 @@ const QUESTION_ORDER = [
   { key: "endereco", label: "Qual é o endereço do evento?" },
   { key: "cidade", label: "Em qual cidade será o evento?" },
   { key: "cep", label: "Qual é o código postal (CEP)?" },
+  { key: "localEvento", label: "Tipo de local do evento" },
+  { key: "publicoEstimado", label: "Público estimado" },
+  { key: "elementosEvento", label: "Elementos escolhidos para o evento" },
   { key: "presentationName", label: "Apresentacao escolhida" },
   { key: "eventCount", label: "Quantidade de eventos" },
   { key: "unitPrice", label: "Valor por evento" },
@@ -173,6 +176,18 @@ async function buildCommercialAnswers(rawAnswers) {
     eventCount: rawAnswers?.eventCount,
     couponCode: rawAnswers?.couponCode
   });
+  if (!pricing.couponCode && rawAnswers?.transportAmountCents !== undefined) {
+    const transportAmountCents = Math.max(0, Math.trunc(Number(rawAnswers.transportAmountCents) || 0));
+    const freeTransport = Boolean(rawAnswers.freeTransport) || transportAmountCents === 0;
+    pricing.transportAmountCents = freeTransport ? 0 : transportAmountCents;
+    pricing.transportTripType = String(rawAnswers.transportTripType || "").trim();
+    pricing.transportCityA = String(rawAnswers.transportCityA || "").trim();
+    pricing.transportCityB = String(rawAnswers.transportCityB || "").trim();
+    pricing.transportDescription = String(rawAnswers.transportDescription || "").trim();
+    pricing.freeTransport = freeTransport;
+    pricing.freeLodging = Boolean(rawAnswers.freeLodging);
+    pricing.finalPriceCents = Math.max(0, pricing.basePriceCents - pricing.couponDiscountCents + pricing.transportAmountCents);
+  }
   return {
     pricing,
     values: {
@@ -204,6 +219,12 @@ export async function createAllTermEntry(rawAnswers, userId = null, rawAcceptedT
   answers.unitPriceCents = String(commercial.pricing.unitPriceCents);
   answers.basePriceCents = String(commercial.pricing.basePriceCents);
   answers.transportAmountCents = String(commercial.pricing.transportAmountCents || 0);
+  answers.transportTripType = commercial.pricing.transportTripType || "";
+  answers.transportCityA = commercial.pricing.transportCityA || "";
+  answers.transportCityB = commercial.pricing.transportCityB || "";
+  answers.localEvento = String(rawAnswers?.localEvento || "").trim();
+  answers.publicoEstimado = String(rawAnswers?.publicoEstimado || "").trim();
+  answers.elementosEvento = String(rawAnswers?.elementosEvento || "").trim();
   answers.couponDiscountCents = String(commercial.pricing.couponDiscountCents);
   answers.finalPriceCents = String(commercial.pricing.finalPriceCents);
   const firstPaymentDue = String(rawAnswers?.pagamentoVencimentoIso || "").trim().slice(0, 10);
