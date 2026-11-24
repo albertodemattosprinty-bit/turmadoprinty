@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101f45">
+  <title>Meu evento | Turma do Printy</title>
+  <style>
+    :root{font-family:Inter,"Segoe UI",Arial,sans-serif;color:#17284b;background:#f4f7fb;font-synthesis:none;text-rendering:optimizeLegibility}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh}
+    .topbar{background:#101f45;color:#fff}
+    .topbar-inner{width:min(100% - 32px,1000px);min-height:76px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:16px}
+    .brand{display:flex;align-items:center;gap:11px;color:inherit;text-decoration:none}
+    .brand-mark{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:#ffd15e;color:#402d00;font-weight:950}
+    .brand-copy strong,.brand-copy span{display:block}.brand-copy strong{font-size:15px}.brand-copy span{margin-top:3px;color:#c8d3e7;font-size:12px}
+    .logout{padding:10px 15px;border:1px solid #526384;border-radius:11px;background:transparent;color:#fff;font:inherit;font-size:13px;font-weight:750;cursor:pointer}
+    main{width:min(100% - 32px,1000px);margin:34px auto 60px}
+    .hero{padding:28px;border-radius:23px;background:linear-gradient(125deg,#132754,#214a84);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:22px;box-shadow:0 15px 38px rgba(16,31,69,.14)}
+    .eyebrow{margin:0 0 9px;color:#ffd15e;font-size:11px;font-weight:900;letter-spacing:.13em;text-transform:uppercase}
+    h1{margin:0;font-size:clamp(25px,4vw,36px);line-height:1.1}
+    .hero-copy{margin:10px 0 0;color:#d9e3f4;font-size:14px;line-height:1.5}
+    .draft-badge{flex:none;padding:9px 13px;border:1px solid rgba(255,209,94,.45);border-radius:999px;background:rgba(255,209,94,.12);color:#ffe8a3;font-size:12px;font-weight:850}
+    .draft-note{margin:18px 0;padding:14px 16px;border:1px solid #f0d995;border-radius:14px;background:#fff8df;color:#6e5311;font-size:13px;line-height:1.5}
+    .sections{display:grid;gap:16px;margin-top:18px}
+    .info-card{padding:23px;border:1px solid #e2e9f2;border-radius:19px;background:#fff;box-shadow:0 8px 24px rgba(30,55,91,.05)}
+    .info-card h2{margin:0 0 16px;color:#152952;font-size:18px}
+    .fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 20px}
+    .field{min-width:0;padding-bottom:12px;border-bottom:1px solid #edf1f6}
+    .field.wide{grid-column:1/-1}
+    dt{margin:0 0 5px;color:#71809a;font-size:11px;font-weight:850;letter-spacing:.035em;text-transform:uppercase}
+    dd{margin:0;color:#1a2c50;font-size:14px;font-weight:700;line-height:1.45;overflow-wrap:anywhere;white-space:pre-line}
+    .error-card{margin-top:22px;padding:20px;border:1px solid #f0c9c3;border-radius:16px;background:#fff0ed;color:#852b20;line-height:1.5}
+    .loading{min-height:230px;display:grid;place-items:center;color:#64738d;font-weight:750}
+    .spinner{width:32px;height:32px;margin:0 auto 12px;border:3px solid #dbe5f1;border-top-color:#2587e8;border-radius:50%;animation:spin .8s linear infinite}
+    [hidden]{display:none!important}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @media(max-width:620px){
+      .topbar-inner{min-height:68px}
+      main{margin-top:18px}
+      .hero{padding:22px;align-items:flex-start;flex-direction:column;gap:14px}
+      .info-card{padding:19px}
+      .fields{grid-template-columns:1fr;gap:12px}
+      .field.wide{grid-column:auto}
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/" aria-label="Turma do Printy">
+        <span class="brand-mark">TP</span>
+        <span class="brand-copy"><strong>Turma do Printy</strong><span>Painel do contratante</span></span>
+      </a>
+      <button class="logout" id="logoutButton" type="button">Sair</button>
+    </div>
+  </header>
+  <main>
+    <div class="loading" id="loadingState"><div><div class="spinner"></div>Carregando os dados do seu evento…</div></div>
+    <section id="panelContent" hidden>
+      <header class="hero">
+        <div><p class="eyebrow">Painel do contratante</p><h1 id="panelTitle">Seu evento</h1><p class="hero-copy">Aqui estão as informações que você preencheu no simulador.</p></div>
+        <span class="draft-badge" id="draftBadge">Proposta em preparação</span>
+      </header>
+      <p class="draft-note" id="draftNote">Sua proposta está salva. Os dados do evento ficam reunidos neste painel.</p>
+      <div class="sections" id="infoSections"></div>
+    </section>
+    <div class="error-card" id="errorState" role="alert" hidden></div>
+  </main>
+  <script>
+    const TOKEN_KEY='turma_do_printy_token';
+    const panelPath='/painel-do-evento.html';
+    const presentationDetails={
+      'teatro-fantoches':{duration:'50 min',team:'2 integrantes'},
+      'teatro-palco':{duration:'1h15',team:'3 integrantes'},
+      'congresso-infantil':{duration:'1h15',team:'4 integrantes'},
+      'parques-arenas':{duration:'1h30',team:'4 integrantes'},
+      'show-completo-2h':{duration:'3h',team:'5 integrantes'}
+    };
+    const $=(id)=>document.getElementById(id);
+    const text=(value,fallback='A definir')=>String(value??'').trim()||fallback;
+    const formatMoney=(cents)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((Number(cents)||0)/100);
+    function renderSection(title,fields){
+      const section=document.createElement('section');
+      section.className='info-card';
+      const heading=document.createElement('h2');
+      heading.textContent=title;
+      section.appendChild(heading);
+      const list=document.createElement('dl');
+      list.className='fields';
+      for(const [label,value,wide] of fields){
+        if(value==null||String(value).trim()==='')continue;
+        const item=document.createElement('div');
+        item.className=wide?'field wide':'field';
+        const term=document.createElement('dt');term.textContent=label;
+        const detail=document.createElement('dd');detail.textContent=String(value);
+        item.append(term,detail);list.appendChild(item);
+      }
+      section.appendChild(list);
+      if(list.childElementCount)$('infoSections').appendChild(section);
+    }
+    function showError(message){
+      $('loadingState').hidden=true;
+      $('panelContent').hidden=true;
+      $('errorState').hidden=false;
+      $('errorState').textContent=message;
+    }
+    function redirectToLogin(){
+      window.location.assign(`/auth.html?next=${encodeURIComponent(panelPath)}`);
+    }
+    function renderPanel(term){
+      const answers=term?.answers||{};
+      const dateLabel=[answers.dia,answers.mes,answers.ano].filter(Boolean).join(' de ');
+      const details=presentationDetails[answers.presentationKey]||{};
+      const installmentCount=Number(answers.proposalInstallments)||0;
+      const installmentAmount=Number(answers.proposalInstallmentCents)||0;
+      $('panelTitle').textContent=`Evento de ${text(answers.contratante,'seu contratante')}`;
+      $('draftBadge').textContent=term?.isDraft?'Proposta em preparação':'Evento registrado';
+      $('draftNote').textContent=term?.isDraft
+        ? 'Sua proposta está salva como rascunho. Confira os dados reunidos abaixo.'
+        : 'Confira as informações do seu evento reunidas neste painel.';
+      $('infoSections').replaceChildren();
+      renderSection('Evento',[
+        ['Tipo de evento',answers.presentationName],
+        ['Duração',details.duration],
+        ['Equipe',details.team],
+        ['Data',dateLabel||date(term?.eventDate)],
+        ['Horário',answers.horario],
+        ['Local escolhido',answers.localEvento],
+        ['Público estimado',answers.publicoEstimado?`${answers.publicoEstimado} pessoas`:'' ],
+        ['História',answers.historia],
+        ['Elementos escolhidos',answers.elementosEvento,true]
+      ]);
+      renderSection('Contratante',[
+        ['Igreja ou organização',answers.igreja],
+        ['Nome do contratante',answers.contratante],
+        ['Telefone / WhatsApp',answers.whatsapp]
+      ]);
+      renderSection('Endereço do evento',[
+        ['Endereço',answers.endereco,true],
+        ['Cidade',answers.cidade],
+        ['CEP',answers.cep],
+        ['País',answers.pais]
+      ]);
+      renderSection('Investimento e logística',[
+        ['Valor base',answers.basePrice],
+        ['Transporte',answers.transportAmount],
+        ['Percurso',answers.transportRoute,true],
+        ['Valor total antes do parcelamento',answers.finalPrice],
+        ['Parcelas',installmentCount?`${installmentCount}x de ${formatMoney(installmentAmount)}`:''],
+        ['Total parcelado',answers.proposalFinancedTotalCents?formatMoney(answers.proposalFinancedTotalCents):''],
+        ['Alimentação incluída','Sim'],
+        ['Hospedagem incluída',answers.freeLodging==='Sim'?'Sim':'Incluída']
+      ]);
+      $('loadingState').hidden=true;
+      $('errorState').hidden=true;
+      $('panelContent').hidden=false;
+    }
+    async function loadPanel(){
+      const token=localStorage.getItem(TOKEN_KEY)||'';
+      if(!token){redirectToLogin();return}
+      try{
+        const response=await fetch('/api/contractor-panel/proposal-draft',{headers:{Authorization:`Bearer ${token}`}});
+        const payload=await response.json().catch(()=>({}));
+        if(response.status===401){localStorage.removeItem(TOKEN_KEY);redirectToLogin();return}
+        if(!response.ok)throw new Error(payload.error||'Não foi possível carregar os dados do seu evento.');
+        if(!payload.term)throw new Error('Ainda não encontramos uma proposta vinculada a este acesso.');
+        renderPanel(payload.term);
+      }catch(error){showError(error?.message||'Não foi possível carregar os dados do seu evento.')}
+    }
+    function date(value){
+      if(!value)return '';
+      const parsed=new Date(`${String(value).slice(0,10)}T12:00:00`);
+      return Number.isNaN(parsed.getTime())?'':new Intl.DateTimeFormat('pt-BR').format(parsed);
+    }
+    $('logoutButton').addEventListener('click',()=>{localStorage.removeItem(TOKEN_KEY);redirectToLogin()});
+    loadPanel();
+  </script>
+</body>
+</html>

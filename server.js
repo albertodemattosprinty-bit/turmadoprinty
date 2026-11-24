@@ -11453,6 +11453,40 @@ async function handleCreateContractorPanelProposalDraft(request, response) {
   }
 }
 
+async function handleGetContractorPanelProposalDraft(request, response) {
+  if (!hasDatabase()) {
+    sendJson(response, 503, { error: "DATABASE_URL nao configurada." });
+    return;
+  }
+
+  const authUser = await requireAuth(request, response);
+  if (!authUser) return;
+
+  try {
+    const term = await getLatestTermByUserId(authUser.id);
+    if (!term) {
+      sendJson(response, 404, { error: "Ainda nao encontramos uma proposta vinculada a este acesso." });
+      return;
+    }
+
+    sendJson(response, 200, {
+      ok: true,
+      term: {
+        id: term.id,
+        answers: term.answers || {},
+        eventDate: term.eventDate,
+        eventTime: term.eventTime,
+        createdAt: term.createdAt,
+        isDraft: Boolean(term.isDraft)
+      }
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar os dados da proposta."
+    });
+  }
+}
+
 async function handleClaimTermAccount(request, response, termId) {
   if (!hasDatabase()) { sendJson(response, 503, { error: "DATABASE_URL nao configurada." }); return; }
   let body;
@@ -16262,6 +16296,11 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/terms") {
     await handleCreateTerm(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/contractor-panel/proposal-draft") {
+    await handleGetContractorPanelProposalDraft(request, response);
     return;
   }
 

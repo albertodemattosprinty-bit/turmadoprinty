@@ -712,7 +712,7 @@
     const event=eventTypes[index];
     const previous=eventAt(index-1);
     const next=eventAt(index+1);
-    document.getElementById('eventTypeGrid').innerHTML=`<article class="event-type-card">${renderEventArtwork(event)}<div class="event-team">${teamIcon}<span>${event.team} integrantes</span></div><strong>${event.name}</strong><div class="event-type-meta"><span>${event.duration}</span><b>${formatMoney(event.priceCents)}</b></div></article>`;
+    document.getElementById('eventTypeGrid').innerHTML=`<article class="event-type-card" data-event-type="${event.id}" data-event-name="${event.name}" data-price-cents="${event.priceCents}" data-duration="${event.duration}" data-team="${event.team}">${renderEventArtwork(event)}<div class="event-team">${teamIcon}<span>${event.team} integrantes</span></div><strong>${event.name}</strong><div class="event-type-meta"><span>${event.duration}</span><b>${formatMoney(event.priceCents)}</b></div></article>`;
     document.getElementById('eventTypePrev').innerHTML=renderEventArtwork(previous);
     document.getElementById('eventTypePeekNext').innerHTML=renderEventArtwork(next);
   }
@@ -840,8 +840,8 @@
     if(action==='close')return;
     if(action==='change-login'){go(12);return}
     if(action==='city'){go(4);document.getElementById('city').focus();return}
-    if(action==='login'){window.location.assign(`/auth.html?next=${encodeURIComponent('/painel-do-contratante')}`);return}
-    if(action==='open-panel'){window.location.assign('/painel-do-contratante');return}
+    if(action==='login'){window.location.assign(`/auth.html?next=${encodeURIComponent('/painel-do-evento.html')}`);return}
+    if(action==='open-panel'){window.location.assign('/painel-do-evento.html');return}
     reserveEvent();
   }
   document.getElementById('reserveFeedbackModal').addEventListener('click',(event)=>{
@@ -893,28 +893,36 @@
       const hour24=Number(hourText);
       const period=hour24>=12?'pm':'am';
       const hour12=(hour24%12)||12;
+      currentStep='montagem-dos-dados-do-evento';
       const eventToPresentation={puppets:'teatro-fantoches','theater-music':'teatro-palco','children-congress':'congresso-infantil','complete-show':'parques-arenas','full-congress':'show-completo-2h'};
       const storyToTerm={'Samuel':'História de Samuel','Fábrica de Heróis':'Fábrica de heróis','História de Davi':'Davi e Golias'};
       const city=document.getElementById('city').value.trim();
-      const event=eventTypes.find((item)=>item.id===selectedEventTypeId)||eventTypes[0];
+      const eventCard=document.querySelector('#eventTypeGrid .event-type-card');
+      if(!eventCard)throw makeReserveError('Escolha o tipo de evento antes de reservar.','EVENT_TYPE_NOT_SELECTED','stage=event-type');
+      const event={id:eventCard.dataset.eventType,name:eventCard.dataset.eventName,priceCents:Number(eventCard.dataset.priceCents),duration:eventCard.dataset.duration,team:Number(eventCard.dataset.team)};
+      const storyName=document.getElementById('storyMainName').textContent.trim();
+      const selectedVenue=document.getElementById('venueName').textContent.trim();
+      const selectedCapacity=document.getElementById('capacityText').textContent.trim().replace(/\s+pessoas$/i,'');
+      const selectedInstallmentCount=Math.max(1,Math.min(12,Number(document.getElementById('installmentSlider').value)||12));
+      if(!event.id||!event.name||!Number.isFinite(event.priceCents))throw makeReserveError('Não consegui identificar o tipo de evento selecionado. Volte e escolha uma opção.','EVENT_TYPE_DATA_INVALID','stage=event-type');
       const transportCents=Math.max(0,Number(travelQuote.transportCents)||0);
-      const interestRate=selectedInstallments===1?0:0.02+((selectedInstallments-2)/10)*0.22;
+      const interestRate=selectedInstallmentCount===1?0:0.02+((selectedInstallmentCount-2)/10)*0.22;
       const financedTotalCents=Math.round((event.priceCents+transportCents)*(1+interestRate));
       const prefill={
         igreja:church,
         contratante:contractor,
         whatsapp:phone,
-        localEvento:venueAt(venueIndex),
-        publicoEstimado:String(capacities[capIndex]),
+        localEvento:selectedVenue,
+        publicoEstimado:selectedCapacity,
         elementosEvento:Array.from(document.querySelectorAll('.feature.selected strong')).map((node)=>node.textContent.trim()).join(', '),
-        historia:storyToTerm[storyAt(storyIndex)]||'Fábrica de heróis',
+        historia:storyToTerm[storyName]||'Fábrica de heróis',
         dia:String(Number(day)),mes:['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][Number(month)-1],ano:year,
         horario:`${hour12}h${minute}${period}`,pais:'Brasil',
         endereco:address,cidade,cep,
         presentationKey:eventToPresentation[event.id]||'teatro-fantoches',eventCount:'1',couponCode:'',
-        proposalInstallments:String(selectedInstallments),
+        proposalInstallments:String(selectedInstallmentCount),
         proposalFinancedTotalCents:String(financedTotalCents),
-        proposalInstallmentCents:String(Math.round(financedTotalCents/selectedInstallments)),
+        proposalInstallmentCents:String(Math.round(financedTotalCents/selectedInstallmentCount)),
         transportAmountCents:String(transportCents),transportTripType:'ROUND_TRIP',transportCityA:'Jacareí-SP',transportCityB:travelQuote.destinationLabel||city,
         freeTransport:false,freeLodging:false
       };
@@ -942,8 +950,8 @@
       }
 
       reserveEventInFlight=false;
-      showReserveFeedback({kind:'success',title:'Acesso criado!',message:'Sua proposta foi salva. Estamos abrindo o painel do contratante.',primaryLabel:'Abrir painel agora',primaryAction:'open-panel'});
-      window.location.assign('/painel-do-contratante');
+      showReserveFeedback({kind:'success',title:'Acesso criado!',message:'Sua proposta foi salva. Estamos abrindo seu novo painel do contratante.',primaryLabel:'Abrir painel agora',primaryAction:'open-panel'});
+      window.location.assign('/painel-do-evento.html');
       window.setTimeout(()=>{
         if(location.pathname.includes('proposta_evento_interativa')){
           button.disabled=false;
@@ -955,7 +963,7 @@
       reserveEventInFlight=false;
       const code=error?.feedbackCode||'RESERVE_UNEXPECTED_CLIENT_ERROR';
       const action=error?.feedbackAction||'retry';
-      const details=error?.feedbackDetails||`step=${currentStep}; error=${error?.name||'unknown'}`;
+      const details=error?.feedbackDetails||`step=${currentStep}; error=${error?.name||'unknown'}; message=${error?.message||'unknown'}`;
       const title=code==='RESERVE_LOGIN_CONFLICT'?'Esse login já está em uso':code==='RESERVE_NETWORK_ERROR'?'Falha de conexão':code==='TRANSPORT_QUOTE_MISSING'?'Transporte ainda não calculado':'Não foi possível abrir o painel';
       const primaryLabel=action==='change-login'?'Corrigir acesso':action==='city'?'Voltar à cidade':action==='login'?'Ir para o login':'Tentar novamente';
       button.disabled=false;
