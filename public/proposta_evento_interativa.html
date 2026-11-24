@@ -150,7 +150,7 @@
   .city-wrap{width:min(100%,820px);margin:0 auto}
   .city-art{height:clamp(230px,42vh,430px);border-radius:30px;margin:16px 0;display:grid;place-items:center;overflow:hidden;background:linear-gradient(145deg,#dff3ff,#bfe5ff)}
   .city-art svg{width:min(84%,560px);height:86%}
-  .step-stage-photo{width:min(100%,720px);height:clamp(180px,30vh,320px);margin:12px auto 20px;border-radius:26px;background-image:url('/midia/proposta-campos-evento.webp');background-repeat:no-repeat;background-size:202% 202%;box-shadow:var(--shadow)}
+  .step-stage-photo{width:min(100%,520px);height:auto;aspect-ratio:1 / 1;margin:12px auto 20px;border-radius:26px;background-image:url('/midia/proposta-campos-evento.webp');background-repeat:no-repeat;background-size:202% 202%;box-shadow:var(--shadow)}
   .step-stage-photo.date{background-position:0 0}
   .step-stage-photo.time{background-position:100% 0}
   .step-stage-photo.type{background-position:0 100%}
@@ -391,7 +391,7 @@
           <div class="progress" data-progress></div>
           <div class="step-label"></div>
           <h1>Estimativa de transporte</h1>
-          <p class="sub">O cálculo considera o percurso rodoviário de ida e volta.</p>
+          <p class="sub">O percurso rodoviário é estimado por inteligência artificial. O cálculo considera ida e volta.</p>
         </header>
         <div class="step-stage-photo transport" role="img" aria-label="Ilustração de palco para a estimativa de transporte"></div>
         <div class="route-card">
@@ -399,7 +399,7 @@
           <div class="route-distance" id="routeDistance"></div>
           <div class="route-formula" id="routeFormula"></div>
           <div class="route-total" id="routeTotal"></div>
-          <p class="route-attribution">Estimativa entre os centros das cidades. O trajeto pode variar conforme o endereço do evento. © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a>; rotas calculadas com OSRM.</p>
+          <p class="route-attribution">Distância rodoviária estimada por inteligência artificial entre os centros das cidades. O trajeto real pode variar conforme o endereço do evento.</p>
         </div>
         <button class="primary" onclick="go(9)">CONTINUAR &nbsp;›</button>
         <button class="back-button" onclick="go(7)">VOLTAR AO TIPO DE EVENTO</button>
@@ -540,7 +540,7 @@
     const button=document.getElementById('eventTypeNext');
     if(!city||!/(?:,|-)[ ]*[A-Za-z]{2}$/.test(city)){go(4);document.getElementById('cityStatus').textContent='Informe a cidade e a sigla do estado (por exemplo: Taubaté-SP).';return}
     button.disabled=true;
-    status.textContent='Calculando o percurso rodoviário…';
+    status.textContent='Estimando a distância rodoviária com inteligência artificial…';
     try{
       const response=await fetch('/api/event-proposal/distance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({city})});
       const payload=await response.json().catch(()=>({}));
@@ -574,7 +574,7 @@
     document.getElementById('totalPrice').textContent=formatMoney(totalCents);
     document.getElementById('installmentValue').textContent=`12x de ${formatMoney(Math.round(totalCents/12))}`;
     document.getElementById('cashPrice').textContent=formatMoney(totalCents);
-    document.getElementById('proposalRouteDetail').textContent=`${new Intl.NumberFormat('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}).format(Number(travelQuote.roundTripKm)||0)} km de ida e volta · R$ 1,15/km.`;
+    document.getElementById('proposalRouteDetail').textContent=`${new Intl.NumberFormat('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}).format(Number(travelQuote.roundTripKm)||0)} km estimados de ida e volta · R$ 1,15/km.`;
     document.getElementById('proposalTransportPrice').textContent=formatMoney(transportCents);
     const eventDate=new Date(`${document.getElementById('eventDate').value}T12:00:00`).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});
     const eventTime=document.getElementById('eventTime').value;

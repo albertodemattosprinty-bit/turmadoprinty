@@ -14776,13 +14776,8 @@ async function handleMidiaTrackAsset(request, response, pathname, download = fal
   }
 }
 
-const EVENT_PROPOSAL_GEOCODER_URL = String(process.env.EVENT_PROPOSAL_GEOCODER_URL || "https://nominatim.openstreetmap.org/search").replace(/\/+$/, "");
-const EVENT_PROPOSAL_ROUTER_URL = String(process.env.EVENT_PROPOSAL_ROUTER_URL || "https://router.project-osrm.org/route/v1/driving").replace(/\/+$/, "");
 const EVENT_PROPOSAL_ROUTE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const eventProposalRouteCache = new Map();
-const eventProposalGeocodeCache = new Map();
-let eventProposalNominatimQueue = Promise.resolve();
-let eventProposalLastNominatimRequestAt = 0;
 
 const EVENT_PROPOSAL_STATE_NAMES = {
   AC: "Acre", AL: "Alagoas", AP: "Amapá", AM: "Amazonas", BA: "Bahia", CE: "Ceará",
@@ -14801,52 +14796,6 @@ function normalizeEventProposalPlace(value) {
   const stateName = EVENT_PROPOSAL_STATE_NAMES[stateCode];
   if (!city || !stateName || city.length > 80) return null;
   return { city, stateCode, stateName, key: `${city},${stateCode}` };
-}
-
-async function geocodeEventProposalPlace(query, cacheKey, expectedStateCode = "") {
-  const cached = eventProposalGeocodeCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return cached.result;
-
-  const task = eventProposalNominatimQueue.then(async () => {
-    const waitMs = Math.max(0, 1100 - (Date.now() - eventProposalLastNominatimRequestAt));
-    if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
-    eventProposalLastNominatimRequestAt = Date.now();
-
-    const searchUrl = new URL(EVENT_PROPOSAL_GEOCODER_URL);
-    searchUrl.searchParams.set("q", query);
-    searchUrl.searchParams.set("format", "jsonv2");
-    searchUrl.searchParams.set("addressdetails", "1");
-    searchUrl.searchParams.set("limit", "1");
-    searchUrl.searchParams.set("countrycodes", "br");
-    const response = await fetch(searchUrl, {
-      headers: {
-        "User-Agent": "TurmaDoPrintyEventProposal/1.0 (+https://www.turmadoprinty.com.br/)",
-        "Accept-Language": "pt-BR"
-      },
-      signal: AbortSignal.timeout(12000)
-    });
-    if (!response.ok) throw new Error("O serviço de busca de cidades está indisponível. Tente novamente em instantes.");
-    const results = await response.json();
-    const result = Array.isArray(results) ? results[0] : null;
-    if (!result || !Number.isFinite(Number(result.lat)) || !Number.isFinite(Number(result.lon))) {
-      throw new Error("Não encontrei essa cidade. Confira o nome e a sigla do estado, como Taubaté-SP.");
-    }
-    const resultStateCode = String(result.address?.["ISO3166-2-lvl4"] || "").split("-").pop().toUpperCase();
-    if (expectedStateCode && resultStateCode && resultStateCode !== expectedStateCode) {
-      throw new Error(`Não encontrei ${query} no estado informado. Confira a cidade e a sigla do estado.`);
-    }
-
-    const geocoded = {
-      latitude: Number(result.lat),
-      longitude: Number(result.lon),
-      label: result.name || result.address?.city || result.address?.town || result.address?.village || query
-    };
-    eventProposalGeocodeCache.set(cacheKey, { result: geocoded, expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 });
-    if (eventProposalGeocodeCache.size > 500) eventProposalGeocodeCache.delete(eventProposalGeocodeCache.keys().next().value);
-    return geocoded;
-  });
-  eventProposalNominatimQueue = task.catch(() => {});
-  return task;
 }
 
 async function handleEventProposalDistanceRequest(request, response) {
@@ -14871,36 +14820,56 @@ async function handleEventProposalDistanceRequest(request, response) {
   }
 
   try {
-    const [origin, destination] = await Promise.all([
-      geocodeEventProposalPlace("Jacareí, São Paulo, Brasil", "Jacareí-SP"),
-      geocodeEventProposalPlace(`${place.city}, ${place.stateName}, Brasil`, place.key, place.stateCode)
-    ]);
-    const routeUrl = `${EVENT_PROPOSAL_ROUTER_URL}/${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}?overview=false&alternatives=false&steps=false`;
-    const routeResponse = await fetch(routeUrl, { signal: AbortSignal.timeout(15000) });
-    if (!routeResponse.ok) throw new Error("O serviço de rotas está indisponível. Tente novamente em instantes.");
-    const routePayload = await routeResponse.json();
-    const distanceMeters = Number(routePayload?.routes?.[0]?.distance);
-    if (routePayload?.code !== "Ok" || !Number.isFinite(distanceMeters) || distanceMeters < 0) {
-      throw new Error("Não consegui traçar uma rota para essa cidade. Confira a cidade e o estado.");
+    const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+    if (!apiKey) throw new Error("A estimativa de transporte está indisponível no momento.");
+
+    const model = String(process.env.EVENT_PROPOSAL_DISTANCE_MODEL || OPENAI_MODEL || OPENAI_INSTANT_MODEL || "gpt-4.1-nano").trim();
+    const aiResponse = await createChatCompletion(apiKey, {
+      model,
+      messages: [
+        {
+          role: "system",
+          content: "Você estima distâncias rodoviárias entre centros de municípios brasileiros. Responda apenas JSON válido no formato {\"oneWayKm\": número ou null, \"confidence\": \"baixa\"|\"média\"|\"alta\"}. Estime a distância por estrada em uma rota rodoviária típica, nunca a distância em linha reta. Se não tiver base suficiente para uma estimativa razoável, retorne oneWayKm como null. Arredonde a distância de ida para o quilômetro inteiro mais próximo."
+        },
+        {
+          role: "user",
+          content: `Estime a distância rodoviária de ida entre o centro de Jacareí-SP e o centro de ${place.city}-${place.stateCode}, no Brasil. Considere uma rota de carro típica. Retorne somente o JSON solicitado.`
+        }
+      ],
+      response_format: { type: "json_object" },
+      max_completion_tokens: 180
+    }, { timeoutMs: 20000, timeoutMessage: "A estimativa de transporte demorou demais. Tente novamente." });
+    const content = aiResponse?.choices?.[0]?.message?.content;
+    let estimate;
+    try {
+      estimate = JSON.parse(content || "{}");
+    } catch {
+      throw new Error("Não consegui estimar a distância para essa cidade. Confira o nome e a sigla do estado.");
+    }
+    const rawOneWayKm = estimate?.oneWayKm == null ? Number.NaN : Number(estimate.oneWayKm);
+    if (!Number.isFinite(rawOneWayKm) || rawOneWayKm < 0 || rawOneWayKm > 5000) {
+      throw new Error("Não consegui estimar a distância para essa cidade. Confira o nome e a sigla do estado.");
     }
 
-    const oneWayKm = distanceMeters / 1000;
+    const oneWayKm = Math.round(rawOneWayKm);
     const roundTripKm = oneWayKm * 2;
     const transportCents = Math.round(roundTripKm * 1.15 * 100);
     const result = {
       originLabel: "Jacareí-SP",
-      destinationLabel: `${destination.label}-${place.stateCode}`,
+      destinationLabel: `${place.city}-${place.stateCode}`,
       oneWayKm,
       roundTripKm,
       rateCentsPerKm: 115,
       transportCents,
-      provider: "OpenStreetMap / OSRM"
+      provider: "OpenAI",
+      estimateConfidence: ["baixa", "média", "alta"].includes(estimate.confidence) ? estimate.confidence : "baixa",
+      isEstimate: true
     };
     eventProposalRouteCache.set(place.key, { result, expiresAt: Date.now() + EVENT_PROPOSAL_ROUTE_CACHE_TTL_MS });
     if (eventProposalRouteCache.size > 500) eventProposalRouteCache.delete(eventProposalRouteCache.keys().next().value);
     sendJson(response, 200, result);
   } catch (error) {
-    sendJson(response, 502, { error: error instanceof Error ? error.message : "Não foi possível calcular o percurso agora." });
+    sendJson(response, 502, { error: error instanceof Error ? error.message : "Não foi possível estimar o transporte agora." });
   }
 }
 
