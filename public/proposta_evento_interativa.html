@@ -91,9 +91,12 @@
   .travel-day-group{display:block}
   .travel-day-group h3{margin:0 0 8px;color:var(--navy);font-size:17px;font-weight:950}
   .travel-day-items{display:grid;gap:8px;margin:0;padding:0;list-style:none}
-  .travel-day-items li{display:grid;grid-template-columns:26px 54px minmax(0,1fr);gap:8px;align-items:center;color:#34435a;font-size:13px}
-  .travel-day-items svg{width:22px;height:22px;color:#187bd2}
-  .travel-day-items time{font-weight:900;color:var(--navy)}
+  .travel-day-items li{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;align-items:center;color:#34435a;font-size:13px}
+  .travel-icon{display:block;width:30px;height:30px;object-fit:contain}
+  .travel-icon.return{transform:scaleX(-1)}
+  .travel-item-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .travel-item-copy strong{font-size:13px;line-height:1.25;color:#34435a}
+  .travel-item-copy time{font-size:12px;font-weight:900;color:var(--navy)}
   .meal-summary{margin-top:16px;padding:12px;border-radius:14px;background:#fff;color:#34435a;font-size:13px;line-height:1.55}
   .meal-summary strong{color:var(--navy)}
   .route-status{width:min(100%,760px);margin:14px auto 0;text-align:center;color:#a33;font-weight:700}
@@ -815,7 +818,12 @@
     document.getElementById('routeTotal').textContent=`Transporte: ${money}`;
     renderTravelSummary(plan);
   }
-  const mealTimes=[{time:'08:00',name:'Café'},{time:'12:30',name:'Almoço'},{time:'16:00',name:'Café'},{time:'21:30',name:'Janta'}];
+  const mealTimes=[
+    {time:'08:00',name:'Café',icon:'cafe'},
+    {time:'12:30',name:'Almoço',icon:'almoco'},
+    {time:'16:00',name:'Café da tarde',icon:'cafe-da-tarde'},
+    {time:'21:30',name:'Jantar',icon:'jantar'}
+  ];
   function eventStartDate(){
     const [year,month,day]=document.getElementById('eventDate').value.split('-').map(Number);
     const [hour,minute]=document.getElementById('eventTime').value.split(':').map(Number);
@@ -831,18 +839,20 @@
   }
   function formatDuration(minutes){const h=Math.floor(minutes/60),m=minutes%60;return h?`${h}h${m?String(m).padStart(2,'0'):''}`:`${m} min`}
   function clockDate(day,time){const [hour,minute]=time.split(':').map(Number);return new Date(day.getFullYear(),day.getMonth(),day.getDate(),hour,minute)}
-  function iconForTravel(kind,mealName=''){
-    const icons={
-      depart:'<path d="M4 12h14M13 6l6 6-6 6"/><path d="M5 5v14"/>',
-      arrive:'<path d="M20 12H6m5-6-6 6 6 6"/><path d="M19 5v14"/>',
-      church:'<path d="M12 3v18M5 9l7-5 7 5M6 10h12v11H6z"/><path d="M10 21v-6h4v6"/>',
-      meal:'<path d="M5 9h12v6a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5zM17 11h2a2 2 0 1 1 0 4h-2M7 5c0-1 1-1 1-2m4 2c0-1 1-1 1-2"/>',
-      lunch:'<path d="M4 3v8m4-8v8M6 3v18M17 3v18m0-18c-3 3-3 8 0 10"/>',
-      dinner:'<path d="M5 11a7 7 0 0 0 14 0H5zM7 15v4h10v-4M12 4v3m-4-2 1 2m7-2-1 2"/>',
-      hotel:'<path d="M3 20V5m0 11h18v4M3 12h6a4 4 0 0 1 4 4m0 0V9h4a4 4 0 0 1 4 4v3"/>'
-    };
-    const icon=kind==='meal'?(mealName==='Almoço'?'lunch':mealName==='Janta'?'dinner':'meal'):kind;
-    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[icon]||icons.meal}</svg>`;
+  const travelIconPaths={
+    hospedagem:'/midia/icons/viagem/hospedagem.svg',
+    carro:'/midia/icons/viagem/carro.svg',
+    almoco:'/midia/icons/viagem/almoco.svg',
+    'cafe-da-tarde':'/midia/icons/viagem/cafe-da-tarde.svg',
+    cafe:'/midia/icons/viagem/cafe.svg',
+    jantar:'/midia/icons/viagem/jantar.svg',
+    igreja:'/midia/icons/viagem/igreja.svg',
+    evento:'/midia/icons/viagem/inicio-evento.svg'
+  };
+  function iconForTravel(item){
+    const src=travelIconPaths[item.icon]||travelIconPaths.carro;
+    const directionClass=item.direction==='return'?' return':'';
+    return `<img class="travel-icon${directionClass}" src="${src}" alt="" aria-hidden="true">`;
   }
   function buildTravelPlan(oneWayKm){
     const event=eventTypes.find((item)=>item.id===selectedEventTypeId)||eventTypes[0];
@@ -885,8 +895,8 @@
           if(index>0){
             const previousLeg=outboundLegs[index-1];
             segments.push({start:previousLeg.end,end:leg.start,kind:'city',label:'Parada para descanso na estrada'});
-            items.push({at:previousLeg.end,kind:'hotel',text:'Pernoite durante o trajeto'});
-            items.push({at:leg.start,kind:'depart',text:'Retomada da viagem entre 06:00 e 18:00'});
+            items.push({at:previousLeg.end,kind:'hotel',icon:'hospedagem',text:'Hospedagem durante o trajeto'});
+            items.push({at:leg.start,kind:'depart',icon:'carro',direction:'outbound',text:'Retomada da viagem'});
           }
         }
       }else{
@@ -901,7 +911,7 @@
         while(remaining>0){
           const drive=Math.min(720,remaining),end=addMinutes(cursor,drive);
           segments.push({start:cursor,end,kind:'road',label:'Estrada — volta'});
-          if(remaining>drive){const next=new Date(end.getFullYear(),end.getMonth(),end.getDate()+1,6,0);segments.push({start:end,end:next,kind:'city',label:'Parada para descanso na estrada'});items.push({at:end,kind:'hotel',text:'Pernoite durante o retorno'});items.push({at:next,kind:'depart',text:'Retomada do retorno às 06:00'});cursor=next}
+          if(remaining>drive){const next=new Date(end.getFullYear(),end.getMonth(),end.getDate()+1,6,0);segments.push({start:end,end:next,kind:'city',label:'Parada para descanso na estrada'});items.push({at:end,kind:'hotel',icon:'hospedagem',text:'Hospedagem durante o retorno'});items.push({at:next,kind:'depart',icon:'carro',direction:'return',text:'Retomada do retorno'});cursor=next}
           else homeArrival=end;
           remaining-=drive;
         }
@@ -910,14 +920,14 @@
       segments.push({start:venueArrival,end:venueDeparture,kind:'church',label:'Permanência na igreja / evento'});
       segments.push({start:venueDeparture,end:returnDeparture,kind:'city',label:'Hospedagem na cidade'});
     }
-    items.push({at:outboundDeparture,kind:'depart',text:'Saída de Jacareí'});
-    items.push({at:outboundArrival,kind:'arrive',text:lodging?'Chegada à cidade do evento':'Chegada ao local do evento'});
-    if(lodging)items.push({at:outboundArrival,kind:'hotel',text:'Hospedagem na cidade até o evento'});
-    items.push({at:venueArrival,kind:'church',text:`Chegada à igreja / local (${arrivalLeadMinutes/60}h antes)`});
-    items.push({at:start,kind:'church',text:`Início do evento · ${event.name}`});
-    items.push({at:venueDeparture,kind:'depart',text:'Saída após desmontagem (2h)'});
-    if(lodging)items.push({at:returnDeparture,kind:'depart',text:'Saída da cidade às 06:00'});
-    items.push({at:homeArrival,kind:'arrive',text:'Chegada a Jacareí'});
+    items.push({at:outboundDeparture,kind:'depart',icon:'carro',direction:'outbound',text:'Saída de Jacareí'});
+    items.push({at:outboundArrival,kind:'arrive',icon:'carro',direction:'outbound',text:lodging?'Chegada à cidade do evento':'Chegada ao local do evento'});
+    if(lodging)items.push({at:outboundArrival,kind:'hotel',icon:'hospedagem',text:'Hospedagem na cidade'});
+    items.push({at:venueArrival,kind:'church',icon:'igreja',text:'Chegada à igreja'});
+    items.push({at:start,kind:'event',icon:'evento',text:`Início do evento · ${event.name}`});
+    items.push({at:venueDeparture,kind:'depart',icon:'carro',direction:'return',text:'Saída após desmontagem (2h)'});
+    if(lodging)items.push({at:returnDeparture,kind:'depart',icon:'carro',direction:'return',text:'Saída da cidade'});
+    items.push({at:homeArrival,kind:'arrive',icon:'carro',direction:'return',text:'Chegada a Jacareí'});
     const meals=[];
     for(const segment of segments){
       for(let day=new Date(segment.start.getFullYear(),segment.start.getMonth(),segment.start.getDate());day<=segment.end;day.setDate(day.getDate()+1)){
@@ -925,7 +935,7 @@
       }
     }
     meals.sort((a,b)=>a.at-b.at);
-    for(const meal of meals)items.push({at:meal.at,kind:'meal',mealName:meal.name,text:`${meal.name} · ${meal.category}`,meal:true});
+    for(const meal of meals)items.push({at:meal.at,kind:'meal',icon:meal.icon,mealName:meal.name,text:`${meal.name} · ${meal.category}`,meal:true});
     items.sort((a,b)=>a.at-b.at);
     return {items,meals,lodging,oneWayMinutes,days:Math.max(1,Math.ceil(oneWayMinutes/720))};
   }
@@ -940,7 +950,7 @@
     ].map((text)=>`<span class="travel-stat">${text}</span>`).join('');
     const days=new Map();
     for(const item of plan.items){const key=`${item.at.getFullYear()}-${item.at.getMonth()}-${item.at.getDate()}`;if(!days.has(key))days.set(key,{date:item.at,items:[]});days.get(key).items.push(item)}
-    document.getElementById('travelTimeline').innerHTML=Array.from(days.values()).map((day)=>`<li class="travel-day-group"><h3>${formatDayHeading(day.date)}</h3><ul class="travel-day-items">${day.items.map((item)=>`<li>${iconForTravel(item.kind,item.mealName)}<time>${formatClock(item.at)}</time><span>${item.text}</span></li>`).join('')}</ul></li>`).join('');
+    document.getElementById('travelTimeline').innerHTML=Array.from(days.values()).map((day)=>`<li class="travel-day-group"><h3>${formatDayHeading(day.date)}</h3><ul class="travel-day-items">${day.items.map((item)=>`<li>${iconForTravel(item)}<span class="travel-item-copy"><strong>${item.text}</strong><time>${formatClock(item.at)}</time></span></li>`).join('')}</ul></li>`).join('');
     const counts={Estrada:0,Cidade:0,Igreja:0};for(const meal of plan.meals)counts[meal.category]+=1;
     const total=plan.meals.length*team;
     document.getElementById('mealSummary').innerHTML=`<strong>Refeições previstas</strong><br>${plan.meals.length?plan.meals.map((meal)=>`${formatClock(meal.at)} · ${meal.name} (${meal.category})`).join('<br>'):'Nenhuma refeição coincide com os horários previstos durante o trajeto ou a permanência do evento.'}<br><strong>Equipe: ${total} refeições</strong> (${counts.Estrada*team} estrada, ${counts.Cidade*team} cidade, ${counts.Igreja*team} igreja).`;
