@@ -87,10 +87,13 @@
   .travel-summary h2{margin:0 0 12px;font-size:18px;color:var(--navy)}
   .travel-stats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
   .travel-stat{padding:7px 10px;border-radius:10px;background:#eaf4ff;color:#27466f;font-size:12px;font-weight:800}
-  .travel-timeline{display:grid;gap:8px;margin:0;padding:0;list-style:none}
-  .travel-timeline li{display:grid;grid-template-columns:26px 72px minmax(0,1fr);gap:8px;align-items:center;color:#34435a;font-size:13px}
-  .travel-timeline svg{width:22px;height:22px;color:#187bd2}
-  .travel-timeline time{font-weight:900;color:var(--navy)}
+  .travel-timeline{display:grid;gap:14px;margin:0;padding:0;list-style:none}
+  .travel-day-group{display:block}
+  .travel-day-group h3{margin:0 0 8px;color:var(--navy);font-size:17px;font-weight:950}
+  .travel-day-items{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+  .travel-day-items li{display:grid;grid-template-columns:26px 54px minmax(0,1fr);gap:8px;align-items:center;color:#34435a;font-size:13px}
+  .travel-day-items svg{width:22px;height:22px;color:#187bd2}
+  .travel-day-items time{font-weight:900;color:var(--navy)}
   .meal-summary{margin-top:16px;padding:12px;border-radius:14px;background:#fff;color:#34435a;font-size:13px;line-height:1.55}
   .meal-summary strong{color:var(--navy)}
   .route-status{width:min(100%,760px);margin:14px auto 0;text-align:center;color:#a33;font-weight:700}
@@ -819,7 +822,13 @@
     return new Date(year,month-1,day,hour,minute,0,0);
   }
   function addMinutes(date,minutes){return new Date(date.getTime()+minutes*60000)}
-  function formatDateTime(date){return new Intl.DateTimeFormat('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).format(date).replace(',',' ·')}
+  function formatDayHeading(date){const parts=Object.fromEntries(new Intl.DateTimeFormat('pt-BR',{weekday:'long',day:'numeric',month:'long'}).formatToParts(date).map((part)=>[part.type,part.value]));const weekday=parts.weekday[0].toLocaleUpperCase('pt-BR')+parts.weekday.slice(1);return `${weekday} · ${parts.day} de ${parts.month}`}
+  function formatClock(date){return new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit'}).format(date)}
+  function formatTravelPlanText(plan){
+    const days=new Map();
+    for(const item of plan.items){const key=`${item.at.getFullYear()}-${item.at.getMonth()}-${item.at.getDate()}`;if(!days.has(key))days.set(key,{date:item.at,items:[]});days.get(key).items.push(item)}
+    return Array.from(days.values()).flatMap((day)=>[formatDayHeading(day.date),...day.items.map((item)=>`${formatClock(item.at)} — ${item.text}`)]).join('\n');
+  }
   function formatDuration(minutes){const h=Math.floor(minutes/60),m=minutes%60;return h?`${h}h${m?String(m).padStart(2,'0'):''}`:`${m} min`}
   function clockDate(day,time){const [hour,minute]=time.split(':').map(Number);return new Date(day.getFullYear(),day.getMonth(),day.getDate(),hour,minute)}
   function iconForTravel(kind,mealName=''){
@@ -839,14 +848,15 @@
     const event=eventTypes.find((item)=>item.id===selectedEventTypeId)||eventTypes[0];
     const oneWayMinutes=Math.max(0,Math.ceil(oneWayKm/75*60));
     const start=eventStartDate();
-    const venueArrival=addMinutes(start,-120);
+    const arrivalLeadMinutes=oneWayMinutes>360?240:120;
+    const venueArrival=addMinutes(start,-arrivalLeadMinutes);
     const eventEnd=addMinutes(start,eventDurationMinutes(event.duration));
     const venueDeparture=addMinutes(eventEnd,120);
     const sameDayDeparture=addMinutes(venueArrival,-oneWayMinutes);
     const sameDayHome=addMinutes(venueDeparture,oneWayMinutes);
-    const minDeparture=new Date(start.getFullYear(),start.getMonth(),start.getDate(),4,0);
+    const minDeparture=new Date(start.getFullYear(),start.getMonth(),start.getDate(),oneWayMinutes>360?5:4,0);
     const nextDay=new Date(start.getFullYear(),start.getMonth(),start.getDate()+1);
-    const sameDay=!Number.isNaN(start.getTime())&&sameDayDeparture>=minDeparture&&sameDayHome<nextDay;
+    const sameDay=!Number.isNaN(start.getTime())&&oneWayMinutes<=720&&sameDayDeparture>=minDeparture&&sameDayHome<nextDay;
     const items=[],segments=[];
     let lodging=!sameDay, outboundArrival, outboundDeparture, returnDeparture, homeArrival;
     if(sameDay){
@@ -858,20 +868,30 @@
       const previousDay=new Date(start.getFullYear(),start.getMonth(),start.getDate()-1);
       if(oneWayMinutes>720){
         let remaining=oneWayMinutes;
-        outboundDeparture=new Date(start.getFullYear(),start.getMonth(),start.getDate()-Math.ceil(oneWayMinutes/720),6,0);
-        let cursor=outboundDeparture;
+        let arrival=clockDate(previousDay,'18:00');
+        const outboundLegs=[];
         while(remaining>0){
-          const drive=Math.min(720,remaining),end=addMinutes(cursor,drive);
-          segments.push({start:cursor,end,kind:'road',label:'Estrada — ida'});
-          if(remaining>drive){const next=new Date(end.getFullYear(),end.getMonth(),end.getDate()+1,6,0);segments.push({start:end,end:next,kind:'city',label:'Parada para descanso na estrada'});items.push({at:end,kind:'hotel',text:'Pernoite durante o trajeto'});items.push({at:next,kind:'depart',text:'Retomada da viagem às 06:00'});cursor=next}
-          else outboundArrival=end;
+          const drive=Math.min(720,remaining),legStart=addMinutes(arrival,-drive);
+          outboundLegs.push({start:legStart,end:arrival,kind:'road',label:'Estrada — ida'});
           remaining-=drive;
+          if(remaining>0)arrival=clockDate(new Date(legStart.getFullYear(),legStart.getMonth(),legStart.getDate()-1),'18:00');
+          else outboundArrival=arrival;
+        }
+        outboundLegs.reverse();
+        outboundDeparture=outboundLegs[0].start;
+        for(let index=0;index<outboundLegs.length;index++){
+          const leg=outboundLegs[index];
+          segments.push(leg);
+          if(index>0){
+            const previousLeg=outboundLegs[index-1];
+            segments.push({start:previousLeg.end,end:leg.start,kind:'city',label:'Parada para descanso na estrada'});
+            items.push({at:previousLeg.end,kind:'hotel',text:'Pernoite durante o trajeto'});
+            items.push({at:leg.start,kind:'depart',text:'Retomada da viagem entre 06:00 e 18:00'});
+          }
         }
       }else{
-        const targetArrival=clockDate(previousDay,`${String(venueArrival.getHours()).padStart(2,'0')}:${String(venueArrival.getMinutes()).padStart(2,'0')}`);
+        const targetArrival=clockDate(previousDay,'19:00');
         outboundDeparture=addMinutes(targetArrival,-oneWayMinutes);
-        const minOutbound=new Date(previousDay.getFullYear(),previousDay.getMonth(),previousDay.getDate(),4,0);
-        if(outboundDeparture<minOutbound)outboundDeparture=minOutbound;
         outboundArrival=addMinutes(outboundDeparture,oneWayMinutes);
         segments.push({start:outboundDeparture,end:outboundArrival,kind:'road',label:'Estrada — ida'});
       }
@@ -893,7 +913,7 @@
     items.push({at:outboundDeparture,kind:'depart',text:'Saída de Jacareí'});
     items.push({at:outboundArrival,kind:'arrive',text:lodging?'Chegada à cidade do evento':'Chegada ao local do evento'});
     if(lodging)items.push({at:outboundArrival,kind:'hotel',text:'Hospedagem na cidade até o evento'});
-    items.push({at:venueArrival,kind:'church',text:'Chegada à igreja / local (2h antes)'});
+    items.push({at:venueArrival,kind:'church',text:`Chegada à igreja / local (${arrivalLeadMinutes/60}h antes)`});
     items.push({at:start,kind:'church',text:`Início do evento · ${event.name}`});
     items.push({at:venueDeparture,kind:'depart',text:'Saída após desmontagem (2h)'});
     if(lodging)items.push({at:returnDeparture,kind:'depart',text:'Saída da cidade às 06:00'});
@@ -901,7 +921,7 @@
     const meals=[];
     for(const segment of segments){
       for(let day=new Date(segment.start.getFullYear(),segment.start.getMonth(),segment.start.getDate());day<=segment.end;day.setDate(day.getDate()+1)){
-        for(const meal of mealTimes){const at=clockDate(day,meal.time);if(at>=segment.start&&at<segment.end)meals.push({...meal,at,category:segment.kind==='road'?'Estrada':segment.kind==='church'?'Igreja':'Cidade'})}
+        for(const meal of mealTimes){const at=clockDate(day,meal.time);if(at>=segment.start&&at<segment.end)meals.push({...meal,at,category:segment.kind==='road'||at<venueArrival?'Estrada':segment.kind==='church'?'Igreja':'Cidade'})}
       }
     }
     meals.sort((a,b)=>a.at-b.at);
@@ -918,10 +938,12 @@
       plan.lodging?'Hospedagem necessária':'Viagem de ida e volta no mesmo dia',
       `Equipe: ${team} integrantes`
     ].map((text)=>`<span class="travel-stat">${text}</span>`).join('');
-    document.getElementById('travelTimeline').innerHTML=plan.items.map((item)=>`<li>${iconForTravel(item.kind,item.mealName)}<time>${formatDateTime(item.at)}</time><span>${item.text}</span></li>`).join('');
+    const days=new Map();
+    for(const item of plan.items){const key=`${item.at.getFullYear()}-${item.at.getMonth()}-${item.at.getDate()}`;if(!days.has(key))days.set(key,{date:item.at,items:[]});days.get(key).items.push(item)}
+    document.getElementById('travelTimeline').innerHTML=Array.from(days.values()).map((day)=>`<li class="travel-day-group"><h3>${formatDayHeading(day.date)}</h3><ul class="travel-day-items">${day.items.map((item)=>`<li>${iconForTravel(item.kind,item.mealName)}<time>${formatClock(item.at)}</time><span>${item.text}</span></li>`).join('')}</ul></li>`).join('');
     const counts={Estrada:0,Cidade:0,Igreja:0};for(const meal of plan.meals)counts[meal.category]+=1;
     const total=plan.meals.length*team;
-    document.getElementById('mealSummary').innerHTML=`<strong>Refeições previstas</strong><br>${plan.meals.length?plan.meals.map((meal)=>`${formatDateTime(meal.at)} · ${meal.name} (${meal.category})`).join('<br>'):'Nenhuma refeição coincide com os horários previstos durante o trajeto ou a permanência do evento.'}<br><strong>Equipe: ${total} refeições</strong> (${counts.Estrada*team} estrada, ${counts.Cidade*team} cidade, ${counts.Igreja*team} igreja).`;
+    document.getElementById('mealSummary').innerHTML=`<strong>Refeições previstas</strong><br>${plan.meals.length?plan.meals.map((meal)=>`${formatClock(meal.at)} · ${meal.name} (${meal.category})`).join('<br>'):'Nenhuma refeição coincide com os horários previstos durante o trajeto ou a permanência do evento.'}<br><strong>Equipe: ${total} refeições</strong> (${counts.Estrada*team} estrada, ${counts.Cidade*team} cidade, ${counts.Igreja*team} igreja).`;
   }
   function renderProposal(){
     if(!travelQuote)return;
@@ -1045,7 +1067,7 @@
       const travelSummary=[
         `Tempo de estrada estimado: ${formatDuration(travelPlan.oneWayMinutes)} por trecho, média de 75 km/h.`,
         travelPlan.lodging?'Hospedagem necessária na cidade do evento.':'Ida e volta no mesmo dia, sem hospedagem.',
-        ...travelPlan.items.map((item)=>`${formatDateTime(item.at)} — ${item.text}`),
+        formatTravelPlanText(travelPlan),
         `Refeições para ${event.team} integrantes: ${travelPlan.meals.length*event.team} no total (${travelPlan.meals.filter((meal)=>meal.category==='Estrada').length*event.team} estrada, ${travelPlan.meals.filter((meal)=>meal.category==='Cidade').length*event.team} cidade, ${travelPlan.meals.filter((meal)=>meal.category==='Igreja').length*event.team} igreja).`
       ].join('\n');
       const interestRate=selectedInstallmentCount===1?0:0.02+((selectedInstallmentCount-2)/10)*0.22;
