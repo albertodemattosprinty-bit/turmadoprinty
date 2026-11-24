@@ -14776,6 +14776,134 @@ async function handleMidiaTrackAsset(request, response, pathname, download = fal
   }
 }
 
+const EVENT_PROPOSAL_GEOCODER_URL = String(process.env.EVENT_PROPOSAL_GEOCODER_URL || "https://nominatim.openstreetmap.org/search").replace(/\/+$/, "");
+const EVENT_PROPOSAL_ROUTER_URL = String(process.env.EVENT_PROPOSAL_ROUTER_URL || "https://router.project-osrm.org/route/v1/driving").replace(/\/+$/, "");
+const EVENT_PROPOSAL_ROUTE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const eventProposalRouteCache = new Map();
+const eventProposalGeocodeCache = new Map();
+let eventProposalNominatimQueue = Promise.resolve();
+let eventProposalLastNominatimRequestAt = 0;
+
+const EVENT_PROPOSAL_STATE_NAMES = {
+  AC: "Acre", AL: "Alagoas", AP: "Amapá", AM: "Amazonas", BA: "Bahia", CE: "Ceará",
+  DF: "Distrito Federal", ES: "Espírito Santo", GO: "Goiás", MA: "Maranhão", MT: "Mato Grosso",
+  MS: "Mato Grosso do Sul", MG: "Minas Gerais", PA: "Pará", PB: "Paraíba", PR: "Paraná",
+  PE: "Pernambuco", PI: "Piauí", RJ: "Rio de Janeiro", RN: "Rio Grande do Norte", RS: "Rio Grande do Sul",
+  RO: "Rondônia", RR: "Roraima", SC: "Santa Catarina", SP: "São Paulo", SE: "Sergipe", TO: "Tocantins"
+};
+
+function normalizeEventProposalPlace(value) {
+  const normalized = String(value || "").trim().replace(/\s+/g, " ");
+  const match = normalized.match(/^(.*?)\s*(?:,|-)\s*([A-Za-z]{2})$/);
+  if (!match) return null;
+  const city = match[1].trim();
+  const stateCode = match[2].toUpperCase();
+  const stateName = EVENT_PROPOSAL_STATE_NAMES[stateCode];
+  if (!city || !stateName || city.length > 80) return null;
+  return { city, stateCode, stateName, key: `${city},${stateCode}` };
+}
+
+async function geocodeEventProposalPlace(query, cacheKey, expectedStateCode = "") {
+  const cached = eventProposalGeocodeCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.result;
+
+  const task = eventProposalNominatimQueue.then(async () => {
+    const waitMs = Math.max(0, 1100 - (Date.now() - eventProposalLastNominatimRequestAt));
+    if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+    eventProposalLastNominatimRequestAt = Date.now();
+
+    const searchUrl = new URL(EVENT_PROPOSAL_GEOCODER_URL);
+    searchUrl.searchParams.set("q", query);
+    searchUrl.searchParams.set("format", "jsonv2");
+    searchUrl.searchParams.set("addressdetails", "1");
+    searchUrl.searchParams.set("limit", "1");
+    searchUrl.searchParams.set("countrycodes", "br");
+    const response = await fetch(searchUrl, {
+      headers: {
+        "User-Agent": "TurmaDoPrintyEventProposal/1.0 (+https://www.turmadoprinty.com.br/)",
+        "Accept-Language": "pt-BR"
+      },
+      signal: AbortSignal.timeout(12000)
+    });
+    if (!response.ok) throw new Error("O serviço de busca de cidades está indisponível. Tente novamente em instantes.");
+    const results = await response.json();
+    const result = Array.isArray(results) ? results[0] : null;
+    if (!result || !Number.isFinite(Number(result.lat)) || !Number.isFinite(Number(result.lon))) {
+      throw new Error("Não encontrei essa cidade. Confira o nome e a sigla do estado, como Taubaté-SP.");
+    }
+    const resultStateCode = String(result.address?.["ISO3166-2-lvl4"] || "").split("-").pop().toUpperCase();
+    if (expectedStateCode && resultStateCode && resultStateCode !== expectedStateCode) {
+      throw new Error(`Não encontrei ${query} no estado informado. Confira a cidade e a sigla do estado.`);
+    }
+
+    const geocoded = {
+      latitude: Number(result.lat),
+      longitude: Number(result.lon),
+      label: result.name || result.address?.city || result.address?.town || result.address?.village || query
+    };
+    eventProposalGeocodeCache.set(cacheKey, { result: geocoded, expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 });
+    if (eventProposalGeocodeCache.size > 500) eventProposalGeocodeCache.delete(eventProposalGeocodeCache.keys().next().value);
+    return geocoded;
+  });
+  eventProposalNominatimQueue = task.catch(() => {});
+  return task;
+}
+
+async function handleEventProposalDistanceRequest(request, response) {
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch {
+    sendJson(response, 400, { error: "Dados inválidos para calcular o percurso." });
+    return;
+  }
+
+  const place = normalizeEventProposalPlace(body.city);
+  if (!place) {
+    sendJson(response, 400, { error: "Informe a cidade e a sigla do estado, por exemplo: Taubaté-SP." });
+    return;
+  }
+
+  const cached = eventProposalRouteCache.get(place.key);
+  if (cached && cached.expiresAt > Date.now()) {
+    sendJson(response, 200, cached.result);
+    return;
+  }
+
+  try {
+    const [origin, destination] = await Promise.all([
+      geocodeEventProposalPlace("Jacareí, São Paulo, Brasil", "Jacareí-SP"),
+      geocodeEventProposalPlace(`${place.city}, ${place.stateName}, Brasil`, place.key, place.stateCode)
+    ]);
+    const routeUrl = `${EVENT_PROPOSAL_ROUTER_URL}/${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}?overview=false&alternatives=false&steps=false`;
+    const routeResponse = await fetch(routeUrl, { signal: AbortSignal.timeout(15000) });
+    if (!routeResponse.ok) throw new Error("O serviço de rotas está indisponível. Tente novamente em instantes.");
+    const routePayload = await routeResponse.json();
+    const distanceMeters = Number(routePayload?.routes?.[0]?.distance);
+    if (routePayload?.code !== "Ok" || !Number.isFinite(distanceMeters) || distanceMeters < 0) {
+      throw new Error("Não consegui traçar uma rota para essa cidade. Confira a cidade e o estado.");
+    }
+
+    const oneWayKm = distanceMeters / 1000;
+    const roundTripKm = oneWayKm * 2;
+    const transportCents = Math.round(roundTripKm * 1.15 * 100);
+    const result = {
+      originLabel: "Jacareí-SP",
+      destinationLabel: `${destination.label}-${place.stateCode}`,
+      oneWayKm,
+      roundTripKm,
+      rateCentsPerKm: 115,
+      transportCents,
+      provider: "OpenStreetMap / OSRM"
+    };
+    eventProposalRouteCache.set(place.key, { result, expiresAt: Date.now() + EVENT_PROPOSAL_ROUTE_CACHE_TTL_MS });
+    if (eventProposalRouteCache.size > 500) eventProposalRouteCache.delete(eventProposalRouteCache.keys().next().value);
+    sendJson(response, 200, result);
+  } catch (error) {
+    sendJson(response, 502, { error: error instanceof Error ? error.message : "Não foi possível calcular o percurso agora." });
+  }
+}
+
 const server = http.createServer(async (request, response) => {
   const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
   const { pathname } = requestUrl;
@@ -14785,6 +14913,11 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "OPTIONS") {
     response.writeHead(204);
     response.end();
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/event-proposal/distance") {
+    await handleEventProposalDistanceRequest(request, response);
     return;
   }
 

@@ -56,7 +56,41 @@
     font-weight:800; letter-spacing:.03em;
   }
 
-  .hero-art{width:min(100%,720px);height:clamp(220px,38vh,420px);border-radius:30px;margin:6px auto 24px}
+  .venue-photo{background-image:url('/midia/quatro-espacos-evento.webp');background-repeat:no-repeat;background-size:202% 202%;border:0;color:transparent}
+  .venue-photo[data-venue-image="Igreja"]{background-position:0 0}
+  .venue-photo[data-venue-image="Escola"]{background-position:100% 0}
+  .venue-photo[data-venue-image="Teatro"]{background-position:0 100%}
+  .venue-photo[data-venue-image="Evento externo"]{background-position:100% 100%}
+
+  .event-type-grid{width:min(100%,1040px);margin:20px auto 0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+  .event-type-card{padding:0;overflow:hidden;border:2px solid #e3eaf4;border-radius:22px;background:#fff;color:var(--navy);text-align:left;cursor:pointer;box-shadow:0 10px 26px rgba(27,53,94,.08);transition:border-color .2s,transform .2s,box-shadow .2s}
+  .event-type-card:hover{transform:translateY(-2px)}
+  .event-type-card:disabled{opacity:.6;cursor:wait;transform:none}
+  .event-type-card.selected{border-color:var(--blue);box-shadow:0 0 0 3px rgba(22,140,242,.14),0 12px 28px rgba(27,53,94,.12)}
+  .event-art{height:150px;display:grid;place-items:center;overflow:hidden}
+  .event-art svg{width:100%;height:100%;display:block}
+  .event-team{display:flex;align-items:center;gap:7px;padding:9px 14px 0;color:#69748b;font-size:11px;font-weight:700}
+  .event-team svg{width:27px;height:18px;flex:none;color:#52688c}
+  .event-type-card strong{display:block;padding:5px 14px 0;font-size:16px;line-height:1.2}
+  .event-type-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 14px 14px;font-size:12px;color:#69748b}
+  .event-type-meta b{color:var(--navy);font-size:14px}
+  .route-card{width:min(100%,760px);margin:34px auto 0;padding:28px;border:1px solid #dce8f4;border-radius:24px;background:#f7fbff;box-shadow:var(--shadow);text-align:center}
+  .route-path{font-size:clamp(18px,2.4vw,26px);font-weight:900;color:var(--navy)}
+  .route-distance{font-size:clamp(30px,4vw,46px);font-weight:1000;color:var(--blue);margin:14px 0 4px}
+  .route-formula,.route-attribution{font-size:13px;color:var(--muted);line-height:1.5}
+  .route-total{font-size:22px;color:var(--navy);font-weight:900;margin-top:14px}
+  .route-status{width:min(100%,760px);margin:14px auto 0;text-align:center;color:#a33;font-weight:700}
+  .route-status:empty{display:none}
+  .route-attribution a{color:inherit}
+  .event-field-wrap{width:min(100%,600px);margin:38px auto 0}
+  .event-field-wrap label{display:block;text-align:left;margin-bottom:8px;color:var(--navy);font-size:13px;font-weight:800}
+  .event-field-wrap .input{font-size:18px}
+  .back-button{display:block;margin:12px auto 0;padding:8px 14px;border:0;background:transparent;color:var(--muted);font-size:12px;font-weight:800;cursor:pointer}
+  .transport-inc{grid-template-columns:64px minmax(0,1fr) auto}
+  .transport-inc .icon svg{width:30px;height:30px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .transport-inc .transport-amount{font-size:16px;font-weight:900;white-space:nowrap}
+
+  .hero-art{display:block;width:min(100%,720px);height:clamp(220px,38vh,420px);object-fit:cover;object-position:center;border-radius:30px;margin:6px auto 24px}
   h1{margin:0;font-size:clamp(34px,4.6vw,64px);line-height:1.02;letter-spacing:-1.6px;color:var(--navy)}
   .dark h1{color:#fff}
   .sub{font-size:clamp(15px,1.3vw,18px);line-height:1.5;color:var(--muted);max-width:680px;margin:12px auto 0}
@@ -73,7 +107,7 @@
   .progress{display:flex;justify-content:center;align-items:center;gap:0;margin:0 auto 10px}
   .progress i{width:13px;height:13px;border-radius:50%;border:2px solid #ccd6e4;display:block;background:#fff}
   .progress i.on{background:var(--blue);border-color:var(--blue);box-shadow:0 0 0 3px rgba(22,140,242,.12)}
-  .progress span{width:33px;height:2px;background:#d9e0ea}
+  .progress span{width:clamp(7px,2.8vw,33px);height:2px;background:#d9e0ea}
   .dark .progress i{background:#171310;border-color:#73592a}
   .dark .progress i.on{background:var(--gold);border-color:var(--gold)}
   .dark .progress span{background:#80632b}
@@ -114,7 +148,13 @@
   .feature.selected .check{background:var(--navy);border-color:var(--navy)}
 
   .city-wrap{width:min(100%,820px);margin:0 auto}
-  .city-art{height:clamp(230px,42vh,430px);border-radius:30px;margin:16px 0}
+  .city-art{height:clamp(230px,42vh,430px);border-radius:30px;margin:16px 0;display:grid;place-items:center;overflow:hidden;background:linear-gradient(145deg,#dff3ff,#bfe5ff)}
+  .city-art svg{width:min(84%,560px);height:86%}
+  .step-stage-photo{width:min(100%,720px);height:clamp(180px,30vh,320px);margin:12px auto 20px;border-radius:26px;background-image:url('/midia/proposta-campos-evento.webp');background-repeat:no-repeat;background-size:202% 202%;box-shadow:var(--shadow)}
+  .step-stage-photo.date{background-position:0 0}
+  .step-stage-photo.time{background-position:100% 0}
+  .step-stage-photo.type{background-position:0 100%}
+  .step-stage-photo.transport{background-position:100% 100%}
   .input{width:100%;border:1px solid #cfd9e7;border-radius:15px;padding:17px 18px;font-size:16px;outline:0;color:var(--navy);background:white}
   .input:focus{border-color:var(--blue);box-shadow:0 0 0 4px rgba(22,140,242,.10)}
 
@@ -135,6 +175,10 @@
   .investment{width:min(100%,820px);margin:0 auto;display:flex;flex-direction:column;gap:14px}
   .price-card{margin-top:8px;border:1px solid rgba(255,195,61,.72);background:linear-gradient(145deg,rgba(255,191,54,.08),rgba(255,255,255,.03));border-radius:24px;padding:24px;box-shadow:0 0 28px rgba(255,192,59,.13);text-align:center}
   .price-card small{color:#f5f5f5;font-weight:700}
+  .base-price-label,.total-price-label{color:#f0e4c4;font-size:13px;margin-top:10px}
+  .base-price-label strong{display:block;color:#fff;font-size:18px;margin-top:3px}
+  .total-price-label{margin-top:18px}
+  .event-schedule-summary{margin-top:14px;padding:14px;border-radius:14px;background:rgba(255,255,255,.08);color:#f5f5f5;font-size:13px;line-height:1.5}
   .installment{color:var(--gold);font-weight:1000;font-size:24px;margin-top:8px}
   .price{color:var(--gold);font-weight:1000;font-size:clamp(42px,6vw,66px);letter-spacing:-2px;line-height:1}
   .cash{margin-top:7px;color:#f0f0f0;font-size:13px}
@@ -157,6 +201,17 @@
     .arrow{width:42px;height:42px}
     .arrow.left{left:4px}.arrow.right{right:4px}
     .feature-list{grid-template-columns:1fr;gap:12px}
+    .event-type-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .event-art{height:112px}
+    .event-type-card{border-radius:17px}
+    .event-type-card strong{font-size:14px;padding-left:10px;padding-right:10px}
+    .event-team{padding:8px 10px 0;font-size:10px}
+    .event-type-meta{padding:6px 10px 12px;font-size:11px}
+    .event-type-meta b{font-size:12px}
+    .route-card{padding:20px 15px;margin-top:24px}
+    .step-stage-photo{height:220px;border-radius:22px;margin:8px auto 14px}
+    .transport-inc{grid-template-columns:50px minmax(0,1fr);gap:10px}
+    .transport-inc .transport-amount{grid-column:2;font-size:14px}
     .feature{min-height:112px;grid-template-columns:120px 1fr;grid-template-rows:1fr}
     .feature .ph{min-height:112px;border-bottom:0;border-right:2px dashed var(--placeholder-border)}
     .feature strong{text-align:left;display:flex;align-items:center;padding-left:18px}
@@ -184,7 +239,7 @@
         <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div>
         <div class="logo"><small>TURMA DO</small><div class="printy">PRINTY</div></div>
         <div class="proposal-kicker">PROPOSTA DE EVENTO</div>
-        <div class="placeholder hero-art">ÁREA DO SVG ANIMADO<br>KIDS / PERSONAGENS / ELEMENTOS</div>
+        <img class="hero-art" src="/midia/proposta-evento-retro.webp" alt="A Turma do Printy reunida com personagens em um palco colorido" fetchpriority="high" />
         <h1>Uma experiência incrível para o seu evento!</h1>
         <p class="sub">Vamos montar juntos um evento inesquecível. É rápido, interativo e feito especialmente para você.</p>
         <button class="primary" onclick="go(1)">TOQUE PARA COMEÇAR &nbsp;›</button>
@@ -194,19 +249,19 @@
     <section class="screen" data-screen="1">
       <div class="screen-inner">
         <header class="top">
-          <div class="progress"><i class="on"></i><span></span><i></i><span></span><i></i><span></span><i></i><span></span><i></i><span></span><i></i></div>
-          <div class="step-label">1 de 6 · Local do evento</div>
+          <div class="progress" data-progress></div>
+          <div class="step-label"></div>
           <h1>Onde vai ser o evento?</h1>
           <p class="sub">Selecione o local que melhor se encaixa com a sua realidade.</p>
         </header>
         <div class="carousel-wrap">
-          <div class="placeholder peek" id="venuePrev">SVG</div>
+          <div class="placeholder peek venue-photo" id="venuePrev" data-venue-image="Evento externo" role="img" aria-label="Local externo"></div>
           <div class="carousel-center">
-            <div class="placeholder card-main" id="venueArt">SVG / IMAGEM<br>IGREJA</div>
+            <div class="placeholder card-main venue-photo" id="venueArt" data-venue-image="Igreja" role="img" aria-label="Igreja"></div>
             <button class="arrow left" onclick="changeVenue(-1)">‹</button>
             <button class="arrow right" onclick="changeVenue(1)">›</button>
           </div>
-          <div class="placeholder peek" id="venueNext">SVG</div>
+          <div class="placeholder peek venue-photo" id="venueNext" data-venue-image="Escola" role="img" aria-label="Escola"></div>
         </div>
         <div class="choice-title" id="venueName">Igreja</div>
         <button class="primary" onclick="go(2)">PRÓXIMO &nbsp;›</button>
@@ -216,8 +271,8 @@
     <section class="screen" data-screen="2">
       <div class="screen-inner">
         <header class="top">
-          <div class="progress"><i class="on"></i><span></span><i class="on"></i><span></span><i></i><span></span><i></i><span></span><i></i><span></span><i></i></div>
-          <div class="step-label">2 de 6 · Tamanho do público</div>
+          <div class="progress" data-progress></div>
+          <div class="step-label"></div>
           <h1>Qual o tamanho do público?</h1>
           <p class="sub">Isso nos ajuda a preparar a melhor estrutura para o seu evento.</p>
         </header>
@@ -244,8 +299,8 @@
     <section class="screen" data-screen="3">
       <div class="screen-inner">
         <header class="top">
-          <div class="progress"><i class="on"></i><span></span><i class="on"></i><span></span><i class="on"></i><span></span><i></i><span></span><i></i><span></span><i></i></div>
-          <div class="step-label">3 de 6 · O que vai ter</div>
+          <div class="progress" data-progress></div>
+          <div class="step-label"></div>
           <h1>O que você quer no seu evento?</h1>
           <p class="sub">Escolha os elementos que farão parte da sua experiência.</p>
         </header>
@@ -261,24 +316,101 @@
     <section class="screen" data-screen="4">
       <div class="screen-inner">
         <header class="top">
-          <div class="progress"><i class="on"></i><span></span><i class="on"></i><span></span><i class="on"></i><span></span><i class="on"></i><span></span><i></i><span></span><i></i></div>
-          <div class="step-label">4 de 6 · Cidade do evento</div>
+          <div class="progress" data-progress></div>
+          <div class="step-label"></div>
           <h1>Qual é a cidade?</h1>
           <p class="sub">Digite o nome da cidade onde será o evento para ajustarmos a logística.</p>
         </header>
         <div class="city-wrap">
-          <div class="placeholder city-art">SVG BONITO<br>DE UMA CIDADE</div>
-          <input id="city" class="input" placeholder="Digite o nome da cidade..." />
+          <div class="city-art" aria-hidden="true"><svg viewBox="0 0 560 300"><path d="M22 74 126 28l98 42 86-36 96 54 108-45M5 210l103-57 105 47 91-61 94 64 147-39M91 4l40 70-48 71 46 68-28 83M289 10l-32 75 56 66-45 70 39 70M457 12l-38 78 53 67-29 62 24 76" fill="none" stroke="#fff" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/><path d="M85 190c63-52 102-16 154-43 54-27 79-69 131-43 51 26 62 61 115 24" fill="none" stroke="#168cf2" stroke-width="9" stroke-linecap="round" stroke-dasharray="2 20"/><circle cx="85" cy="190" r="21" fill="#fff" stroke="#168cf2" stroke-width="7"/><circle cx="485" cy="128" r="21" fill="#ffca45" stroke="#fff" stroke-width="7"/><path d="M84 182a9 9 0 1 0 1 0m400-62a9 9 0 1 0 1 0" fill="#11245a"/></svg></div>
+          <label for="city">Cidade e estado</label>
+          <input id="city" class="input" placeholder="Ex.: Taubaté-SP" autocomplete="address-level2" />
+          <div class="route-status" id="cityStatus" role="status" aria-live="polite"></div>
         </div>
-        <button class="primary" onclick="go(5)">PRÓXIMO &nbsp;›</button>
+        <button class="primary" onclick="continueToDate()">PRÓXIMO &nbsp;›</button>
       </div>
     </section>
 
     <section class="screen" data-screen="5">
       <div class="screen-inner">
         <header class="top">
-          <div class="progress"><i class="on"></i><span></span><i class="on"></i><span></span><i class="on"></i><span></span><i class="on"></i><span></span><i class="on"></i><span></span><i></i></div>
-          <div class="step-label">5 de 6 · História</div>
+          <div class="progress" data-progress></div>
+          <div class="step-label"></div>
+          <h1>Qual é o dia do evento?</h1>
+          <p class="sub">Escolha a data para conferirmos a disponibilidade da equipe.</p>
+        </header>
+        <div class="step-stage-photo date" role="img" aria-label="Ilustração de calendário para escolher a data"></div>
+        <div class="event-field-wrap">
+          <label for="eventDate">Data do evento</label>
+          <input id="eventDate" class="input" type="date" />
+          <div class="route-status" id="dateStatus" role="status" aria-live="polite"></div>
+        </div>
+        <button class="primary" onclick="continueToTime()">PRÓXIMO &nbsp;›</button>
+        <button class="back-button" onclick="go(4)">VOLTAR À CIDADE</button>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="6">
+      <div class="screen-inner">
+        <header class="top">
+          <div class="progress" data-progress></div>
+          <div class="step-label"></div>
+          <h1>Qual é o horário do evento?</h1>
+          <p class="sub">Informe o horário previsto para o início da programação.</p>
+        </header>
+        <div class="step-stage-photo time" role="img" aria-label="Ilustração de relógio para escolher o horário"></div>
+        <div class="event-field-wrap">
+          <label for="eventTime">Horário de início</label>
+          <input id="eventTime" class="input" type="time" />
+          <div class="route-status" id="timeStatus" role="status" aria-live="polite"></div>
+        </div>
+        <button class="primary" onclick="continueToEventType()">PRÓXIMO &nbsp;›</button>
+        <button class="back-button" onclick="go(5)">VOLTAR À DATA</button>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="7">
+      <div class="screen-inner">
+        <header class="top">
+          <div class="progress" data-progress></div>
+          <div class="step-label"></div>
+          <h1>Qual tipo de evento você quer?</h1>
+          <p class="sub">Escolha o formato que combina com a sua programação.</p>
+        </header>
+        <div class="step-stage-photo type" role="img" aria-label="Ilustração de teatro para escolher o formato do evento"></div>
+        <div class="event-type-grid" id="eventTypeGrid"></div>
+        <button class="primary" id="eventTypeNext" onclick="calculateTravel()">CALCULAR TRANSPORTE &nbsp;›</button>
+        <div class="route-status" id="eventTypeStatus" role="status" aria-live="polite"></div>
+        <button class="back-button" onclick="go(6)">VOLTAR AO HORÁRIO</button>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="8">
+      <div class="screen-inner">
+        <header class="top">
+          <div class="progress" data-progress></div>
+          <div class="step-label"></div>
+          <h1>Estimativa de transporte</h1>
+          <p class="sub">O cálculo considera o percurso rodoviário de ida e volta.</p>
+        </header>
+        <div class="step-stage-photo transport" role="img" aria-label="Ilustração de palco para a estimativa de transporte"></div>
+        <div class="route-card">
+          <div class="route-path" id="routePath"></div>
+          <div class="route-distance" id="routeDistance"></div>
+          <div class="route-formula" id="routeFormula"></div>
+          <div class="route-total" id="routeTotal"></div>
+          <p class="route-attribution">Estimativa entre os centros das cidades. O trajeto pode variar conforme o endereço do evento. © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a>; rotas calculadas com OSRM.</p>
+        </div>
+        <button class="primary" onclick="go(9)">CONTINUAR &nbsp;›</button>
+        <button class="back-button" onclick="go(7)">VOLTAR AO TIPO DE EVENTO</button>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="9">
+      <div class="screen-inner">
+        <header class="top">
+          <div class="progress" data-progress></div>
+          <div class="step-label"></div>
           <h1>Qual história você quer contar?</h1>
           <p class="sub">Cada história tem uma mensagem especial e uma experiência única.</p>
         </header>
@@ -303,22 +435,31 @@
           </div>
         </div>
 
-        <button class="primary" onclick="go(6)">PRÓXIMO &nbsp;›</button>
+        <button class="primary" onclick="go(10)">PRÓXIMO &nbsp;›</button>
+        <button class="back-button" onclick="go(8)">VOLTAR AO TRANSPORTE</button>
       </div>
     </section>
 
-    <section class="screen dark" data-screen="6">
+    <section class="screen dark" data-screen="10">
       <div class="screen-inner">
         <header class="top">
-          <div class="progress"><i class="on"></i><span></span><i class="on"></i><span></span><i class="on"></i><span></span><i class="on"></i><span></span><i class="on"></i><span></span><i class="on"></i></div>
-          <div class="step-label" style="color:#d8bd7d">6 de 6 · Seu investimento</div>
+          <div class="progress" data-progress></div>
+          <div class="step-label" style="color:#d8bd7d"></div>
           <h1>Seu evento completo ✦</h1>
           <p class="sub">Um investimento que gera memórias, valores e transforma vidas.</p>
         </header>
         <div class="investment">
-          <div class="price-card"><small>Investimento</small><div class="installment">12x de</div><div class="price">R$ 272,35</div><div class="cash">ou R$ 2.990,00 à vista</div></div>
+          <div class="price-card">
+            <small id="selectedEventName">Investimento</small>
+            <div class="base-price-label">Valor base <strong id="basePrice">—</strong></div>
+            <div class="total-price-label">Total com transporte</div>
+            <div class="price" id="totalPrice">—</div>
+            <div class="installment" id="installmentValue">12x de —</div>
+            <div class="cash">ou <span id="cashPrice">—</span> à vista</div>
+          </div>
+          <div class="event-schedule-summary" id="eventScheduleSummary"></div>
           <div class="inc"><div class="icon">⌂</div><div><b>Hospedagem</b><p>Incluída para toda a equipe.</p></div></div>
-          <div class="inc"><div class="icon">↔</div><div><b>Transporte</b><p>Todo o deslocamento da equipe.</p></div></div>
+          <div class="inc transport-inc"><div class="icon"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 18.5 6.3 11a3 3 0 0 1 2.9-2.2h13.6a3 3 0 0 1 2.9 2.2l2.3 7.5v7h-3v-3H7v3H4z"/><path d="M7 18.5h18M9 13h14M10 21.5h.1M22 21.5h.1"/></svg></div><div><b>Transporte</b><p id="proposalRouteDetail">Ida e volta desde Jacareí-SP.</p></div><strong class="transport-amount" id="proposalTransportPrice">—</strong></div>
           <div class="inc"><div class="icon">☕</div><div><b>Alimentação</b><p>Todas as refeições durante o evento.</p></div></div>
           <button class="gold-btn">▣ &nbsp; QUERO RESERVAR UMA DATA</button>
           <div class="secondary-row"><button class="secondary">Falar com a equipe</button><button class="secondary">Ver datas disponíveis</button></div>
@@ -331,10 +472,20 @@
 
 <script>
   let current = 0;
+  const stageNames=['','Local do evento','Tamanho do público','O que vai ter','Cidade do evento','Dia do evento','Horário do evento','Tipo de evento','Transporte','História','Proposta final'];
+  function renderProgress(){
+    document.querySelectorAll('[data-progress]').forEach((progress)=>{
+      const stage=Number(progress.closest('[data-screen]').dataset.screen);
+      progress.innerHTML=Array.from({length:10},(_,index)=>`${index?'<span></span>':''}<i class="${index<stage?'on':''}"></i>`).join('');
+      const label=progress.parentElement.querySelector('.step-label');
+      if(label) label.textContent=`${stage} de 10 · ${stageNames[stage]}`;
+    });
+  }
   function go(index){
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
     document.querySelector('[data-screen="'+index+'"]').classList.add('active');
     current=index;
+    if(index===10) renderProposal();
     window.scrollTo({top:0,behavior:'smooth'});
   }
 
@@ -344,11 +495,91 @@
   function renderVenue(){
     const cur=venueAt(venueIndex), prev=venueAt(venueIndex-1), next=venueAt(venueIndex+1);
     document.getElementById('venueName').textContent=cur;
-    document.getElementById('venueArt').innerHTML='SVG / IMAGEM<br>'+cur.toUpperCase();
-    document.getElementById('venuePrev').innerHTML='SVG<br>'+prev.toUpperCase();
-    document.getElementById('venueNext').innerHTML='SVG<br>'+next.toUpperCase();
+    [["venueArt",cur],["venuePrev",prev],["venueNext",next]].forEach(([id,venue])=>{
+      const photo=document.getElementById(id);
+      photo.dataset.venueImage=venue;
+      photo.setAttribute('aria-label',venue==='Evento externo'?'Local externo':venue);
+    });
   }
   function changeVenue(delta){venueIndex=(venueIndex+delta+venues.length)%venues.length;renderVenue()}
+
+  const eventTypes=[
+    {id:'puppets',name:'Teatrinho e Fantoches',duration:'50 min',team:2,priceCents:180000,art:'<svg viewBox="0 0 320 180" aria-hidden="true"><defs><linearGradient id="puppetBg" x2="0" y2="1"><stop stop-color="#fbe7ff"/><stop offset="1" stop-color="#ffd9b5"/></linearGradient></defs><rect width="320" height="180" fill="url(#puppetBg)"/><path d="M0 0h70v180H0zm250 0h70v180h-70z" fill="#e85c82"/><path d="M0 0h320v24H0z" fill="#c63e6d"/><path d="M62 146h196v34H62z" fill="#77438e"/><path d="M103 146v-44q0-25 23-25t23 25v44m44 0v-44q0-25 23-25t23 25v44" fill="#f4b52f" stroke="#643a70" stroke-width="5"/><circle cx="126" cy="97" r="5" fill="#26304d"/><circle cx="230" cy="97" r="5" fill="#26304d"/><path d="M120 110q7 8 14 0m89 0q7 8 14 0" fill="none" stroke="#26304d" stroke-width="3"/></svg>'},
+    {id:'theater-music',name:'Teatro e músicas',duration:'1h15',team:3,priceCents:260000,art:'<svg viewBox="0 0 320 180" aria-hidden="true"><defs><linearGradient id="musicBg" x2="0" y2="1"><stop stop-color="#b8e5ff"/><stop offset="1" stop-color="#d8c2ff"/></linearGradient></defs><rect width="320" height="180" fill="url(#musicBg)"/><path d="M0 0h55v180H0zm265 0h55v180h-55z" fill="#5660c9"/><path d="M0 18q36 30 0 67m320-67q-36 30 0 67" fill="none" stroke="#ff78a5" stroke-width="18"/><path d="M45 145h230v35H45z" fill="#414b96"/><path d="M129 47v66m0-66 39-9v62" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round"/><ellipse cx="117" cy="117" rx="14" ry="9" fill="#ffbf45"/><ellipse cx="156" cy="108" rx="14" ry="9" fill="#ffbf45"/><path d="M212 66q30-27 40 7-27-2-40-7zm-10 24q28-17 33 13-25-7-33-13z" fill="#ff6687"/></svg>'},
+    {id:'children-congress',name:'Congresso Infantil',duration:'1h15',team:4,priceCents:340000,art:'<svg viewBox="0 0 320 180" aria-hidden="true"><defs><linearGradient id="congressBg" x2="0" y2="1"><stop stop-color="#c8f3ff"/><stop offset="1" stop-color="#fff1b5"/></linearGradient></defs><rect width="320" height="180" fill="url(#congressBg)"/><circle cx="160" cy="48" r="26" fill="#ffcf53"/><path d="M78 145h164v35H78z" fill="#4385db"/><rect x="137" y="102" width="46" height="43" rx="7" fill="#fff" stroke="#4385db" stroke-width="4"/><circle cx="83" cy="82" r="16" fill="#ef8e63"/><circle cx="124" cy="68" r="16" fill="#c476d7"/><circle cx="196" cy="68" r="16" fill="#56b9a3"/><circle cx="237" cy="82" r="16" fill="#f0739b"/><path d="M60 131q2-31 23-31t23 31m-2-17q2-31 23-31t23 31m21 0q2-31 23-31t23 31m-2 17q2-31 23-31t23 31" fill="#fff" stroke="#334d83" stroke-width="4"/><path d="M151 120h18" stroke="#ffad36" stroke-width="4" stroke-linecap="round"/><path d="m42 37 7 13 14 2-10 10 3 14-14-7-13 7 3-14-10-10 14-2zm236 10 6 10 12 2-9 8 2 12-11-6-11 6 2-12-9-8 12-2z" fill="#fff"/></svg>'},
+    {id:'complete-show',name:'Show Completo',duration:'1h30',team:4,priceCents:450000,art:'<svg viewBox="0 0 320 180" aria-hidden="true"><defs><linearGradient id="showBg" x2="0" y2="1"><stop stop-color="#333d91"/><stop offset="1" stop-color="#bf57b6"/></linearGradient></defs><rect width="320" height="180" fill="url(#showBg)"/><path d="m65 0 76 0-48 106zm190 0-76 0 48 106z" fill="#fff3a5" opacity=".55"/><path d="M0 145h320v35H0z" fill="#242b65"/><rect x="22" y="72" width="40" height="72" rx="5" fill="#151a3f"/><rect x="258" y="72" width="40" height="72" rx="5" fill="#151a3f"/><circle cx="42" cy="111" r="13" fill="#7076bc"/><circle cx="278" cy="111" r="13" fill="#7076bc"/><path d="M135 44v67m0-67 40-10v61" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round"/><ellipse cx="123" cy="114" rx="14" ry="9" fill="#ffd45a"/><ellipse cx="163" cy="105" rx="14" ry="9" fill="#ffd45a"/><path d="m206 40 8 16 18 3-13 13 3 18-16-9-16 9 3-18-13-13 18-3z" fill="#ffdf73"/></svg>'},
+    {id:'full-congress',name:'Congresso Completo',duration:'3h',team:5,priceCents:600000,art:'<svg viewBox="0 0 320 180" aria-hidden="true"><defs><linearGradient id="fullBg" x2="0" y2="1"><stop stop-color="#a6e7ff"/><stop offset="1" stop-color="#ffc7e2"/></linearGradient></defs><rect width="320" height="180" fill="url(#fullBg)"/><path d="M0 26h320v18H0z" fill="#ff78a5"/><path d="M0 26 32 68 64 26 96 68 128 26 160 68 192 26 224 68 256 26 288 68 320 26" fill="#ffdb58"/><path d="M35 147h250v33H35z" fill="#5646a0"/><rect x="137" y="111" width="46" height="36" rx="5" fill="#fff"/><circle cx="78" cy="88" r="13" fill="#f39a70"/><circle cx="119" cy="77" r="13" fill="#f6c64d"/><circle cx="160" cy="72" r="13" fill="#70bfae"/><circle cx="201" cy="77" r="13" fill="#d580c9"/><circle cx="242" cy="88" r="13" fill="#f07f89"/><path d="M61 129q1-24 17-24t17 24m8-12q1-24 16-24t17 24m8-5q1-24 16-24t16 24m8 5q1-24 17-24t17 24m8 12q1-24 17-24t17 24" fill="#fff" stroke="#514a8e" stroke-width="4"/><path d="m26 76 6 11 13 2-9 9 2 13-12-6-11 6 2-13-9-9 13-2zm268 0 6 11 13 2-9 9 2 13-12-6-11 6 2-13-9-9 13-2z" fill="#fff"/></svg>'}
+  ];
+  let selectedEventTypeId='puppets';
+  let travelQuote=null;
+  const teamIcon='<svg viewBox="0 0 44 24" aria-hidden="true"><circle cx="14" cy="7" r="5" fill="currentColor"/><path d="M4 22v-3a10 10 0 0 1 20 0v3z" fill="currentColor"/><circle cx="32" cy="8" r="4" fill="currentColor" opacity=".72"/><path d="M25 22v-3a8 8 0 0 1 15 0v3z" fill="currentColor" opacity=".72"/></svg>';
+  function formatMoney(cents){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cents/100)}
+  function renderEventTypes(){
+    document.getElementById('eventTypeGrid').innerHTML=eventTypes.map((event)=>`<button class="event-type-card ${event.id===selectedEventTypeId?'selected':''}" type="button" data-event-type="${event.id}" aria-pressed="${event.id===selectedEventTypeId}" onclick="selectEventType('${event.id}')"><div class="event-art">${event.art}</div><div class="event-team">${teamIcon}<span>${event.team} integrantes</span></div><strong>${event.name}</strong><div class="event-type-meta"><span>${event.duration}</span><b>${formatMoney(event.priceCents)}</b></div></button>`).join('');
+  }
+  function selectEventType(id){selectedEventTypeId=id;renderEventTypes()}
+  function continueToDate(){
+    const city=document.getElementById('city').value.trim();
+    if(!city||!/(?:,|-)[ ]*[A-Za-z]{2}$/.test(city)){document.getElementById('cityStatus').textContent='Informe a cidade e a sigla do estado (por exemplo: Taubaté-SP).';return}
+    document.getElementById('cityStatus').textContent='';
+    go(5);
+  }
+  function continueToTime(){
+    if(!document.getElementById('eventDate').value){document.getElementById('dateStatus').textContent='Escolha o dia do evento para continuar.';return}
+    document.getElementById('dateStatus').textContent='';
+    go(6);
+  }
+  function continueToEventType(){
+    if(!document.getElementById('eventTime').value){document.getElementById('timeStatus').textContent='Informe o horário do evento para continuar.';return}
+    document.getElementById('timeStatus').textContent='';
+    go(7);
+  }
+  async function calculateTravel(){
+    const city=document.getElementById('city').value.trim();
+    const status=document.getElementById('eventTypeStatus');
+    const button=document.getElementById('eventTypeNext');
+    if(!city||!/(?:,|-)[ ]*[A-Za-z]{2}$/.test(city)){go(4);document.getElementById('cityStatus').textContent='Informe a cidade e a sigla do estado (por exemplo: Taubaté-SP).';return}
+    button.disabled=true;
+    status.textContent='Calculando o percurso rodoviário…';
+    try{
+      const response=await fetch('/api/event-proposal/distance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({city})});
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(payload.error||'Não foi possível calcular a distância agora.');
+      travelQuote=payload;
+      renderTravelQuote();
+      status.textContent='';
+      go(8);
+    }catch(error){status.textContent=error.message||'Não foi possível calcular a distância agora. Tente novamente.'}
+    finally{button.disabled=false}
+  }
+  function renderTravelQuote(){
+    if(!travelQuote)return;
+    const oneWay=Number(travelQuote.oneWayKm)||0;
+    const roundTrip=Number(travelQuote.roundTripKm)||oneWay*2;
+    const money=formatMoney(Number(travelQuote.transportCents)||0);
+    const displayKm=(value)=>new Intl.NumberFormat('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}).format(value);
+    document.getElementById('routePath').textContent=`Jacareí-SP → ${travelQuote.destinationLabel||document.getElementById('city').value.trim()}`;
+    document.getElementById('routeDistance').textContent=`${displayKm(roundTrip)} km · ida e volta`;
+    document.getElementById('routeFormula').textContent=`${displayKm(roundTrip)} km × R$ 1,15/km`;
+    document.getElementById('routeTotal').textContent=`Transporte: ${money}`;
+  }
+  function renderProposal(){
+    if(!travelQuote)return;
+    const event=eventTypes.find((item)=>item.id===selectedEventTypeId)||eventTypes[0];
+    const baseCents=event.priceCents;
+    const transportCents=Number(travelQuote.transportCents)||0;
+    const totalCents=baseCents+transportCents;
+    document.getElementById('selectedEventName').textContent=event.name;
+    document.getElementById('basePrice').textContent=formatMoney(baseCents);
+    document.getElementById('totalPrice').textContent=formatMoney(totalCents);
+    document.getElementById('installmentValue').textContent=`12x de ${formatMoney(Math.round(totalCents/12))}`;
+    document.getElementById('cashPrice').textContent=formatMoney(totalCents);
+    document.getElementById('proposalRouteDetail').textContent=`${new Intl.NumberFormat('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}).format(Number(travelQuote.roundTripKm)||0)} km de ida e volta · R$ 1,15/km.`;
+    document.getElementById('proposalTransportPrice').textContent=formatMoney(transportCents);
+    const eventDate=new Date(`${document.getElementById('eventDate').value}T12:00:00`).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const eventTime=document.getElementById('eventTime').value;
+    document.getElementById('eventScheduleSummary').textContent=`${eventDate} · início às ${eventTime} · ${event.duration} · ${event.team} integrantes`;
+  }
 
   const capacities=[100,300,500,'1000+']; let capIndex=1;
   function selectCap(cap){
@@ -382,6 +613,12 @@
 
   renderVenue();
   renderStory();
+  renderProgress();
+  renderEventTypes();
+  const eventDateInput=document.getElementById('eventDate');
+  const today=new Date();
+  today.setMinutes(today.getMinutes()-today.getTimezoneOffset());
+  eventDateInput.min=today.toISOString().slice(0,10);
 </script>
 </body>
 </html>
