@@ -203,8 +203,25 @@
   .inc .icon img{display:block;width:42px;height:42px;object-fit:contain}
   .inc b{display:block;font-size:17px;color:#fff}.inc p{margin:3px 0 0;font-size:12px;color:#fff}
   .gold-btn{width:100%;border:0;background:linear-gradient(180deg,#ffd75e,#f6aa13);color:#2c1b05;padding:18px 16px;border-radius:16px;font-weight:1000;font-size:15px;cursor:pointer;margin-top:4px}
+  .gold-btn:disabled{opacity:.65;cursor:wait}
   .secondary-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .secondary{border:1px solid rgba(255,255,255,.25);color:#fff;background:rgba(255,255,255,.03);border-radius:14px;padding:13px 8px;font-size:11px;font-weight:800}
+  .feedback-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:18px;background:rgba(12,20,37,.72);backdrop-filter:blur(5px)}
+  .feedback-backdrop[hidden]{display:none}
+  .feedback-dialog{width:min(100%,440px);padding:28px;border:1px solid #e3eaf4;border-radius:24px;background:#fff;color:var(--navy);box-shadow:0 24px 80px rgba(0,0,0,.3);text-align:center}
+  .feedback-icon{width:54px;height:54px;margin:0 auto 14px;border-radius:50%;display:grid;place-items:center;background:#fff5d9;color:#855c00;font-size:25px;font-weight:900}
+  .feedback-dialog[data-kind="error"] .feedback-icon{background:#fff0ed;color:#a42b20}
+  .feedback-dialog h2{margin:0;font-size:23px;line-height:1.2}
+  .feedback-dialog p{margin:12px 0 0;color:#53627b;font-size:14px;line-height:1.5;white-space:pre-line}
+  .feedback-diagnostic{margin:16px 0 0;padding:12px;border-radius:12px;background:#f3f6fa;text-align:left}
+  .feedback-diagnostic span{display:block;color:#66738b;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+  .feedback-diagnostic code{display:block;margin-top:4px;color:#263c63;font-size:12px;overflow-wrap:anywhere}
+  .feedback-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px}
+  .feedback-actions.single{grid-template-columns:1fr}
+  .feedback-action{min-height:46px;padding:11px 14px;border:0;border-radius:12px;background:var(--navy);color:#fff;font:inherit;font-size:13px;font-weight:850;cursor:pointer}
+  .feedback-action.secondary{border:1px solid #d9e2ed;background:#fff;color:#30445f}
+  .feedback-spinner{width:24px;height:24px;border:3px solid #f1d98f;border-top-color:#805900;border-radius:50%;animation:feedbackSpin .8s linear infinite}
+  @keyframes feedbackSpin{to{transform:rotate(360deg)}}
 
   @media(max-width:760px){
     .screen{padding:20px 16px 22px}
@@ -566,6 +583,22 @@
   </main>
 </div>
 
+<div class="feedback-backdrop" id="reserveFeedbackModal" hidden>
+  <section class="feedback-dialog" id="reserveFeedbackDialog" role="dialog" aria-modal="true" aria-labelledby="reserveFeedbackTitle" aria-describedby="reserveFeedbackMessage" data-kind="loading">
+    <div class="feedback-icon" id="reserveFeedbackIcon" aria-hidden="true"><span class="feedback-spinner"></span></div>
+    <h2 id="reserveFeedbackTitle">Preparando seu painel</h2>
+    <p id="reserveFeedbackMessage">Estamos salvando sua proposta e criando seu acesso.</p>
+    <div class="feedback-diagnostic" id="reserveFeedbackDiagnostic" hidden>
+      <span>Referência para suporte</span>
+      <code id="reserveFeedbackCode"></code>
+    </div>
+    <div class="feedback-actions single" id="reserveFeedbackActions">
+      <button class="feedback-action secondary" id="reserveFeedbackClose" type="button" onclick="closeReserveFeedback()" hidden>Fechar</button>
+      <button class="feedback-action" id="reserveFeedbackPrimary" type="button" onclick="retryReserveEvent()" hidden>Tentar novamente</button>
+    </div>
+  </section>
+</div>
+
 <script>
   let current = 0;
   const stageNames=['','Local do evento','Tamanho do público','O que vai ter','Cidade do evento','Dia do evento','Horário do evento','Tipo de evento','Transporte','História','Dados do contratante','Endereço do evento','Acesso ao painel','Proposta final'];
@@ -775,54 +808,160 @@
     updateInstallmentDisplay();
     document.getElementById('proposalTransportPrice').textContent=formatMoney(transportCents);
   }
+  let reserveEventInFlight=false;
+  function showReserveFeedback({kind='error',title='Não foi possível abrir o painel',message='Tente novamente em instantes.',code='',primaryLabel='Tentar novamente',primaryAction='retry'}={}){
+    const modal=document.getElementById('reserveFeedbackModal');
+    const dialog=document.getElementById('reserveFeedbackDialog');
+    const icon=document.getElementById('reserveFeedbackIcon');
+    const closeButton=document.getElementById('reserveFeedbackClose');
+    const primaryButton=document.getElementById('reserveFeedbackPrimary');
+    const diagnostic=document.getElementById('reserveFeedbackDiagnostic');
+    dialog.dataset.kind=kind;
+    icon.innerHTML=kind==='loading'?'<span class="feedback-spinner"></span>':kind==='success'?'✓':'!';
+    document.getElementById('reserveFeedbackTitle').textContent=title;
+    document.getElementById('reserveFeedbackMessage').textContent=message;
+    diagnostic.hidden=!code;
+    document.getElementById('reserveFeedbackCode').textContent=code;
+    closeButton.hidden=kind==='loading'||kind==='success';
+    primaryButton.hidden=!primaryLabel;
+    primaryButton.textContent=primaryLabel;
+    primaryButton.dataset.action=primaryAction;
+    document.getElementById('reserveFeedbackActions').classList.toggle('single',kind==='loading'||kind==='success'||!primaryLabel);
+    modal.hidden=false;
+    if(kind!=='loading')primaryButton.focus();
+  }
+  function closeReserveFeedback(){
+    if(reserveEventInFlight)return;
+    document.getElementById('reserveFeedbackModal').hidden=true;
+  }
+  function retryReserveEvent(){
+    const action=document.getElementById('reserveFeedbackPrimary').dataset.action;
+    document.getElementById('reserveFeedbackModal').hidden=true;
+    if(action==='close')return;
+    if(action==='change-login'){go(12);return}
+    if(action==='city'){go(4);document.getElementById('city').focus();return}
+    if(action==='login'){window.location.assign(`/auth.html?next=${encodeURIComponent('/painel-do-contratante')}`);return}
+    if(action==='open-panel'){window.location.assign('/painel-do-contratante');return}
+    reserveEvent();
+  }
+  document.getElementById('reserveFeedbackModal').addEventListener('click',(event)=>{
+    if(event.target.id==='reserveFeedbackModal')closeReserveFeedback();
+  });
+  document.addEventListener('keydown',(event)=>{
+    if(event.key==='Escape'&&!document.getElementById('reserveFeedbackModal').hidden)closeReserveFeedback();
+  });
+  function makeReserveError(message,code,details='',action='retry'){
+    const error=new Error(message);
+    error.feedbackCode=code;
+    error.feedbackDetails=details;
+    error.feedbackAction=action;
+    return error;
+  }
   async function reserveEvent(){
-    const status=document.getElementById('reserveStatus');
-    if(!travelQuote){status.textContent='O transporte ainda não foi calculado. Volte à etapa da cidade e tente novamente.';return}
-    const dateValue=document.getElementById('eventDate').value;
-    const [year,month,day]=dateValue.split('-');
-    const [hourText,minute]=document.getElementById('eventTime').value.split(':');
-    const hour24=Number(hourText);
-    const period=hour24>=12?'pm':'am';
-    const hour12=(hour24%12)||12;
-    const eventToPresentation={puppets:'teatro-fantoches','theater-music':'teatro-palco','children-congress':'congresso-infantil','complete-show':'parques-arenas','full-congress':'show-completo-2h'};
-    const storyToTerm={'Samuel':'História de Samuel','Fábrica de Heróis':'Fábrica de heróis','História de Davi':'Davi e Golias'};
-    const city=document.getElementById('city').value.trim();
-    const event=eventTypes.find((item)=>item.id===selectedEventTypeId)||eventTypes[0];
-    const transportCents=Math.max(0,Number(travelQuote.transportCents)||0);
-    const interestRate=selectedInstallments===1?0:0.02+((selectedInstallments-2)/10)*0.22;
-    const financedTotalCents=Math.round((event.priceCents+transportCents)*(1+interestRate));
-    const prefill={
-      igreja:document.getElementById('churchName').value.trim(),
-      contratante:document.getElementById('contractorName').value.trim(),
-      whatsapp:document.getElementById('contractorPhone').value.replace(/\D/g,''),
-      localEvento:venueAt(venueIndex),
-      publicoEstimado:String(capacities[capIndex]),
-      elementosEvento:Array.from(document.querySelectorAll('.feature.selected strong')).map((node)=>node.textContent.trim()).join(', '),
-      historia:storyToTerm[storyAt(storyIndex)]||'Fábrica de heróis',
-      dia:String(Number(day)),mes:['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][Number(month)-1],ano:year,
-      horario:`${hour12}h${minute}${period}`,pais:'Brasil',
-      endereco:document.getElementById('eventAddress').value.trim(),cidade,cep:document.getElementById('eventCep').value.replace(/\D/g,''),
-      presentationKey:eventToPresentation[event.id]||'teatro-fantoches',eventCount:'1',couponCode:'',
-      proposalInstallments:String(selectedInstallments),
-      proposalFinancedTotalCents:String(financedTotalCents),
-      proposalInstallmentCents:String(Math.round(financedTotalCents/selectedInstallments)),
-      transportAmountCents:String(transportCents),transportTripType:'ROUND_TRIP',transportCityA:'Jacareí-SP',transportCityB:travelQuote.destinationLabel||city,
-      freeTransport:false,freeLodging:false
-    };
     const button=document.querySelector('.gold-btn');
+    const status=document.getElementById('reserveStatus');
+    if(reserveEventInFlight)return;
+    if(!button){showReserveFeedback({code:'RESERVE_BUTTON_NOT_FOUND',message:'Não encontrei o botão de reserva nesta etapa.',primaryLabel:'Fechar',primaryAction:'close'});return}
+    reserveEventInFlight=true;
     button.disabled=true;
     button.textContent='CRIANDO SEU PAINEL...';
     status.textContent='';
+    showReserveFeedback({kind:'loading'});
+    let currentStep='validacao-dos-dados';
     try{
-      const response=await fetch('/api/contractor-panel/proposal-draft',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:prefill.contratante,username:document.getElementById('siteUsername').value.trim(),password:document.getElementById('sitePassword').value,answers:prefill})});
+      if(!travelQuote)throw makeReserveError('O cálculo do transporte ainda não terminou. Volte à etapa da cidade e tente novamente.','TRANSPORT_QUOTE_MISSING','stage=transport', 'city');
+      const dateValue=document.getElementById('eventDate').value;
+      const timeValue=document.getElementById('eventTime').value;
+      const church=document.getElementById('churchName').value.trim();
+      const contractor=document.getElementById('contractorName').value.trim();
+      const phone=document.getElementById('contractorPhone').value.replace(/\D/g,'');
+      const address=document.getElementById('eventAddress').value.trim();
+      const cep=document.getElementById('eventCep').value.replace(/\D/g,'');
+      const username=document.getElementById('siteUsername').value.trim();
+      const password=document.getElementById('sitePassword').value;
+      const confirmation=document.getElementById('sitePasswordConfirm').value;
+      if(!dateValue)throw makeReserveError('A data do evento não está preenchida. Volte e escolha o dia do evento.','EVENT_DATE_MISSING','field=eventDate');
+      if(!timeValue)throw makeReserveError('O horário do evento não está preenchido. Volte e escolha o horário.','EVENT_TIME_MISSING','field=eventTime');
+      if(!church||!contractor||phone.length<8)throw makeReserveError('Confira o nome da igreja, o nome do contratante e o telefone informado.','CONTRACTOR_DATA_INCOMPLETE','stage=contractor');
+      if(!address||cep.length!==8)throw makeReserveError('Confira o endereço do evento e o CEP com 8 dígitos.','EVENT_ADDRESS_INCOMPLETE','stage=event-address');
+      if(!/^[\p{L}\p{M}\p{N} ._-]{3,24}$/u.test(username))throw makeReserveError('O login deve ter entre 3 e 24 caracteres. Volte e ajuste o acesso.','USERNAME_INVALID','field=siteUsername','change-login');
+      if(password.length<6)throw makeReserveError('A senha precisa ter pelo menos 6 caracteres. Volte e ajuste o acesso.','PASSWORD_TOO_SHORT','field=sitePassword','change-login');
+      if(password!==confirmation)throw makeReserveError('As senhas não conferem. Volte e confirme a senha.','PASSWORD_CONFIRMATION_MISMATCH','field=sitePasswordConfirm','change-login');
+
+      const [year,month,day]=dateValue.split('-');
+      const [hourText,minute]=timeValue.split(':');
+      const hour24=Number(hourText);
+      const period=hour24>=12?'pm':'am';
+      const hour12=(hour24%12)||12;
+      const eventToPresentation={puppets:'teatro-fantoches','theater-music':'teatro-palco','children-congress':'congresso-infantil','complete-show':'parques-arenas','full-congress':'show-completo-2h'};
+      const storyToTerm={'Samuel':'História de Samuel','Fábrica de Heróis':'Fábrica de heróis','História de Davi':'Davi e Golias'};
+      const city=document.getElementById('city').value.trim();
+      const event=eventTypes.find((item)=>item.id===selectedEventTypeId)||eventTypes[0];
+      const transportCents=Math.max(0,Number(travelQuote.transportCents)||0);
+      const interestRate=selectedInstallments===1?0:0.02+((selectedInstallments-2)/10)*0.22;
+      const financedTotalCents=Math.round((event.priceCents+transportCents)*(1+interestRate));
+      const prefill={
+        igreja:church,
+        contratante:contractor,
+        whatsapp:phone,
+        localEvento:venueAt(venueIndex),
+        publicoEstimado:String(capacities[capIndex]),
+        elementosEvento:Array.from(document.querySelectorAll('.feature.selected strong')).map((node)=>node.textContent.trim()).join(', '),
+        historia:storyToTerm[storyAt(storyIndex)]||'Fábrica de heróis',
+        dia:String(Number(day)),mes:['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][Number(month)-1],ano:year,
+        horario:`${hour12}h${minute}${period}`,pais:'Brasil',
+        endereco:address,cidade,cep,
+        presentationKey:eventToPresentation[event.id]||'teatro-fantoches',eventCount:'1',couponCode:'',
+        proposalInstallments:String(selectedInstallments),
+        proposalFinancedTotalCents:String(financedTotalCents),
+        proposalInstallmentCents:String(Math.round(financedTotalCents/selectedInstallments)),
+        transportAmountCents:String(transportCents),transportTripType:'ROUND_TRIP',transportCityA:'Jacareí-SP',transportCityB:travelQuote.destinationLabel||city,
+        freeTransport:false,freeLodging:false
+      };
+
+      currentStep='criacao-da-conta-e-rascunho';
+      let response;
+      try{
+        response=await fetch('/api/contractor-panel/proposal-draft',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:contractor,username,password,answers:prefill})});
+      }catch(error){
+        throw makeReserveError('Não consegui falar com o servidor para criar seu painel. Confira sua conexão e tente novamente.','RESERVE_NETWORK_ERROR',`step=${currentStep}; error=${error?.name||'unknown'}`);
+      }
       const payload=await response.json().catch(()=>({}));
-      if(!response.ok||!payload.token)throw new Error(payload.error||'Não foi possível criar seu acesso agora.');
-      localStorage.setItem('turma_do_printy_token',payload.token);
-      window.location.href='/painel-do-contratante';
+      if(!response.ok){
+        const isLoginConflict=response.status===409;
+        throw makeReserveError(payload.error||'O servidor não conseguiu concluir sua reserva agora.',isLoginConflict?'RESERVE_LOGIN_CONFLICT':`RESERVE_API_HTTP_${response.status}`,`step=${currentStep}; http=${response.status}; endpoint=/api/contractor-panel/proposal-draft`,isLoginConflict?'change-login':'retry');
+      }
+      if(!payload.token)throw makeReserveError('O servidor criou uma resposta incompleta e não devolveu o acesso ao painel.','RESERVE_SESSION_TOKEN_MISSING',`step=${currentStep}; http=${response.status}`);
+
+      currentStep='salvamento-da-sessao';
+      try{
+        localStorage.setItem('turma_do_printy_token',payload.token);
+        if(localStorage.getItem('turma_do_printy_token')!==payload.token)throw new Error('token não confirmado no armazenamento local');
+      }catch(error){
+        throw makeReserveError('Seu acesso foi criado, mas este navegador não conseguiu guardar a sessão. Entre com o login e a senha que acabou de criar.','RESERVE_SESSION_STORAGE_ERROR',`step=${currentStep}; error=${error?.name||'unknown'}`,'login');
+      }
+
+      reserveEventInFlight=false;
+      showReserveFeedback({kind:'success',title:'Acesso criado!',message:'Sua proposta foi salva. Estamos abrindo o painel do contratante.',primaryLabel:'Abrir painel agora',primaryAction:'open-panel'});
+      window.location.assign('/painel-do-contratante');
+      window.setTimeout(()=>{
+        if(location.pathname.includes('proposta_evento_interativa')){
+          button.disabled=false;
+          button.textContent='▣  QUERO RESERVAR UMA DATA';
+          showReserveFeedback({kind:'error',title:'O painel não abriu automaticamente',message:'Seu acesso e sua proposta foram criados. Use o botão abaixo para abrir o painel.',code:'RESERVE_REDIRECT_STALLED',primaryLabel:'Abrir painel',primaryAction:'open-panel'});
+        }
+      },5000);
     }catch(error){
-      status.textContent=error.message||'Não foi possível criar seu acesso agora. Tente novamente.';
+      reserveEventInFlight=false;
+      const code=error?.feedbackCode||'RESERVE_UNEXPECTED_CLIENT_ERROR';
+      const action=error?.feedbackAction||'retry';
+      const details=error?.feedbackDetails||`step=${currentStep}; error=${error?.name||'unknown'}`;
+      const title=code==='RESERVE_LOGIN_CONFLICT'?'Esse login já está em uso':code==='RESERVE_NETWORK_ERROR'?'Falha de conexão':code==='TRANSPORT_QUOTE_MISSING'?'Transporte ainda não calculado':'Não foi possível abrir o painel';
+      const primaryLabel=action==='change-login'?'Corrigir acesso':action==='city'?'Voltar à cidade':action==='login'?'Ir para o login':'Tentar novamente';
       button.disabled=false;
       button.textContent='▣  QUERO RESERVAR UMA DATA';
+      status.textContent=error?.message||'Tente novamente em instantes.';
+      showReserveFeedback({kind:'error',title,message:error?.message||'Tente novamente em instantes.',code:`${code} · ${details}`,primaryLabel,primaryAction:action});
     }
   }
 
