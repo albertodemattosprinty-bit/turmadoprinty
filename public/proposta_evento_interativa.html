@@ -87,7 +87,7 @@
   .event-field-wrap .input{font-size:18px}
   .back-button{display:block;margin:12px auto 0;padding:8px 14px;border:0;background:transparent;color:var(--muted);font-size:12px;font-weight:800;cursor:pointer}
   .transport-inc{grid-template-columns:64px minmax(0,1fr)}
-  .transport-inc .icon svg{width:30px;height:30px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .inc .icon img{display:block;width:38px;height:38px;object-fit:contain}
   .transport-inc .transport-amount{font-size:16px;font-weight:900;white-space:nowrap;color:#38250e}
 
   .hero-art{display:block;width:min(100%,720px);height:clamp(220px,38vh,420px);object-fit:cover;object-position:center;border-radius:30px;margin:6px auto 24px}
@@ -178,9 +178,14 @@
   .base-price-label,.total-price-label{color:#f0e4c4;font-size:13px;margin-top:10px}
   .base-price-label strong{display:block;color:#fff;font-size:18px;margin-top:3px}
   .total-price-label{margin-top:18px;color:#fff}
-  .event-schedule-summary{margin-top:14px;padding:14px;border-radius:14px;background:rgba(255,255,255,.08);color:#f5f5f5;font-size:13px;line-height:1.5}
   .installment{color:var(--gold);font-weight:1000;font-size:clamp(34px,5vw,52px);letter-spacing:-1px;line-height:1.08;margin-top:20px}
   .price{color:#fff;font-weight:900;font-size:clamp(20px,2.5vw,28px);letter-spacing:0;line-height:1.2;margin-top:4px}
+  .installment-control{padding:2px 12px 4px;color:#f5f5f5}
+  .installment-control label{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;font-weight:800}
+  .installment-control label strong{color:var(--gold);font-size:16px}
+  .installment-slider{display:block;width:100%;height:7px;margin:17px 0 9px;border-radius:99px;background:linear-gradient(90deg,#ffd75e,#f6aa13);accent-color:var(--gold);cursor:pointer;touch-action:pan-y}
+  .installment-slider:focus-visible{outline:3px solid rgba(255,215,94,.45);outline-offset:5px}
+  .installment-range-labels{display:flex;justify-content:space-between;color:#d9d4c7;font-size:11px;font-weight:700}
   .inc{display:grid;grid-template-columns:64px 1fr;gap:14px;align-items:center;background:linear-gradient(180deg,#fff8e8,#f5e1b0);color:#38250e;border-radius:17px;padding:10px 14px}
   .inc .icon{width:54px;height:54px;border-radius:14px;background:#ffefc4;border:1px solid #e8ca79;display:grid;place-items:center;font-size:27px}
   .inc b{display:block;font-size:17px}.inc p{margin:3px 0 0;font-size:12px;color:#5a4b38}
@@ -208,7 +213,7 @@
     .event-type-meta{padding:6px 10px 12px;font-size:11px}
     .event-type-meta b{font-size:12px}
     .route-card{padding:20px 15px;margin-top:24px}
-    .step-stage-photo{height:220px;border-radius:22px;margin:8px auto 14px}
+    .step-stage-photo{height:auto;aspect-ratio:1 / 1;border-radius:22px;margin:8px auto 14px}
     .transport-inc{grid-template-columns:50px minmax(0,1fr);gap:10px}
     .transport-inc .transport-amount{grid-column:2;font-size:14px}
     .feature{min-height:112px;grid-template-columns:120px 1fr;grid-template-rows:1fr}
@@ -455,10 +460,14 @@
             <div class="total-price-label">Total à vista com transporte</div>
             <div class="price" id="totalPrice">—</div>
           </div>
-          <div class="event-schedule-summary" id="eventScheduleSummary"></div>
-          <div class="inc"><div class="icon">⌂</div><div><b>Hospedagem</b><p>Incluída para toda a equipe.</p></div></div>
-          <div class="inc transport-inc"><div class="icon"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 18.5 6.3 11a3 3 0 0 1 2.9-2.2h13.6a3 3 0 0 1 2.9 2.2l2.3 7.5v7h-3v-3H7v3H4z"/><path d="M7 18.5h18M9 13h14M10 21.5h.1M22 21.5h.1"/></svg></div><div><b>Transporte</b><p><strong class="transport-amount" id="proposalTransportPrice">—</strong></p></div></div>
-          <div class="inc"><div class="icon">☕</div><div><b>Alimentação</b><p>Todas as refeições durante o evento.</p></div></div>
+          <div class="installment-control">
+            <label for="installmentSlider">Escolha o número de parcelas <strong id="installmentCountLabel">12x</strong></label>
+            <input class="installment-slider" id="installmentSlider" type="range" min="1" max="12" step="1" value="12" aria-label="Número de parcelas" oninput="updateInstallmentDisplay()">
+            <div class="installment-range-labels" aria-hidden="true"><span>1x</span><span>12x</span></div>
+          </div>
+          <div class="inc"><div class="icon"><img src="/midia/icons/hospedagem.svg" alt="" aria-hidden="true"></div><div><b>Hospedagem</b><p>Incluída para toda a equipe.</p></div></div>
+          <div class="inc transport-inc"><div class="icon"><img src="/midia/icons/transporte.svg" alt="" aria-hidden="true"></div><div><b>Transporte</b><p><strong class="transport-amount" id="proposalTransportPrice">—</strong></p></div></div>
+          <div class="inc"><div class="icon"><img src="/midia/icons/alimentacao.svg" alt="" aria-hidden="true"></div><div><b>Alimentação</b><p>Todas as refeições durante o evento.</p></div></div>
           <button class="gold-btn">▣ &nbsp; QUERO RESERVAR UMA DATA</button>
           <div class="secondary-row"><button class="secondary">Falar com a equipe</button><button class="secondary">Ver datas disponíveis</button></div>
         </div>
@@ -510,8 +519,16 @@
   ];
   let selectedEventTypeId='puppets';
   let travelQuote=null;
+  let selectedInstallments=12;
+  let currentProposalTotalCents=0;
   const teamIcon='<svg viewBox="0 0 44 24" aria-hidden="true"><circle cx="14" cy="7" r="5" fill="currentColor"/><path d="M4 22v-3a10 10 0 0 1 20 0v3z" fill="currentColor"/><circle cx="32" cy="8" r="4" fill="currentColor" opacity=".72"/><path d="M25 22v-3a8 8 0 0 1 15 0v3z" fill="currentColor" opacity=".72"/></svg>';
   function formatMoney(cents){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cents/100)}
+  function updateInstallmentDisplay(){
+    const slider=document.getElementById('installmentSlider');
+    selectedInstallments=Math.max(1,Math.min(12,Number(slider.value)||12));
+    document.getElementById('installmentCountLabel').textContent=`${selectedInstallments}x`;
+    document.getElementById('installmentValue').textContent=`${selectedInstallments}x de ${formatMoney(Math.round(currentProposalTotalCents/selectedInstallments))}`;
+  }
   function renderEventTypes(){
     document.getElementById('eventTypeGrid').innerHTML=eventTypes.map((event)=>`<button class="event-type-card ${event.id===selectedEventTypeId?'selected':''}" type="button" data-event-type="${event.id}" aria-pressed="${event.id===selectedEventTypeId}" onclick="selectEventType('${event.id}')"><div class="event-art">${event.art}</div><div class="event-team">${teamIcon}<span>${event.team} integrantes</span></div><strong>${event.name}</strong><div class="event-type-meta"><span>${event.duration}</span><b>${formatMoney(event.priceCents)}</b></div></button>`).join('');
   }
@@ -567,14 +584,13 @@
     const baseCents=event.priceCents;
     const transportCents=Number(travelQuote.transportCents)||0;
     const totalCents=baseCents+transportCents;
+    currentProposalTotalCents=totalCents;
     document.getElementById('selectedEventName').textContent=event.name;
     document.getElementById('basePrice').textContent=formatMoney(baseCents);
     document.getElementById('totalPrice').textContent=formatMoney(totalCents);
-    document.getElementById('installmentValue').textContent=`12x de ${formatMoney(Math.round(totalCents/12))}`;
+    document.getElementById('installmentSlider').value=String(selectedInstallments);
+    updateInstallmentDisplay();
     document.getElementById('proposalTransportPrice').textContent=formatMoney(transportCents);
-    const eventDate=new Date(`${document.getElementById('eventDate').value}T12:00:00`).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});
-    const eventTime=document.getElementById('eventTime').value;
-    document.getElementById('eventScheduleSummary').textContent=`${eventDate} · início às ${eventTime} · ${event.duration} · ${event.team} integrantes`;
   }
 
   const capacities=[100,300,500,'1000+']; let capIndex=1;
