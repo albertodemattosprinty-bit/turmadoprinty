@@ -369,7 +369,7 @@ function exerciseLibrary(){ return Array.isArray(state.dashboard?.exerciseLibrar
 function libraryItem(exerciseId){ return exerciseLibrary().find((item)=>item.exerciseId===exerciseId)||null; }
 function exerciseScheduledToday(item,date=new Date()){
   const schedule=item?.scheduleConfig; if(!schedule||typeof schedule!=="object")return true;
-  const dateKey=exerciseGoalDateKey(date);if(Array.isArray(schedule.oneTimeDates)&&schedule.oneTimeDates.map((value)=>String(value).slice(0,10)).includes(dateKey))return true;
+  const dateKey=exerciseGoalDateKey(date);if(Array.isArray(schedule.oneTimeDates)&&schedule.oneTimeDates.map((value)=>String(value).slice(0,10)).includes(dateKey))return true;if(Array.isArray(schedule.excludedDates)&&schedule.excludedDates.map((value)=>String(value).slice(0,10)).includes(dateKey))return false;
   if(schedule.frequency==="none")return false;
   const startsOn=String(schedule.startsOn||"").slice(0,10); if(startsOn&&startsOn>dateKey)return false;
   const weekDays=[...new Set((Array.isArray(schedule.weekDays)?schedule.weekDays:[]).map(Number).filter((day)=>Number.isInteger(day)&&day>=0&&day<=6))];
@@ -468,10 +468,10 @@ function renderDailyExerciseProgress(){ const items=selectedDayExerciseLibrary()
 function renderDoWorkoutTodayButton(){const items=selectedDayExerciseLibrary(),shouldShow=state.selectedWorkoutDateOffset!==0&&items.length>0;if(!elements.doWorkoutToday)return;elements.doWorkoutToday.hidden=!shouldShow;elements.doWorkoutToday.disabled=false;elements.doWorkoutToday.textContent="Fazer hoje";}
 async function makeSelectedWorkoutToday(){
   const items=selectedDayExerciseLibrary(),button=elements.doWorkoutToday;if(!button||!items.length||state.selectedWorkoutDateOffset===0)return;
-  const dateKey=exerciseGoalDateKey(new Date());button.disabled=true;button.textContent="Salvando treino...";
+  const dateKey=exerciseGoalDateKey(new Date()),selectedIds=new Set(items.map((item)=>String(item.exerciseId))),todayIds=new Set(todayExerciseLibrary().map((item)=>String(item.exerciseId))),affected=exerciseLibrary().filter((item)=>selectedIds.has(String(item.exerciseId))||todayIds.has(String(item.exerciseId)));button.disabled=true;button.textContent="Substituindo treino...";
   try{
-    for(const item of items){
-      const scheduleConfig={...(item.scheduleConfig||{}),oneTimeDates:[...new Set([...(Array.isArray(item.scheduleConfig?.oneTimeDates)?item.scheduleConfig.oneTimeDates.map((value)=>String(value).slice(0,10)):[]),dateKey])].slice(-90)};
+    for(const item of affected){
+      const selected=selectedIds.has(String(item.exerciseId)),current=item.scheduleConfig||{},oneTimeDates=Array.isArray(current.oneTimeDates)?current.oneTimeDates.map((value)=>String(value).slice(0,10)):[],excludedDates=Array.isArray(current.excludedDates)?current.excludedDates.map((value)=>String(value).slice(0,10)):[],scheduleConfig={...current,oneTimeDates:selected?[...new Set([...oneTimeDates,dateKey])].slice(-90):oneTimeDates.filter((value)=>value!==dateKey),excludedDates:selected?excludedDates.filter((value)=>value!==dateKey):[...new Set([...excludedDates,dateKey])].slice(-90)};
       const payload=await apiRequest("/api/200/exercises/library",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:profileName(),exerciseId:item.exerciseId,exerciseName:item.exerciseName,category:item.category,trackingType:item.trackingType,equipment:item.equipment,targetSeries:item.targetSeries,targetReps:item.targetReps,targetMinutes:item.targetMinutes,targetDistanceMeters:item.targetDistanceMeters,loadKg:item.loadKg,scheduleConfig}),offlineInvalidates:["/api/200/wellness","/api/200/extra-goals"]});
       if(payload.dashboard)state.dashboard=payload.dashboard;
       else state.dashboard={...(state.dashboard||{}),exerciseLibrary:exerciseLibrary().map((entry)=>String(entry.exerciseId)===String(item.exerciseId)?{...entry,scheduleConfig}:entry)};
