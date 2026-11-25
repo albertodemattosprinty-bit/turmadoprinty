@@ -369,8 +369,9 @@ function exerciseLibrary(){ return Array.isArray(state.dashboard?.exerciseLibrar
 function libraryItem(exerciseId){ return exerciseLibrary().find((item)=>item.exerciseId===exerciseId)||null; }
 function exerciseScheduledToday(item,date=new Date()){
   const schedule=item?.scheduleConfig; if(!schedule||typeof schedule!=="object")return true;
+  const dateKey=exerciseGoalDateKey(date);if(Array.isArray(schedule.oneTimeDates)&&schedule.oneTimeDates.map((value)=>String(value).slice(0,10)).includes(dateKey))return true;
   if(schedule.frequency==="none")return false;
-  const dateKey=exerciseGoalDateKey(date),startsOn=String(schedule.startsOn||"").slice(0,10); if(startsOn&&startsOn>dateKey)return false;
+  const startsOn=String(schedule.startsOn||"").slice(0,10); if(startsOn&&startsOn>dateKey)return false;
   const weekDays=[...new Set((Array.isArray(schedule.weekDays)?schedule.weekDays:[]).map(Number).filter((day)=>Number.isInteger(day)&&day>=0&&day<=6))];
   return !weekDays.length||weekDays.includes(date.getDay());
 }
@@ -464,6 +465,22 @@ function formatExerciseTotal(item,value=exerciseTodayValue(item)){
 function exerciseProgress(item){ const value=exerciseTodayValue(item), goal=Math.max(1,Number(item?.dailyGoal||1)), percent=Math.max(0,Math.round((value/goal)*100)); return {value,goal,percent,width:Math.min(100,percent)}; }
 function dailyExerciseProgress(){ const items=todayExerciseLibrary(); if(!items.length)return 0; return Math.round(items.reduce((sum,item)=>sum+Math.min(100,exerciseProgress(item).percent),0)/items.length); }
 function renderDailyExerciseProgress(){ const items=selectedDayExerciseLibrary(),today=state.selectedWorkoutDateOffset===0,percent=Math.max(0,Math.min(100,dailyExerciseProgress())),label=selectedWorkoutDateLabel(); if(elements.todayExercisesTitle)elements.todayExercisesTitle.textContent=`Exercícios para ${label.toLowerCase()}`;if(elements.todayExercisesHint)elements.todayExercisesHint.textContent=`${items.length?`${items.length} ${items.length===1?"exercício programado":"exercícios programados"}`:"Nenhum exercício programado"} · use as setas ou deslize para mudar o dia.`;if(elements.exerciseDailyCard){elements.exerciseDailyCard.hidden=!exerciseLibrary().length;elements.exerciseDailyCard.setAttribute("aria-label",`Ver o treino de ${label.toLowerCase()}; deslize para mudar o dia`);} if(elements.exerciseDailyPercent)elements.exerciseDailyPercent.textContent=today?`${percent}%`:`${items.length} ${items.length===1?"exercício":"exercícios"}`; if(elements.exerciseDailyDate)elements.exerciseDailyDate.textContent=`${label} · deslize para mudar o dia`; if(elements.exerciseDailyProgressFill)elements.exerciseDailyProgressFill.style.width=`${today?percent:0}%`; if(elements.exerciseDailyPlay){elements.exerciseDailyPlay.disabled=!items.length;elements.exerciseDailyPlay.setAttribute("aria-label",`Iniciar o primeiro exercício ${label.toLowerCase()}`);} }
+function renderDoWorkoutTodayButton(){const items=selectedDayExerciseLibrary(),shouldShow=state.selectedWorkoutDateOffset!==0&&items.length>0&&items.some((item)=>!exerciseScheduledToday(item,new Date()));if(!elements.doWorkoutToday)return;elements.doWorkoutToday.hidden=!shouldShow;elements.doWorkoutToday.disabled=false;elements.doWorkoutToday.textContent="Fazer hoje";}
+async function makeSelectedWorkoutToday(){
+  const items=selectedDayExerciseLibrary(),button=elements.doWorkoutToday;if(!button||!items.length||state.selectedWorkoutDateOffset===0)return;
+  const dateKey=exerciseGoalDateKey(new Date());button.disabled=true;button.textContent="Salvando treino...";
+  try{
+    for(const item of items){
+      const scheduleConfig={...(item.scheduleConfig||{}),oneTimeDates:[...new Set([...(Array.isArray(item.scheduleConfig?.oneTimeDates)?item.scheduleConfig.oneTimeDates.map((value)=>String(value).slice(0,10)):[]),dateKey])].slice(-90)};
+      const payload=await apiRequest("/api/200/exercises/library",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:profileName(),exerciseId:item.exerciseId,exerciseName:item.exerciseName,category:item.category,trackingType:item.trackingType,equipment:item.equipment,targetSeries:item.targetSeries,targetReps:item.targetReps,targetMinutes:item.targetMinutes,targetDistanceMeters:item.targetDistanceMeters,loadKg:item.loadKg,scheduleConfig}),offlineInvalidates:["/api/200/wellness","/api/200/extra-goals"]});
+      if(payload.dashboard)state.dashboard=payload.dashboard;
+      else state.dashboard={...(state.dashboard||{}),exerciseLibrary:exerciseLibrary().map((entry)=>String(entry.exerciseId)===String(item.exerciseId)?{...entry,scheduleConfig}:entry)};
+      cacheDashboard();
+    }
+    state.selectedWorkoutDateOffset=0;renderExerciseGrid();window.dispatchEvent(new CustomEvent("project200:exercise-mission-updated"));
+  }catch(error){button.textContent=error instanceof Error?error.message:"Não foi possível trazer o treino para hoje.";button.disabled=false;return;}
+  button.disabled=false;button.textContent="Fazer hoje";
+}
 function muscleMapDisplayTitle(map,index){ const title=String(map?.title||"").toLowerCase(); if(title.includes("perna")||index===1)return "Pernas"; if(title.includes("costa")||title.includes("poster")||index===2)return "Costas"; return "Frente"; }
 function muscleMapHeadingMarkup(map,index){ return `<header class="wellness-muscle-map-heading"><strong>${escapeHtml(muscleMapDisplayTitle(map,index))}</strong><small>Toque no músculo para treinar</small></header>`; }
 function currentMuscleProgress(){
@@ -534,6 +551,7 @@ function cycleExerciseCategory(direction){ const currentIndex=Math.max(0,EXERCIS
 function renderExerciseGrid(){
   renderMechanicalStrength();
   renderDailyExerciseProgress();
+  renderDoWorkoutTodayButton();
   renderMuscleProgressMap();
   const visible=currentHomeExerciseLibrary().map(exerciseFromLibrary).filter(Boolean);
   if(!visible.length){ elements.exerciseGrid.innerHTML=exerciseLibrary().length?`<div class="wellness-exercise-empty"><strong>Nenhum exercício programado ${selectedWorkoutDateLabel().toLowerCase()}</strong><span>Deslize para ver outro dia do seu plano.</span></div>`:'<button class="wellness-exercise-empty" type="button" data-open-catalog><strong>Adicione seu primeiro exercício</strong><span>Escolha no acervo para montar seu plano.</span></button>'; return; }
@@ -1469,6 +1487,7 @@ elements.dailyPlanPrevious?.addEventListener("click",()=>shiftSelectedWorkoutDat
 elements.dailyPlanNext?.addEventListener("click",()=>shiftSelectedWorkoutDate(1));
 elements.exerciseDayPrevious?.addEventListener("click",()=>shiftSelectedWorkoutDate(-1));
 elements.exerciseDayNext?.addEventListener("click",()=>shiftSelectedWorkoutDate(1));
+elements.doWorkoutToday?.addEventListener("click",()=>void makeSelectedWorkoutToday());
 elements.exerciseGrid?.addEventListener("pointerdown",beginExerciseDateSwipe,{passive:true});
 elements.exerciseGrid?.addEventListener("pointerup",finishSelectedWorkoutDateSwipe,{passive:true});
 elements.exerciseGrid?.addEventListener("pointercancel",(event)=>{if(state.dailySwipePointerId===event.pointerId)state.dailySwipePointerId=null;},{passive:true});
