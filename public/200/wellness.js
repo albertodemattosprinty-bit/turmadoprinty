@@ -331,10 +331,9 @@ function confirmRir(event){
   event.preventDefault();if(!state.rirPending||!state.workout)return;
   const repetitions=state.rirRepetitions,rir=state.rirValue,gain=mechanicalStrengthPoints(rir);
   state.rirPending=false;
-  // Grava localmente no gesto do usuário; o servidor persiste em segundo plano.
-  const savePromise=addSeries(repetitions,rir);
-  elements.rirLayer.hidden=true;showLayer(elements.workoutLayer);renderWorkout();renderMechanicalSummary(gain);
-  void savePromise.catch(()=>{});
+  elements.rirLayer.hidden=true;showLayer(elements.workoutLayer);renderMechanicalSummary(gain);
+  // Fecha a decisão antes de iniciar o registro local e a sincronização.
+  try{void Promise.resolve(addSeries(repetitions,rir)).catch(()=>{});}catch(error){elements.workoutLayer?.setAttribute("data-sync-pending","true");console.error("Não foi possível registrar a série localmente.",error);}
 }
 function reconcileMechanicalDashboard(dashboard){
   if(!dashboard?.mechanicalStrength)return;const value=readMechanicalState();value.points=Math.max(value.points,Number(dashboard.mechanicalStrength.points||0));
