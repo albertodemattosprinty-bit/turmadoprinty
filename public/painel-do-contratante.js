@@ -1,5 +1,4 @@
 import { getApiUrl } from "/api.js";
-import { renderContractorOverview } from "/painel-do-contratante-overview.js";
 
 const TOKEN_KEY = "turma_do_printy_token";
 const $ = (id) => document.getElementById(id);
@@ -329,7 +328,6 @@ function render(data) {
   renderReadiness(answers, workflow, Boolean(term.isDraft));
   renderContractorContactDetails(answers);
   if (term.isDraft) showProposalDraftNotice(answers);
-  renderContractorOverview({ term, answers, workflow });
 
   $("contractorLoading").classList.add("hidden");
   $("emptyState").classList.add("hidden");

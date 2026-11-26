@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101f45">
   <title>Meu evento | Turma do Printy</title>
+  <link rel="stylesheet" href="/painel-do-evento-overview.css">
   <style>
     :root{font-family:Inter,"Segoe UI",Arial,sans-serif;color:#17284b;background:#f4f7fb;font-synthesis:none;text-rendering:optimizeLegibility}
     *{box-sizing:border-box}
@@ -161,12 +162,18 @@
       const token=localStorage.getItem(TOKEN_KEY)||'';
       if(!token){redirectToLogin();return}
       try{
-        const response=await fetch('/api/contractor-panel/proposal-draft',{headers:{Authorization:`Bearer ${token}`}});
-        const payload=await response.json().catch(()=>({}));
+        const [response,workflowResponse]=await Promise.all([
+          fetch('/api/contractor-panel/proposal-draft',{headers:{Authorization:`Bearer ${token}`}}),
+          fetch('/api/contractor-panel',{headers:{Authorization:`Bearer ${token}`}})
+        ]);
+        const [payload,workflowPayload]=await Promise.all([
+          response.json().catch(()=>({})),workflowResponse.json().catch(()=>({}))
+        ]);
         if(response.status===401){localStorage.removeItem(TOKEN_KEY);redirectToLogin();return}
         if(!response.ok)throw new Error(payload.error||'Não foi possível carregar os dados do seu evento.');
         if(!payload.term)throw new Error('Ainda não encontramos uma proposta vinculada a este acesso.');
         renderPanel(payload.term);
+        window.dispatchEvent(new CustomEvent('contractor-event-panel-ready',{detail:{term:payload.term,workflow:workflowPayload?.panel?.term?.workflow||{}}}));
       }catch(error){showError(error?.message||'Não foi possível carregar os dados do seu evento.')}
     }
     function date(value){
@@ -177,5 +184,6 @@
     $('logoutButton').addEventListener('click',()=>{localStorage.removeItem(TOKEN_KEY);redirectToLogin()});
     loadPanel();
   </script>
+  <script type="module" src="/painel-do-evento-overview.js"></script>
 </body>
 </html>
