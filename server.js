@@ -139,6 +139,7 @@ const MINI_COURSE_MODEL_LABELS = new Map([
 ]);
 const MINI_COURSE_COVERS_PREFIX = "mini/courses";
 const MINI_MEDIA_LIBRARY_KEY = "mini/media/library.json";
+const EVENT_PROPOSAL_MODELS_KEY = "event-proposal/models.json";
 const MINI_MEDIA_ALBUMS_PREFIX = "mini/media/albums";
 const MINI_MEDIA_COVER_SYNC_PREFIX = "Capas/";
 const MINI_MEDIA_IMAGE_MODELS = [
@@ -161,6 +162,7 @@ const MAX_EVENT_PROMO_VIDEO_BYTES = 250 * 1024 * 1024;
 const MAX_PROJECT200_EXERCISE_VIDEO_BYTES = 80 * 1024 * 1024;
 const MAX_EVENT_CHURCH_PHOTO_BYTES = 15 * 1024 * 1024;
 const MAX_EVENT_EXPENSE_NOTE_BYTES = 20 * 1024 * 1024;
+const MAX_EVENT_PROPOSAL_SLIDE_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_SCORE_BYTES = 30 * 1024 * 1024;
 const MINI_DOC_KEY_ALL_DOCS = "all-docs";
 const MINI_DOC_TITLE_ALL_DOCS = "AllDocs";
@@ -14855,6 +14857,125 @@ async function handleMidiaTrackAsset(request, response, pathname, download = fal
 
 const EVENT_PROPOSAL_ROUTE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const eventProposalRouteCache = new Map();
+const EVENT_PROPOSAL_MODEL_IDS = new Set(["puppets", "theater-music", "complete-show", "children-congress", "full-congress"]);
+
+async function readEventProposalModels() {
+  const raw = await readR2ObjectText(EVENT_PROPOSAL_MODELS_KEY);
+  if (!raw) return { models: {} };
+  try {
+    const parsed = JSON.parse(raw);
+    const models = {};
+    const allowedPrefix = buildPublicR2UrlFromKey("event-proposal/model-slides") + "/";
+    for (const eventId of EVENT_PROPOSAL_MODEL_IDS) {
+      const slides = parsed?.models?.[eventId];
+      if (!Array.isArray(slides) || !slides.length || slides.length > 250) continue;
+      const normalized = slides.map((slide) => ({
+        url: String(slide?.url || ""),
+        seconds: slide?.seconds == null ? null : Number(slide.seconds)
+      }));
+      if (normalized.some((slide) => !slide.url.startsWith(allowedPrefix)
+        || (slide.seconds != null && (!Number.isFinite(slide.seconds) || slide.seconds < 0.2 || slide.seconds > 600)))) continue;
+      models[eventId] = normalized;
+    }
+    return { models };
+  } catch {
+    return { models: {} };
+  }
+}
+
+async function handleEventProposalModelsRead(request, response, adminOnly = false) {
+  if (adminOnly && !(await requireAdmin(request, response))) return;
+  try {
+    sendJson(response, 200, await readEventProposalModels());
+  } catch (error) {
+    if (adminOnly) {
+      sendJson(response, 503, { error: "Não foi possível carregar as apresentações agora." });
+      return;
+    }
+    sendJson(response, 200, { models: {} });
+  }
+}
+
+async function handleEventProposalModelsSave(request, response) {
+  if (!(await requireAdmin(request, response))) return;
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch {
+    sendJson(response, 400, { error: "Dados inválidos para salvar as imagens." });
+    return;
+  }
+  const eventId = String(body?.eventId || "");
+  const slides = Array.isArray(body?.slides) ? body.slides : [];
+  const allowedPrefix = buildPublicR2UrlFromKey("event-proposal/model-slides") + "/";
+  if (!EVENT_PROPOSAL_MODEL_IDS.has(eventId) || !slides.length || slides.length > 250) {
+    sendJson(response, 400, { error: "Escolha um modelo e envie de 1 a 250 imagens." });
+    return;
+  }
+  const normalizedSlides = [];
+  for (const slide of slides) {
+    const url = String(slide?.url || "");
+    const seconds = slide?.seconds == null ? null : Number(slide.seconds);
+    if (!url.startsWith(allowedPrefix)
+      || (seconds != null && (!Number.isFinite(seconds) || seconds < 0.2 || seconds > 600))) {
+      sendJson(response, 400, { error: "Uma imagem ou duração da sequência é inválida." });
+      return;
+    }
+    normalizedSlides.push({ url, seconds });
+  }
+  try {
+    const config = await readEventProposalModels();
+    config.models[eventId] = normalizedSlides;
+    await getR2Client().send(new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: EVENT_PROPOSAL_MODELS_KEY,
+      Body: Buffer.from(JSON.stringify(config), "utf8"),
+      ContentType: "application/json; charset=utf-8",
+      CacheControl: "public, max-age=60"
+    }));
+    sendJson(response, 200, config);
+  } catch (error) {
+    sendJson(response, 503, { error: error instanceof Error ? error.message : "Não foi possível salvar a apresentação." });
+  }
+}
+
+async function handleEventProposalSlideUpload(request, response) {
+  if (!(await requireAdmin(request, response))) return;
+  const contentType = String(request.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
+  const allowedTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
+  if (!allowedTypes.has(contentType)) {
+    sendJson(response, 415, { error: "Envie uma imagem PNG, JPG ou WebP." });
+    return;
+  }
+  let buffer;
+  try {
+    buffer = await readBinaryBody(request, MAX_EVENT_PROPOSAL_SLIDE_BYTES);
+    if (!buffer.length) throw new Error("A imagem está vazia.");
+  } catch (error) {
+    sendJson(response, 413, { error: error instanceof Error ? error.message : "Não foi possível ler a imagem." });
+    return;
+  }
+  try {
+    const image = sharp(buffer, { failOn: "error" });
+    const metadata = await image.metadata();
+    if (!["png", "jpeg", "webp"].includes(String(metadata.format || ""))) {
+      sendJson(response, 415, { error: "O arquivo enviado não é uma imagem PNG, JPG ou WebP válida." });
+      return;
+    }
+    const webp = await image.rotate().resize(1400, 1400, { fit: "inside", withoutEnlargement: true }).webp({ quality: 84, effort: 5 }).toBuffer();
+    const key = "event-proposal/model-slides/" + crypto.randomUUID() + ".webp";
+    await getR2Client().send(new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key,
+      Body: webp,
+      ContentType: "image/webp",
+      CacheControl: "public, max-age=31536000, immutable"
+    }));
+    sendJson(response, 201, { url: buildPublicR2UrlFromKey(key), contentType: "image/webp", bytes: webp.length });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível otimizar e enviar a imagem." });
+  }
+}
 
 const EVENT_PROPOSAL_STATE_NAMES = {
   AC: "Acre", AL: "Alagoas", AP: "Amapá", AM: "Amazonas", BA: "Bahia", CE: "Ceará",
@@ -14970,6 +15091,26 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "OPTIONS") {
     response.writeHead(204);
     response.end();
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/event-proposal/models") {
+    await handleEventProposalModelsRead(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/admin/event-proposal/models") {
+    await handleEventProposalModelsRead(request, response, true);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname === "/api/admin/event-proposal/models") {
+    await handleEventProposalModelsSave(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/admin/event-proposal/models/image") {
+    await handleEventProposalSlideUpload(request, response);
     return;
   }
 

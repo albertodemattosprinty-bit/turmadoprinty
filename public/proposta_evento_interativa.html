@@ -70,7 +70,17 @@
   .event-type-card{overflow:hidden;border:1px solid #e3eaf4;border-radius:26px;background:#fff;color:var(--navy);box-shadow:0 10px 26px rgba(27,53,94,.08)}
   .event-type-card .event-art{width:min(100%,clamp(250px,42vh,430px));margin-inline:auto}
   .event-art{width:100%;height:auto;aspect-ratio:1 / 1;display:grid;place-items:center;overflow:hidden}
-  .event-art.event-art-photo{background-position:center;background-repeat:no-repeat;background-size:cover}
+  .event-art.event-art-photo{position:relative;background:#eef3fb}
+  .event-art-photo img.event-slide{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .72s ease}
+  .event-art-photo img.event-slide.visible{opacity:1}
+  .event-audio-play{position:absolute;right:16px;bottom:16px;z-index:2;width:58px;height:58px;border:3px solid #fff;border-radius:50%;display:grid;place-items:center;background:#ed263d;color:#fff;box-shadow:0 6px 20px rgba(19,27,50,.3);cursor:pointer;transition:transform .18s ease,background .18s ease}
+  .event-audio-play:hover{transform:scale(1.07);background:#d91831}
+  .event-audio-play svg{width:25px;height:25px;display:block;margin-left:3px}
+  .event-preview-player{width:min(100%,430px);margin:12px auto 0;padding:10px 14px;border-radius:14px;background:#eff7ff;color:#174f94}
+  .event-preview-player[hidden]{display:none}
+  .event-preview-controls{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px}
+  .event-preview-slider{width:100%;height:6px;margin:0;border-radius:99px;background:#b8d7f8;accent-color:#168cf2;cursor:pointer;touch-action:pan-y}
+  .event-preview-time{min-width:76px;text-align:right;font-size:11px;font-weight:850;font-variant-numeric:tabular-nums}
   .event-art svg{width:100%;height:100%;display:block}
   .event-team{display:flex;align-items:center;gap:7px;padding:9px 14px 0;color:#69748b;font-size:11px;font-weight:700}
   .event-team svg{width:27px;height:18px;flex:none;color:#52688c}
@@ -280,6 +290,26 @@
   .feedback-action.secondary{border:1px solid #d9e2ed;background:#fff;color:#30445f}
   .feedback-spinner{width:24px;height:24px;border:3px solid #f1d98f;border-top-color:#805900;border-radius:50%;animation:feedbackSpin .8s linear infinite}
   @keyframes feedbackSpin{to{transform:rotate(360deg)}}
+  .event-admin-backdrop{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:18px;background:rgba(9,20,42,.76);backdrop-filter:blur(6px)}
+  .event-admin-backdrop[hidden]{display:none}
+  .event-admin-dialog{width:min(100%,720px);max-height:min(90dvh,900px);overflow:auto;padding:24px;border:1px solid #dce6f3;border-radius:22px;background:#fff;color:var(--navy);box-shadow:0 24px 80px rgba(0,0,0,.32)}
+  .event-admin-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+  .event-admin-header h2{margin:0;font-size:23px}
+  .event-admin-header p{margin:6px 0 0;color:#66738a;font-size:13px;line-height:1.4}
+  .event-admin-close{width:38px;height:38px;border:0;border-radius:50%;background:#eef4fb;color:#24466f;font-size:24px;cursor:pointer}
+  .event-admin-field{display:grid;gap:8px;margin:14px 0;color:#28466f;font-size:13px;font-weight:850}
+  .event-admin-field select,.event-admin-field input{min-height:44px;padding:10px 12px;border:1px solid #d5e0ed;border-radius:11px;background:#fff;color:var(--navy);font:inherit}
+  .event-admin-help{margin:8px 0 12px;color:#66738a;font-size:12px;line-height:1.5}
+  .event-admin-slides{display:grid;gap:10px;margin:12px 0}
+  .event-admin-slide{display:grid;grid-template-columns:64px minmax(0,1fr) 110px 40px;align-items:center;gap:10px;padding:9px;border:1px solid #e0e8f2;border-radius:13px;background:#f8fbff}
+  .event-admin-slide img{width:64px;height:64px;border-radius:9px;object-fit:cover}
+  .event-admin-slide span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:800}
+  .event-admin-slide input{width:100%;padding:9px;border:1px solid #d5e0ed;border-radius:9px;font:inherit;font-size:12px}
+  .event-admin-slide button{width:36px;height:36px;border:0;border-radius:50%;background:#ffebeb;color:#ad1d2e;font-size:19px;cursor:pointer}
+  .event-admin-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+  .event-admin-actions button{min-height:44px;padding:10px 16px;border:0;border-radius:11px;background:#168cf2;color:#fff;font:inherit;font-weight:900;cursor:pointer}
+  .event-admin-actions button.secondary{border:1px solid #d5e0ed;background:#fff;color:#30445f}
+  .event-admin-status{min-height:20px;margin:8px 0 0;color:#52627a;font-size:12px}
 
   @media(max-width:760px){
     .screen{padding:20px 16px 22px}
@@ -288,6 +318,10 @@
     h1{font-size:34px}
     .sub{font-size:14px}
     .carousel-wrap{grid-template-columns:58px 1fr 58px;gap:10px;width:calc(100% + 20px);margin-left:-10px}
+    .event-audio-play{right:12px;bottom:12px;width:52px;height:52px}
+    .event-admin-dialog{padding:18px}
+    .event-admin-slide{grid-template-columns:52px minmax(0,1fr) 88px 34px;gap:7px;padding:7px}
+    .event-admin-slide img{width:52px;height:52px}
     .peek{height:300px;border-radius:22px}
     .card-main{height:330px;border-radius:26px}
     .arrow{width:42px;height:42px}
@@ -483,6 +517,12 @@
           <div class="event-type-center">
             <button class="arrow left" type="button" aria-label="Evento anterior" onclick="changeEventType(-1)">‹</button>
             <div class="event-type-grid" id="eventTypeGrid" aria-live="polite"></div>
+          <div class="event-preview-player" id="eventPreviewPlayer" hidden>
+            <div class="event-preview-controls">
+              <input class="event-preview-slider" id="eventPreviewSlider" type="range" min="0" max="1000" value="0" aria-label="Avançar ou voltar no áudio da apresentação" oninput="seekEventPreview(this.value)">
+              <time class="event-preview-time" id="eventPreviewTime">0:00 / 0:00</time>
+            </div>
+          </div>
             <button class="arrow right" type="button" aria-label="Próximo evento" onclick="changeEventType(1)">›</button>
           </div>
           <div class="event-type-peek" id="eventTypePeekNext" aria-hidden="true"></div>
@@ -678,6 +718,28 @@
   </section>
 </div>
 
+<div class="event-admin-backdrop" id="eventAdminModal" hidden>
+  <section class="event-admin-dialog" role="dialog" aria-modal="true" aria-labelledby="eventAdminTitle">
+    <header class="event-admin-header">
+      <div><h2 id="eventAdminTitle">Editar apresentação do evento</h2><p>Escolha um modelo, envie os quadros e ajuste por quantos segundos cada um aparece.</p></div>
+      <button class="event-admin-close" type="button" aria-label="Fechar editor" onclick="closeEventAdminModal()">×</button>
+    </header>
+    <label class="event-admin-field" for="eventAdminModel">Modelo de evento
+      <select id="eventAdminModel" onchange="changeEventAdminModel(this.value)"></select>
+    </label>
+    <label class="event-admin-field" for="eventAdminFiles">Substituir a sequência por imagens
+      <input id="eventAdminFiles" type="file" accept="image/png,image/jpeg,image/webp" multiple onchange="addEventAdminFiles(this.files)">
+    </label>
+    <p class="event-admin-help">Selecione todas as imagens da nova sequência de uma vez. A primeira será a capa. Informe um tempo como <b>4,2seg</b>; os quadros sem tempo dividem o restante do áudio. Se todos ficarem vazios, a sequência será distribuída igualmente.</p>
+    <div class="event-admin-slides" id="eventAdminSlides"></div>
+    <p class="event-admin-status" id="eventAdminStatus" role="status" aria-live="polite"></p>
+    <footer class="event-admin-actions">
+      <button class="secondary" type="button" onclick="closeEventAdminModal()">Cancelar</button>
+      <button type="button" id="eventAdminSave" onclick="saveEventAdminSlides()">Salvar apresentação</button>
+    </footer>
+  </section>
+</div>
+
 <script>
   let current = 0;
   const stageNames=['','Local do evento','Tamanho do público','O que vai ter','Cidade do evento','Dia do evento','Horário do evento','Tipo de evento','Transporte','História','Dados do contratante','Endereço do evento','Acesso ao painel','Proposta final'];
@@ -690,6 +752,7 @@
     });
   }
   function go(index){
+    if(index!==7)stopEventPreview();
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
     document.querySelector('[data-screen="'+index+'"]').classList.add('active');
     current=index;
@@ -713,11 +776,11 @@
   function changeVenue(delta){venueIndex=(venueIndex+delta+venues.length)%venues.length;renderVenue()}
 
   const eventTypes=[
-    {id:'puppets',name:'Teatrinho e Fantoches',duration:'50 min',team:2,priceCents:180000},
-    {id:'theater-music',name:'Teatro e músicas',duration:'1h15',team:3,priceCents:260000},
-    {id:'children-congress',name:'Congresso Infantil',duration:'1h15',team:4,priceCents:340000},
-    {id:'complete-show',name:'Show Completo',duration:'1h30',team:4,priceCents:450000,art:'<svg viewBox="0 0 320 180" aria-hidden="true"><defs><linearGradient id="showBg" x2="0" y2="1"><stop stop-color="#333d91"/><stop offset="1" stop-color="#bf57b6"/></linearGradient></defs><rect width="320" height="180" fill="url(#showBg)"/><path d="m65 0 76 0-48 106zm190 0-76 0 48 106z" fill="#fff3a5" opacity=".55"/><path d="M0 145h320v35H0z" fill="#242b65"/><rect x="22" y="72" width="40" height="72" rx="5" fill="#151a3f"/><rect x="258" y="72" width="40" height="72" rx="5" fill="#151a3f"/><circle cx="42" cy="111" r="13" fill="#7076bc"/><circle cx="278" cy="111" r="13" fill="#7076bc"/><path d="M135 44v67m0-67 40-10v61" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round"/><ellipse cx="123" cy="114" rx="14" ry="9" fill="#ffd45a"/><ellipse cx="163" cy="105" rx="14" ry="9" fill="#ffd45a"/><path d="m206 40 8 16 18 3-13 13 3 18-16-9-16 9 3-18-13-13 18-3z" fill="#ffdf73"/></svg>'},
-    {id:'full-congress',name:'Congresso Completo',duration:'3h',team:5,priceCents:600000}
+    {id:'puppets',name:'Econômico Simples',duration:'50 min',team:2,priceCents:180000,model:1},
+    {id:'theater-music',name:'Econômico Plus',duration:'1h15',team:3,priceCents:260000,model:2},
+    {id:'complete-show',name:'Show Completo',duration:'1h30',team:4,priceCents:450000,model:3},
+    {id:'children-congress',name:'Congresso infantil',duration:'1h15',team:4,priceCents:340000,model:4},
+    {id:'full-congress',name:'Turma do Printy Experience',duration:'3h',team:5,priceCents:600000,model:5}
   ];
   let selectedEventTypeId='puppets';
   let travelQuote=null;
@@ -775,29 +838,257 @@
     document.getElementById('installmentValue').textContent=`${selectedInstallments}x de ${formatMoney(Math.round(financedTotalCents/selectedInstallments))}`;
     document.getElementById('totalPrice').textContent=formatMoney(financedTotalCents);
   }
-  const eventTypeImages={
-    puppets:'/midia/tipos-evento/teatrinho-fantoches.webp',
-    'theater-music':'/midia/tipos-evento/teatro-musicas.webp',
-    'children-congress':'/midia/tipos-evento/congresso-infantil.webp',
-    'full-congress':'/midia/tipos-evento/congresso-completo.webp'
+  const eventTypeAudio={
+    puppets:'/midia/tipos-evento/audio/modelo1.mp3',
+    'theater-music':'/midia/tipos-evento/audio/modelo2.mp3',
+    'complete-show':'/midia/tipos-evento/audio/modelo3.mp3',
+    'children-congress':'/midia/tipos-evento/audio/modelo4.mp3',
+    'full-congress':'/midia/tipos-evento/audio/modelo5.mp3'
   };
+  let eventPreviewConfig={models:{}};
+  let eventPreviewState=null;
+  const eventAdminDrafts=new Map();
+  let eventAdminModelId='puppets';
+  const eventAdminObjectUrls=new Set();
+  function eventDefaultSlides(event){
+    return Array.from({length:9},(_,index)=>({url:`/midia/tipos-evento/modelo${event.model}-${String(index+1).padStart(2,'0')}.webp`,seconds:null}));
+  }
+  function eventSlidesFor(event){
+    const custom=eventPreviewConfig?.models?.[event.id];
+    return Array.isArray(custom)&&custom.length?custom:eventDefaultSlides(event);
+  }
+  function eventCoverFor(event){return eventSlidesFor(event)[0]?.url||eventDefaultSlides(event)[0].url}
   function eventAt(index){return eventTypes[(index+eventTypes.length)%eventTypes.length]}
-  function renderEventArtwork(event){
-    const image=eventTypeImages[event.id];
-    return image
-      ? `<div class="event-art event-art-photo" role="img" aria-label="${event.name}" style="background-image:url('${image}')"></div>`
-      : `<div class="event-art" role="img" aria-label="${event.name}">${event.art||''}</div>`;
+  function renderEventArtwork(event,interactive=false){
+    const active=eventPreviewState?.eventId===event.id;
+    const slides=eventSlidesFor(event);
+    const frame=active?eventPreviewState.frame:0;
+    const imageA=slides[frame]?.url||eventCoverFor(event);
+    const imageB=slides[(frame+1)%slides.length]?.url||imageA;
+    const playing=active&&!eventPreviewState.audio.paused;
+    const button=interactive?`<button class="event-audio-play" type="button" aria-label="${playing?'Pausar':'Reproduzir'} apresentação de ${event.name}" onclick="toggleEventPreview(event,'${event.id}')"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">${playing?'<path d="M7 5h4v14H7zm6 0h4v14h-4z"/>':'<path d="M7 4.8c0-.8.9-1.3 1.6-.9l10.2 6.1a1.1 1.1 0 0 1 0 1.9L8.6 18a1.1 1.1 0 0 1-1.6-.9z"/>'}</svg></button>`:'';
+    return `<div class="event-art event-art-photo" role="img" aria-label="${event.name}"><img class="event-slide visible" data-slot="0" src="${imageA}" alt="${event.name}" loading="eager"><img class="event-slide" data-slot="1" src="${imageB}" alt="" aria-hidden="true" loading="eager">${button}</div>`;
   }
   function renderEventTypes(){
     const index=Math.max(0,eventTypes.findIndex((item)=>item.id===selectedEventTypeId));
     const event=eventTypes[index];
     const previous=eventAt(index-1);
     const next=eventAt(index+1);
-    document.getElementById('eventTypeGrid').innerHTML=`<article class="event-type-card" data-event-type="${event.id}" data-event-name="${event.name}" data-price-cents="${event.priceCents}" data-duration="${event.duration}" data-team="${event.team}">${renderEventArtwork(event)}<div class="event-team">${teamIcon}<span>${event.team} integrantes</span></div><strong>${event.name}</strong><div class="event-type-meta"><span>${event.duration}</span><b>${formatMoney(event.priceCents)}</b></div></article>`;
+    document.getElementById('eventTypeGrid').innerHTML=`<article class="event-type-card" data-event-type="${event.id}" data-event-name="${event.name}" data-price-cents="${event.priceCents}" data-duration="${event.duration}" data-team="${event.team}">${renderEventArtwork(event,true)}<div class="event-team">${teamIcon}<span>${event.team} integrantes</span></div><strong>${event.name}</strong><div class="event-type-meta"><span>${event.duration}</span><b>${formatMoney(event.priceCents)}</b></div></article>`;
     document.getElementById('eventTypePrev').innerHTML=renderEventArtwork(previous);
     document.getElementById('eventTypePeekNext').innerHTML=renderEventArtwork(next);
   }
+  function eventSlideIndexAt(slides,time,duration){
+    const custom=slides.some((slide)=>Number.isFinite(Number(slide.seconds))&&Number(slide.seconds)>0);
+    if(!custom||!duration)return Math.min(slides.length-1,Math.floor((time/Math.max(duration,.001))*slides.length));
+    const explicitTotal=slides.reduce((sum,slide)=>sum+(Number(slide.seconds)>0?Number(slide.seconds):0),0);
+    const automaticCount=slides.filter((slide)=>!(Number(slide.seconds)>0)).length;
+    const automaticDuration=automaticCount?Math.max(.1,(duration-explicitTotal)/automaticCount):0;
+    let cursor=0;
+    for(let index=0;index<slides.length;index++){
+      cursor+=Number(slides[index].seconds)>0?Number(slides[index].seconds):automaticDuration;
+      if(time<cursor)return index;
+    }
+    return slides.length-1;
+  }
+  function eventPreviewTimeLabel(seconds){
+    const safe=Math.max(0,Math.floor(Number(seconds)||0));
+    return `${Math.floor(safe/60)}:${String(safe%60).padStart(2,'0')}`;
+  }
+  function setEventPreviewFrame(index){
+    const state=eventPreviewState;
+    if(!state||state.frame===index)return;
+    const art=document.querySelector('#eventTypeGrid .event-art');
+    if(!art)return;
+    const nextSlot=state.slot===0?1:0;
+    const next=art.querySelector(`[data-slot="${nextSlot}"]`);
+    const current=art.querySelector(`[data-slot="${state.slot}"]`);
+    next.src=state.slides[index]?.url||state.slides[0].url;
+    next.classList.add('visible');
+    current.classList.remove('visible');
+    state.slot=nextSlot;
+    state.frame=index;
+  }
+  function syncEventPreview(){
+    const state=eventPreviewState;
+    if(!state)return;
+    const audio=state.audio;
+    const duration=Number.isFinite(audio.duration)?audio.duration:0;
+    const time=Number(audio.currentTime)||0;
+    setEventPreviewFrame(eventSlideIndexAt(state.slides,time,duration));
+    const slider=document.getElementById('eventPreviewSlider');
+    slider.value=duration?String(Math.round(time/duration*1000)):'0';
+    document.getElementById('eventPreviewTime').textContent=`${eventPreviewTimeLabel(time)} / ${eventPreviewTimeLabel(duration)}`;
+  }
+  function seekEventPreview(value){
+    const state=eventPreviewState;
+    if(!state||!Number.isFinite(state.audio.duration))return;
+    state.audio.currentTime=(Math.max(0,Math.min(1000,Number(value)||0))/1000)*state.audio.duration;
+    syncEventPreview();
+  }
+  function stopEventPreview(){
+    if(!eventPreviewState)return;
+    eventPreviewState.audio.pause();
+    eventPreviewState.audio.removeAttribute('src');
+    eventPreviewState.audio.load();
+    eventPreviewState=null;
+    document.getElementById('eventPreviewPlayer').hidden=true;
+    renderEventTypes();
+  }
+  async function toggleEventPreview(event,id){
+    event?.stopPropagation?.();
+    const selected=eventTypes.find((item)=>item.id===id);
+    if(!selected)return;
+    if(eventPreviewState?.eventId===id){
+      if(eventPreviewState.audio.paused){await eventPreviewState.audio.play();renderEventTypes();syncEventPreview()}
+      else{eventPreviewState.audio.pause();renderEventTypes()}
+      return;
+    }
+    stopEventPreview();
+    const slides=eventSlidesFor(selected);
+    slides.forEach((slide)=>{const image=new Image();image.src=slide.url});
+    const audio=new Audio(eventTypeAudio[id]);
+    audio.preload='metadata';
+    eventPreviewState={eventId:id,audio,slides,frame:0,slot:0};
+    audio.addEventListener('loadedmetadata',syncEventPreview);
+    audio.addEventListener('timeupdate',syncEventPreview);
+    audio.addEventListener('seeked',syncEventPreview);
+    audio.addEventListener('ended',stopEventPreview,{once:true});
+    document.getElementById('eventPreviewPlayer').hidden=false;
+    document.getElementById('eventPreviewSlider').value='0';
+    renderEventTypes();
+    try{await audio.play();syncEventPreview();renderEventTypes()}
+    catch(error){stopEventPreview();document.getElementById('eventTypeStatus').textContent='Não foi possível reproduzir este áudio neste navegador.'}
+  }
+  async function loadEventPreviewConfig(){
+    try{
+      const response=await fetch('/api/event-proposal/models',{cache:'no-store'});
+      if(!response.ok)return;
+      const payload=await response.json();
+      if(payload&&payload.models)eventPreviewConfig=payload;
+      renderEventTypes();
+    }catch{}
+  }
+  function eventAdminToken(){
+    const key='turma_do_printy_token';
+    const match=document.cookie.match(/(?:^|;\s*)turma_do_printy_token=([^;]+)/);
+    try{return localStorage.getItem(key)||sessionStorage.getItem(key)||(match?decodeURIComponent(match[1]):'')}catch{return match?decodeURIComponent(match[1]):''}
+  }
+  function eventAdminAuth(){const token=eventAdminToken();return token?{Authorization:`Bearer ${token}`}:{}}
+  function eventSecondsText(value){return value==null?'':`${String(value).replace('.',',')}seg`}
+  function parseEventSeconds(value){
+    const normalized=String(value||'').trim().toLowerCase().replace(/\s*seg(?:undos?)?\s*$/,'').replace(',','.');
+    if(!normalized)return null;
+    const seconds=Number(normalized);
+    return Number.isFinite(seconds)&&seconds>=.2&&seconds<=600?seconds:NaN;
+  }
+  function eventAdminCurrentDraft(){
+    const rows=[...document.querySelectorAll('#eventAdminSlides .event-admin-slide')];
+    const draft=rows.map((row)=>{
+      const slide=eventAdminDrafts.get(eventAdminModelId)?.[Number(row.dataset.index)];
+      const parsed=parseEventSeconds(row.querySelector('input').value);
+      return slide?{...slide,seconds:parsed}:null;
+    }).filter(Boolean);
+    eventAdminDrafts.set(eventAdminModelId,draft);
+    return draft;
+  }
+  function renderEventAdminSlides(){
+    const draft=eventAdminDrafts.get(eventAdminModelId)||[];
+    document.getElementById('eventAdminSlides').innerHTML=draft.map((slide,index)=>`<div class="event-admin-slide" data-index="${index}"><img src="${slide.previewUrl||slide.url}" alt="Quadro ${index+1}"><span>${index===0?'Capa · ':''}${slide.file?.name||`Imagem ${index+1}`}</span><input type="text" inputmode="decimal" aria-label="Tempo do quadro ${index+1} em segundos" placeholder="Automático" value="${eventSecondsText(slide.seconds)}" oninput="updateEventAdminSlideTime(${index},this.value)"><button type="button" aria-label="Remover imagem ${index+1}" onclick="removeEventAdminSlide(${index})">×</button></div>`).join('');
+  }
+  function updateEventAdminSlideTime(index,value){
+    const draft=eventAdminDrafts.get(eventAdminModelId)||[];
+    if(draft[index])draft[index].seconds=parseEventSeconds(value);
+  }
+  function removeEventAdminSlide(index){
+    eventAdminCurrentDraft();
+    const draft=eventAdminDrafts.get(eventAdminModelId)||[];
+    const removed=draft.splice(index,1)[0];
+    if(removed?.previewUrl){URL.revokeObjectURL(removed.previewUrl);eventAdminObjectUrls.delete(removed.previewUrl)}
+    renderEventAdminSlides();
+  }
+  function changeEventAdminModel(id){
+    eventAdminCurrentDraft();
+    eventAdminModelId=id;
+    if(!eventAdminDrafts.has(id)){
+      const selected=eventTypes.find((item)=>item.id===id);
+      eventAdminDrafts.set(id,eventSlidesFor(selected).map((slide)=>({...slide})));
+    }
+    renderEventAdminSlides();
+  }
+  function addEventAdminFiles(fileList){
+    eventAdminCurrentDraft();
+    const files=[...(fileList||[])];
+    if(!files.length)return;
+    if(files.some((file)=>!/^image\/(png|jpeg|webp)$/i.test(file.type))){document.getElementById('eventAdminStatus').textContent='Use somente imagens PNG, JPG ou WebP. A sequência atual foi mantida.';return}
+    for(const slide of eventAdminDrafts.get(eventAdminModelId)||[])if(slide.previewUrl){URL.revokeObjectURL(slide.previewUrl);eventAdminObjectUrls.delete(slide.previewUrl)}
+    const draft=files.map((file)=>{const previewUrl=URL.createObjectURL(file);eventAdminObjectUrls.add(previewUrl);return {url:'',seconds:null,file,previewUrl}});
+    eventAdminDrafts.set(eventAdminModelId,draft);
+    document.getElementById('eventAdminFiles').value='';
+    renderEventAdminSlides();
+  }
+  async function openEventAdminModal(){
+    if(!window.matchMedia('(min-width: 761px)').matches)return;
+    document.getElementById('eventAdminModal').hidden=false;
+    const select=document.getElementById('eventAdminModel');
+    select.innerHTML=eventTypes.map((item)=>`<option value="${item.id}">${item.name}</option>`).join('');
+    eventAdminModelId=selectedEventTypeId;
+    select.value=eventAdminModelId;
+    const status=document.getElementById('eventAdminStatus');
+    status.textContent='Carregando as imagens deste modelo…';
+    if(!eventAdminToken()){status.textContent='Entre com uma conta de administrador no site para editar e salvar as imagens.';return}
+    try{
+      const response=await fetch('/api/admin/event-proposal/models',{headers:eventAdminAuth(),cache:'no-store'});
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(payload.error||'Apenas administradores podem editar esta apresentação.');
+      if(payload?.models)eventPreviewConfig=payload;
+      for(const model of eventTypes)eventAdminDrafts.set(model.id,eventSlidesFor(model).map((slide)=>({...slide})));
+      status.textContent='';renderEventAdminSlides();renderEventTypes();
+    }catch(error){status.textContent=error.message||'Não foi possível carregar a apresentação.'}
+  }
+  function closeEventAdminModal(){
+    document.getElementById('eventAdminModal').hidden=true;
+    for(const url of eventAdminObjectUrls)URL.revokeObjectURL(url);
+    eventAdminObjectUrls.clear();
+    eventAdminDrafts.clear();
+  }
+  async function saveEventAdminSlides(){
+    const status=document.getElementById('eventAdminStatus');
+    const button=document.getElementById('eventAdminSave');
+    const draft=eventAdminCurrentDraft();
+    if(!draft.length){status.textContent='Adicione ao menos uma imagem.';return}
+    if(draft.some((slide)=>Number.isNaN(slide.seconds))){status.textContent='Informe tempos entre 0,2 e 600 segundos ou deixe automático.';return}
+    button.disabled=true;
+    try{
+      for(let index=0;index<draft.length;index++){
+        const slide=draft[index];
+        if(!slide.file)continue;
+        status.textContent=`Enviando imagem ${index+1} de ${draft.length}…`;
+        const response=await fetch('/api/admin/event-proposal/models/image',{method:'POST',headers:{...eventAdminAuth(),'Content-Type':slide.file.type,'X-File-Name':encodeURIComponent(slide.file.name)},body:slide.file});
+        const payload=await response.json().catch(()=>({}));
+        if(!response.ok)throw new Error(payload.error||`Não foi possível enviar ${slide.file.name}.`);
+        slide.url=payload.url;slide.file=null;
+        if(slide.previewUrl){URL.revokeObjectURL(slide.previewUrl);eventAdminObjectUrls.delete(slide.previewUrl);slide.previewUrl=''}
+      }
+      const response=await fetch('/api/admin/event-proposal/models',{method:'PUT',headers:{...eventAdminAuth(),'Content-Type':'application/json'},body:JSON.stringify({eventId:eventAdminModelId,slides:draft.map(({url,seconds})=>({url,seconds}))})});
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(payload.error||'Não foi possível salvar a sequência.');
+      eventPreviewConfig=payload;
+      eventAdminDrafts.set(eventAdminModelId,draft.map((slide)=>({...slide})));
+      renderEventTypes();status.textContent='Apresentação salva para todos os visitantes.';
+    }catch(error){status.textContent=error.message||'Não foi possível salvar as imagens.'}
+    finally{button.disabled=false}
+  }
+  let eventAdminKeyTimes=[];
+  document.addEventListener('keydown',(keyboardEvent)=>{
+    if(keyboardEvent.key==='Escape'&&!document.getElementById('eventAdminModal').hidden){closeEventAdminModal();return}
+    if(keyboardEvent.key.toLowerCase()!=='c'||keyboardEvent.target?.matches('input,textarea,select,[contenteditable="true"]'))return;
+    if(!window.matchMedia('(min-width: 761px)').matches)return;
+    const now=Date.now();eventAdminKeyTimes=eventAdminKeyTimes.filter((time)=>now-time<1500);eventAdminKeyTimes.push(now);
+    if(eventAdminKeyTimes.length>=3){eventAdminKeyTimes=[];openEventAdminModal()}
+  });
   function changeEventType(delta){
+    stopEventPreview();
     const index=eventTypes.findIndex((item)=>item.id===selectedEventTypeId);
     selectedEventTypeId=eventAt(index+delta).id;
     renderEventTypes();
@@ -1330,6 +1621,7 @@
   renderStory();
   renderProgress();
   renderEventTypes();
+  loadEventPreviewConfig();
   const eventDateInput=document.getElementById('eventDate');
   const today=new Date();
   today.setMinutes(today.getMinutes()-today.getTimezoneOffset());
