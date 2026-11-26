@@ -322,7 +322,7 @@ function renderEventRoom(data) {
 
   $("adminPayments").innerHTML = (workflow.payments || []).map((payment) => {
     const [statusClass, statusLabel] = statusMeta(payment.status);
-    const title = payment.order === 1 ? "Sinal do evento" : "Pagamento final";
+    const title = `${payment.order}ª parcela`;
     const action = payment.status === "REVIEW"
       ? `<button class="button button--success button--wide" type="button" data-confirm-payment="${esc(payment.id)}">Confirmar recebimento</button>`
       : payment.status === "CONFIRMED"

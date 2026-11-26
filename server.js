@@ -11552,12 +11552,13 @@ async function handleGetContractorPanel(request, response) {
   try {
     const requestUrl = new URL(request.url || "/api/contractor-panel", `http://${request.headers.host || "localhost"}`);
     const eventPageSlug = normalizeEventPageSlug(requestUrl.searchParams.get("eventPageSlug"));
+    const includeDraftPayments = requestUrl.searchParams.get("includeDraftPayments") === "true";
     const term = eventPageSlug
       ? await getTermByEventPageSlug(eventPageSlug, { userId: authUser.id })
       : await getLatestTermByUserId(authUser.id);
     if (term) await markContractorPanelReached(authUser.id);
     const workflow = term ? {
-      ...await getEventContractWorkflow(term),
+      ...await getEventContractWorkflow(term, { includeDraftPayments }),
       churchArtwork: toPublicEventChurchArtwork(await getEventChurchArtworkFile(term.id))
     } : null;
 
@@ -12265,8 +12266,8 @@ async function handleContractorVenuePhotoUpload(request, response, slot) {
       return;
     }
     const contentType = String(request.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
-    if (!new Set(["image/jpeg", "image/png", "image/webp"]).has(contentType)) {
-      sendJson(response, 400, { error: "Envie uma foto JPG, PNG ou WebP." });
+    if (!new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]).has(contentType)) {
+      sendJson(response, 400, { error: "Envie uma foto JPG, PNG, WebP ou HEIC." });
       return;
     }
     const sourceBuffer = await readBinaryBody(request, MAX_EVENT_CHURCH_PHOTO_BYTES);
@@ -12375,7 +12376,7 @@ async function handleAdminEventUserDetail(request, response, userId) {
       return;
     }
     const workflow = {
-      ...await getEventContractWorkflow(term),
+      ...await getEventContractWorkflow(term, { includeDraftPayments: true }),
       churchArtwork: toPublicEventChurchArtwork(await getEventChurchArtworkFile(term.id))
     };
     const list = await listAdminEventFlow();

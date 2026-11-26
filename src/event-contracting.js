@@ -125,6 +125,8 @@ export async function ensureEventContractingSchema() {
         );
       `);
       await query(`create index if not exists idx_event_contract_payments_user on event_contract_payments(user_id, updated_at desc);`);
+      await query(`alter table event_contract_payments drop constraint if exists event_contract_payments_payment_order_check;`);
+      await query(`alter table event_contract_payments add constraint event_contract_payments_payment_order_check check (payment_order between 1 and 12);`);
       await query(`alter table event_contract_payments add column if not exists paid_cents integer not null default 0 check (paid_cents >= 0);`);
       await query(`alter table event_contract_payments add column if not exists reported_amount_cents integer not null default 0 check (reported_amount_cents >= 0);`);
       await query(`update event_contract_payments set paid_cents = amount_cents where status = 'CONFIRMED' and paid_cents = 0;`);
@@ -191,14 +193,18 @@ export async function ensureEventContractingSchema() {
 async function ensureRows(term) {
   await ensureEventContractingSchema();
   const answers = term?.answers || {};
-  const total = Math.max(0, Math.trunc(Number(answers.finalPriceCents || 0)));
-  const firstAmount = Math.floor(total / 2);
-  const amounts = [firstAmount, total - firstAmount];
+  const total = Math.max(0, Math.trunc(Number(answers.proposalFinancedTotalCents) || Number(answers.finalPriceCents) || 0));
+  const installmentCount = Math.max(1, Math.min(12, Math.trunc(Number(answers.proposalInstallments || 2))));
   const chosenDue = dateOnly(answers.pagamentoVencimentoIso);
   const createdFallback = addDays(term.createdAt, 5);
   const eventDue = addDays(term.eventDate, -7);
-  const dues = [chosenDue || createdFallback, eventDue || chosenDue || createdFallback];
-  for (let index = 0; index < 2; index += 1) {
+  const firstDue = chosenDue || createdFallback;
+  await query(`delete from event_contract_payments where term_id = $1 and payment_order > $2 and status = 'PENDING' and paid_cents = 0`, [term.id, installmentCount]);
+  for (let index = 0; index < installmentCount; index += 1) {
+    const amount = Math.floor(total / installmentCount) + (index === installmentCount - 1 ? total % installmentCount : 0);
+    const due = installmentCount > 2
+      ? addDays(firstDue, index * 30)
+      : index === 1 ? eventDue || firstDue : firstDue;
     await query(`
       insert into event_contract_payments (term_id, user_id, payment_order, due_at, amount_cents)
       values ($1, $2, $3, $4::date, $5)
@@ -206,14 +212,15 @@ async function ensureRows(term) {
         set due_at = case when event_contract_payments.status = 'PENDING' then excluded.due_at else event_contract_payments.due_at end,
             amount_cents = case when event_contract_payments.status = 'PENDING' then greatest(event_contract_payments.paid_cents, excluded.amount_cents) else event_contract_payments.amount_cents end,
             updated_at = now()
-    `, [term.id, term.userId, index + 1, dues[index], amounts[index]]);
+    `, [term.id, term.userId, index + 1, due, amount]);
   }
   await query(`insert into event_contract_lodging (term_id, user_id) values ($1, $2) on conflict (term_id) do nothing`, [term.id, term.userId]);
 }
 
-export async function getEventContractWorkflow(term) {
+export async function getEventContractWorkflow(term, { includeDraftPayments = false } = {}) {
   if (!term?.id || !term?.userId) return null;
-  if (term.isDraft) {
+  const draftPrice = Number(term.answers?.proposalFinancedTotalCents) || Number(term.answers?.finalPriceCents) || 0;
+  if (term.isDraft && (!includeDraftPayments || draftPrice < 1)) {
     return {
       pixKey: "36.442.785/0001-00",
       pixLabel: "CNPJ",

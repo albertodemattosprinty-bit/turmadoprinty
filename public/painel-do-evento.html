@@ -20,7 +20,6 @@
     .hero{padding:28px;border-radius:23px;background:linear-gradient(125deg,#132754,#214a84);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:22px;box-shadow:0 15px 38px rgba(16,31,69,.14)}
     .eyebrow{margin:0 0 9px;color:#ffd15e;font-size:11px;font-weight:900;letter-spacing:.13em;text-transform:uppercase}
     h1{margin:0;font-size:clamp(25px,4vw,36px);line-height:1.1}
-    .hero-copy{margin:10px 0 0;color:#d9e3f4;font-size:14px;line-height:1.5}
     .draft-badge{flex:none;padding:9px 13px;border:1px solid rgba(255,209,94,.45);border-radius:999px;background:rgba(255,209,94,.12);color:#ffe8a3;font-size:12px;font-weight:850}
     .draft-note{margin:18px 0;padding:14px 16px;border:1px solid #f0d995;border-radius:14px;background:#fff8df;color:#6e5311;font-size:13px;line-height:1.5}
     .sections{display:grid;gap:16px;margin-top:18px}
@@ -60,8 +59,7 @@
     <div class="loading" id="loadingState"><div><div class="spinner"></div>Carregando os dados do seu evento…</div></div>
     <section id="panelContent" hidden>
       <header class="hero">
-        <div><p class="eyebrow">Painel do contratante</p><h1 id="panelTitle">Seu evento</h1><p class="hero-copy">Aqui estão as informações que você preencheu no simulador.</p></div>
-        <span class="draft-badge" id="draftBadge">Proposta em preparação</span>
+        <div><p class="eyebrow">Painel do contratante</p><h1 id="panelTitle">Seu evento</h1><span class="event-overview__status event-overview__status--open" id="eventOverallStatus">Em aberto</span></div>
       </header>
       <p class="draft-note" id="draftNote">Sua proposta está salva. Os dados do evento ficam reunidos neste painel.</p>
       <div class="sections" id="infoSections"></div>
@@ -116,7 +114,6 @@
       const installmentCount=Number(answers.proposalInstallments)||0;
       const installmentAmount=Number(answers.proposalInstallmentCents)||0;
       $('panelTitle').textContent=`Evento de ${text(answers.contratante,'seu contratante')}`;
-      $('draftBadge').textContent=term?.isDraft?'Proposta em preparação':'Evento registrado';
       $('draftNote').textContent=term?.isDraft
         ? 'Sua proposta está salva como rascunho. Confira os dados reunidos abaixo.'
         : 'Confira as informações do seu evento reunidas neste painel.';
@@ -164,7 +161,7 @@
       try{
         const [response,workflowResponse]=await Promise.all([
           fetch('/api/contractor-panel/proposal-draft',{headers:{Authorization:`Bearer ${token}`}}),
-          fetch('/api/contractor-panel',{headers:{Authorization:`Bearer ${token}`}})
+          fetch('/api/contractor-panel?includeDraftPayments=true',{headers:{Authorization:`Bearer ${token}`}})
         ]);
         const [payload,workflowPayload]=await Promise.all([
           response.json().catch(()=>({})),workflowResponse.json().catch(()=>({}))
@@ -173,7 +170,8 @@
         if(!response.ok)throw new Error(payload.error||'Não foi possível carregar os dados do seu evento.');
         if(!payload.term)throw new Error('Ainda não encontramos uma proposta vinculada a este acesso.');
         renderPanel(payload.term);
-        window.dispatchEvent(new CustomEvent('contractor-event-panel-ready',{detail:{term:payload.term,workflow:workflowPayload?.panel?.term?.workflow||{}}}));
+        window.contractorEventPanelData={term:payload.term,workflow:workflowPayload?.panel?.term?.workflow||{}};
+        window.dispatchEvent(new CustomEvent('contractor-event-panel-ready',{detail:window.contractorEventPanelData}));
       }catch(error){showError(error?.message||'Não foi possível carregar os dados do seu evento.')}
     }
     function date(value){
