@@ -9,6 +9,7 @@ let activeDetail = null;
 let activeFilter = "all";
 let editingPage = null;
 let adminChurchArtworkObjectUrl = "";
+const adminVenuePhotoObjectUrls = new Map();
 let expenseStep = 1;
 let expenseDraft = { userId: "", file: null, amountCents: 0, category: "" };
 
@@ -243,11 +244,64 @@ function normalizeAdminChurchArtworkStaticCopy() {
 }
 normalizeAdminChurchArtworkStaticCopy();
 
+async function renderAdminVenuePhotos(photos = {}) {
+  const overview = $("roomOverview");
+  if (!overview) return;
+  for (const objectUrl of adminVenuePhotoObjectUrls.values()) URL.revokeObjectURL(objectUrl);
+  adminVenuePhotoObjectUrls.clear();
+  let section = $("adminVenuePhotos");
+  if (!section) {
+    section = document.createElement("section");
+    section.id = "adminVenuePhotos";
+    section.className = "contractor-venue-photos";
+    section.innerHTML = `
+      <header class="contractor-venue-photos__header"><img src="/midia/icons/contratante/event-photos.svg" alt=""><div><h2>Fotos do local enviadas pelo contratante</h2><p>Palco, público e entrada da igreja.</p></div></header>
+      <div class="contractor-photo-grid" id="adminVenuePhotoGrid"></div>`;
+    overview.appendChild(section);
+    if (!$("contractorOverviewStyles")) {
+      const link = document.createElement("link");
+      link.id = "contractorOverviewStyles";
+      link.rel = "stylesheet";
+      link.href = "/painel-do-contratante-overview.css";
+      document.head.appendChild(link);
+    }
+  }
+  const slots = [
+    ["stage", "Palco"],
+    ["audience", "Público"],
+    ["entrance", "Entrada da igreja"]
+  ];
+  $("adminVenuePhotoGrid").innerHTML = slots.map(([slot, label]) => `
+    <article class="contractor-photo-card">
+      <div class="contractor-photo-card__preview"><span id="adminVenuePhoto-${slot}">${photos[slot]?.url ? "Carregando foto…" : "Ainda não enviada"}</span></div>
+      <strong>${label}</strong>
+    </article>`).join("");
+  await Promise.all(slots.map(async ([slot, label]) => {
+    const photo = photos[slot];
+    const target = $(`adminVenuePhoto-${slot}`);
+    if (!photo?.adminUrl || !target) return;
+    try {
+      const response = await fetch(getApiUrl(photo.adminUrl), { headers: auth(), cache: "no-store" });
+      if (!response.ok) throw new Error();
+      const objectUrl = URL.createObjectURL(await response.blob());
+      adminVenuePhotoObjectUrls.set(slot, objectUrl);
+      const image = document.createElement("img");
+      image.id = `adminVenuePhoto-${slot}`;
+      image.alt = `Foto do local enviada: ${label}`;
+      image.src = objectUrl;
+      $(`adminVenuePhoto-${slot}`)?.replaceWith(image);
+    } catch {
+      target.textContent = "Não foi possível abrir a foto agora.";
+    }
+  }));
+}
+
 function renderEventRoom(data) {
   const summary = getUser(activeUserId) || {};
   const answers = data.term.answers || {};
   const workflow = data.workflow || {};
   renderAdminChurchArtwork(workflow);
+  void renderAdminVenuePhotos(workflow.venuePhotos || {});
 
   $("roomAccount").textContent = `${data.user.name || "Contratante"} · @${data.user.username || "usuário"}`;
   $("roomTitle").textContent = answers.igreja || summary.name || "Evento";

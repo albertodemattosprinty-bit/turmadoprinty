@@ -1,0 +1,261 @@
+.contractor-overview {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.contractor-hero .meta-chip {
+  display: none;
+}
+
+.contractor-hero .meta-row {
+  margin-top: 12px;
+}
+
+.contractor-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.contractor-progress-card,
+.contractor-overview-details,
+.contractor-venue-photos {
+  border: 1px solid var(--events-line);
+  border-radius: 20px;
+  background: var(--events-surface);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, .16);
+}
+
+.contractor-progress-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-height: 168px;
+  padding: 17px;
+  color: var(--events-text, #fff);
+  text-decoration: none;
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+.contractor-progress-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(85, 164, 255, .55);
+}
+
+.contractor-progress-card__head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 1rem;
+  font-weight: 850;
+}
+
+.contractor-progress-card__head img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+
+.contractor-progress-card__value {
+  font-size: clamp(1.25rem, 2.2vw, 1.75rem);
+  font-weight: 900;
+  letter-spacing: -.025em;
+  line-height: 1.15;
+}
+
+.contractor-progress-card__note {
+  min-height: 2.4em;
+  color: var(--events-muted);
+  font-size: .8rem;
+  line-height: 1.45;
+}
+
+.contractor-progress-track {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, .12);
+}
+
+.contractor-progress-track > span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4293ff, #45df98);
+  transition: width 250ms ease;
+}
+
+.contractor-overview-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 18px;
+  padding: 8px 17px;
+}
+
+.contractor-overview-detail {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-height: 65px;
+  border-bottom: 1px solid var(--events-line);
+  color: var(--events-text, #fff);
+  font-size: .98rem;
+  font-weight: 750;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.contractor-overview-detail:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.contractor-overview-detail img {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  object-fit: contain;
+}
+
+.contractor-overview-detail__phone {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  color: #72b9ff;
+}
+
+.contractor-venue-photos {
+  padding: 18px;
+}
+
+.contractor-venue-photos__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.contractor-venue-photos__header img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.contractor-venue-photos__header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.contractor-venue-photos__header p {
+  margin: 3px 0 0;
+  color: var(--events-muted);
+  font-size: .82rem;
+}
+
+.contractor-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.contractor-photo-card {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  min-width: 0;
+  border: 1px solid var(--events-line);
+  border-radius: 16px;
+  padding: 11px;
+  background: var(--events-surface-2);
+}
+
+.contractor-photo-card__preview {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 1.35 / 1;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, .055);
+  color: var(--events-muted);
+}
+
+.contractor-photo-card__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.contractor-photo-card__preview span {
+  padding: 10px;
+  text-align: center;
+  font-size: .78rem;
+}
+
+.contractor-photo-card strong {
+  font-size: .92rem;
+}
+
+.contractor-photo-card small,
+.contractor-photo-feedback {
+  color: var(--events-muted);
+  font-size: .76rem;
+  line-height: 1.4;
+}
+
+.contractor-photo-picker {
+  position: relative;
+  display: grid;
+  min-height: 42px;
+  place-items: center;
+  border: 1px solid rgba(85, 164, 255, .35);
+  border-radius: 11px;
+  background: rgba(85, 164, 255, .09);
+  color: #b9dbff;
+  cursor: pointer;
+  font-size: .8rem;
+  font-weight: 800;
+}
+
+.contractor-photo-picker:hover {
+  background: rgba(85, 164, 255, .17);
+}
+
+.contractor-photo-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.status-pill--open {
+  border-color: rgba(76, 159, 255, .3);
+  background: rgba(76, 159, 255, .12);
+  color: #91c6ff;
+}
+
+.status-pill--overdue,
+.status-pill--cancelled {
+  border-color: rgba(255, 83, 101, .32);
+  background: rgba(255, 83, 101, .13);
+  color: #ff9eaa;
+}
+
+@media (max-width: 900px) {
+  .contractor-progress-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .contractor-progress-card:last-child { grid-column: 1 / -1; }
+}
+
+@media (max-width: 640px) {
+  .contractor-progress-grid,
+  .contractor-overview-details,
+  .contractor-photo-grid { grid-template-columns: 1fr; }
+  .contractor-progress-card:last-child { grid-column: auto; }
+  .contractor-progress-card { min-height: 0; }
+  .contractor-overview-details { padding: 4px 14px; }
+  .contractor-overview-detail:nth-last-child(-n + 2) { border-bottom: 1px solid var(--events-line); }
+  .contractor-overview-detail:last-child { border-bottom: 0; }
+  .contractor-venue-photos { padding: 14px; }
+}

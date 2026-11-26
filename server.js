@@ -55,7 +55,7 @@ import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugify
 import { claimAllTerm, createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getLatestTermByUserId, getTermByEventPageSlug, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { updateLatestTermCouponByUserId } from "./src/all-terms.js";
 import { archiveAdminEventFlow, createEventCoupon, deleteEventCoupon, ensureEventFlowSchema, getEventPresentations, listAdminEventFlow, listEventCoupons, markContractorPanelReached, markEventTermSubmitted, normalizeEventPageSlug, recordProposalActivity, recordProposalVisit, resolveEventPage, resolveEventPricing, updateEventCoupon } from "./src/event-flow.js";
-import { confirmEventLodging, confirmEventPayment, createEventExpenseNote, ensureEventContractingSchema, getEventContractWorkflow, getEventExpenseNoteFile, getEventPromoVideoFile, listUnreadEventUserIds, markEventUpdatesViewed, reportEventPayment, saveEventLodging, saveEventPromoVideo } from "./src/event-contracting.js";
+import { confirmEventLodging, confirmEventPayment, createEventExpenseNote, ensureEventContractingSchema, getEventContractVenuePhoto, getEventContractWorkflow, getEventExpenseNoteFile, getEventPromoVideoFile, listUnreadEventUserIds, markEventUpdatesViewed, reportEventPayment, saveEventContractVenuePhoto, saveEventLodging, saveEventPromoVideo } from "./src/event-contracting.js";
 import { buildEventPromoNarration, composeEventPromoVideo, synthesizeEventPromoNarration } from "./src/event-promo-video.js";
 import { compileProject200ExerciseVideo } from "./src/project200-exercise-video.js";
 import { EVENT_CHURCH_IMAGE_DEFAULTS, generateEventChurchArtwork } from "./src/event-church-artwork.js";
@@ -161,6 +161,7 @@ const MAX_MINI_MEDIA_TRACK_BYTES = 40 * 1024 * 1024;
 const MAX_EVENT_PROMO_VIDEO_BYTES = 250 * 1024 * 1024;
 const MAX_PROJECT200_EXERCISE_VIDEO_BYTES = 80 * 1024 * 1024;
 const MAX_EVENT_CHURCH_PHOTO_BYTES = 15 * 1024 * 1024;
+const EVENT_CONTRACT_VENUE_PHOTO_SLOTS = new Set(["stage", "audience", "entrance"]);
 const MAX_EVENT_EXPENSE_NOTE_BYTES = 20 * 1024 * 1024;
 const MAX_EVENT_PROPOSAL_SLIDE_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_SCORE_BYTES = 30 * 1024 * 1024;
@@ -11779,6 +11780,9 @@ async function handleContractorPromoVideoGenerate(request, response) {
   const authUser = await requireAuth(request, response);
   if (!authUser) return;
 
+  sendJson(response, 410, { error: "O vídeo de divulgação será enviado pela equipe após o primeiro pagamento." });
+  return;
+
   const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
   const elevenLabsApiKey = String(process.env.ELEVENLABS_API_KEY || "").trim();
   if (!elevenLabsApiKey && !apiKey) {
@@ -12245,6 +12249,107 @@ async function handleContractorPaymentReport(request, response, paymentId) {
   }
 }
 
+async function handleContractorVenuePhotoUpload(request, response, slot) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  if (!EVENT_CONTRACT_VENUE_PHOTO_SLOTS.has(slot)) {
+    sendJson(response, 404, { error: "Tipo de foto do local não encontrado." });
+    return;
+  }
+
+  let uploadedKey = "";
+  try {
+    const term = await getLatestTermByUserId(user.id);
+    if (!term) {
+      sendJson(response, 404, { error: "Os dados do seu evento ainda não foram encontrados." });
+      return;
+    }
+    const contentType = String(request.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
+    if (!new Set(["image/jpeg", "image/png", "image/webp"]).has(contentType)) {
+      sendJson(response, 400, { error: "Envie uma foto JPG, PNG ou WebP." });
+      return;
+    }
+    const sourceBuffer = await readBinaryBody(request, MAX_EVENT_CHURCH_PHOTO_BYTES);
+    if (!sourceBuffer?.length) {
+      sendJson(response, 400, { error: "A foto está vazia." });
+      return;
+    }
+    const optimizedBuffer = await sharp(sourceBuffer, { limitInputPixels: 40000000 })
+      .rotate()
+      .resize({ width: 1800, height: 1800, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 82, effort: 4 })
+      .toBuffer();
+    const fileName = `${slot}-${crypto.randomUUID()}.webp`;
+    uploadedKey = ["eventos", "contratantes", user.id, term.id, "fotos-local", fileName].join("/");
+    await getProject200PrivateR2Client().send(new PutObjectCommand({
+      Bucket: R2_PRIVATE_BUCKET,
+      Key: uploadedKey,
+      Body: optimizedBuffer,
+      ContentType: "image/webp",
+      CacheControl: "private, no-store"
+    }));
+    const saved = await saveEventContractVenuePhoto(user.id, term.id, slot, {
+      key: uploadedKey,
+      fileName,
+      contentType: "image/webp",
+      sizeBytes: optimizedBuffer.length
+    });
+    if (saved.previous?.key && saved.previous.key !== uploadedKey) {
+      try {
+        await getProject200PrivateR2Client().send(new DeleteObjectCommand({
+          Bucket: R2_PRIVATE_BUCKET,
+          Key: saved.previous.key
+        }));
+      } catch {
+        // A foto atual já foi salva; uma limpeza antiga não deve desfazer o envio.
+      }
+    }
+    sendJson(response, 201, { ok: true, photo: saved.photo });
+  } catch (error) {
+    if (uploadedKey) {
+      try {
+        await getProject200PrivateR2Client().send(new DeleteObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: uploadedKey }));
+      } catch {
+        // A limpeza não deve esconder a falha do envio.
+      }
+    }
+    sendJson(response, Number(error?.statusCode) || 400, {
+      error: error instanceof Error ? error.message : "Não foi possível salvar esta foto."
+    });
+  }
+}
+
+async function handleContractorVenuePhotoFile(request, response, slot) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  if (!EVENT_CONTRACT_VENUE_PHOTO_SLOTS.has(slot)) {
+    sendJson(response, 404, { error: "Foto do local não encontrada." });
+    return;
+  }
+  try {
+    const term = await getLatestTermByUserId(user.id);
+    const photo = term ? await getEventContractVenuePhoto(term.id, slot) : null;
+    if (!photo || String(photo.userId) !== String(user.id)) {
+      sendJson(response, 404, { error: "Foto do local não encontrada." });
+      return;
+    }
+    const buffer = await readProject200PrivateR2ObjectBuffer(photo.key);
+    if (!buffer.length) {
+      sendJson(response, 404, { error: "Foto do local não encontrada." });
+      return;
+    }
+    response.writeHead(200, {
+      "Content-Type": "image/webp",
+      "Content-Length": String(buffer.length),
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff"
+    });
+    response.end(buffer);
+  } catch (error) {
+    sendJson(response, 500, { error: error instanceof Error ? error.message : "Não foi possível abrir esta foto." });
+  }
+}
+
 async function handleContractorLodgingUpdate(request, response) {
   const user = await requireAuth(request, response);
   if (!user) return;
@@ -12284,6 +12389,37 @@ async function handleAdminEventUserDetail(request, response, userId) {
     });
   } catch (error) {
     sendJson(response, 500, { error: error instanceof Error ? error.message : "Nao foi possivel carregar o evento." });
+  }
+}
+
+async function handleAdminEventVenuePhotoFile(request, response, userId, slot) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+  if (!EVENT_CONTRACT_VENUE_PHOTO_SLOTS.has(slot)) {
+    sendJson(response, 404, { error: "Foto do local não encontrada." });
+    return;
+  }
+  try {
+    const term = await getLatestTermByUserId(userId);
+    const photo = term ? await getEventContractVenuePhoto(term.id, slot) : null;
+    if (!photo || String(photo.userId) !== String(userId)) {
+      sendJson(response, 404, { error: "Foto do local não encontrada." });
+      return;
+    }
+    const buffer = await readProject200PrivateR2ObjectBuffer(photo.key);
+    if (!buffer.length) {
+      sendJson(response, 404, { error: "Foto do local não encontrada." });
+      return;
+    }
+    response.writeHead(200, {
+      "Content-Type": "image/webp",
+      "Content-Length": String(buffer.length),
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff"
+    });
+    response.end(buffer);
+  } catch (error) {
+    sendJson(response, 500, { error: error instanceof Error ? error.message : "Não foi possível abrir esta foto." });
   }
 }
 
@@ -16568,6 +16704,18 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "POST" && pathname.match(/^\/api\/contractor-panel\/venue-photos\/(stage|audience|entrance)$/)) {
+    const slot = pathname.match(/^\/api\/contractor-panel\/venue-photos\/(stage|audience|entrance)$/)[1];
+    await handleContractorVenuePhotoUpload(request, response, slot);
+    return;
+  }
+
+  if (request.method === "GET" && pathname.match(/^\/api\/contractor-panel\/venue-photos\/(stage|audience|entrance)$/)) {
+    const slot = pathname.match(/^\/api\/contractor-panel\/venue-photos\/(stage|audience|entrance)$/)[1];
+    await handleContractorVenuePhotoFile(request, response, slot);
+    return;
+  }
+
   if (request.method === "PUT" && pathname === "/api/contractor-panel/lodging") {
     await handleContractorLodgingUpdate(request, response);
     return;
@@ -18426,6 +18574,12 @@ const server = http.createServer(async (request, response) => {
         error: error instanceof Error ? error.message : "Nao foi possivel salvar a atualizacao do app."
       });
     }
+    return;
+  }
+
+  if (request.method === "GET" && pathname.match(/^\/api\/admin\/eventos\/users\/[^/]+\/venue-photos\/(stage|audience|entrance)$/)) {
+    const match = pathname.match(/^\/api\/admin\/eventos\/users\/([^/]+)\/venue-photos\/(stage|audience|entrance)$/);
+    await handleAdminEventVenuePhotoFile(request, response, decodeURIComponent(match[1]), match[2]);
     return;
   }
 

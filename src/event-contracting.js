@@ -67,6 +67,26 @@ function mapAsset(row) {
   };
 }
 
+function mapVenuePhotos(row) {
+  let photos = row?.venue_photos || {};
+  if (typeof photos === "string") {
+    try { photos = JSON.parse(photos); } catch { photos = {}; }
+  }
+  return Object.fromEntries(["stage", "audience", "entrance"].map((slot) => {
+    const photo = photos?.[slot];
+    return [slot, photo?.key ? {
+      fileName: String(photo.fileName || "foto-do-local.webp"),
+      contentType: String(photo.contentType || "image/webp"),
+      sizeBytes: Number(photo.sizeBytes || 0),
+      updatedAt: photo.updatedAt || null,
+      url: `/api/contractor-panel/venue-photos/${slot}`,
+      adminUrl: row?.user_id
+        ? `/api/admin/eventos/users/${encodeURIComponent(row.user_id)}/venue-photos/${slot}`
+        : ""
+    } : null];
+  }));
+}
+
 function mapExpenseNote(row) {
   if (!row) return null;
   return {
@@ -126,10 +146,12 @@ export async function ensureEventContractingSchema() {
           user_id uuid not null references users(id) on delete cascade,
           promo_video_key text, promo_video_url text, promo_video_name text,
           promo_video_content_type text, promo_video_size bigint,
+          venue_photos jsonb not null default '{}'::jsonb,
           uploaded_by_user_id uuid references users(id) on delete set null,
           created_at timestamptz not null default now(), updated_at timestamptz not null default now()
         );
       `);
+      await query(`alter table event_contract_assets add column if not exists venue_photos jsonb not null default '{}'::jsonb;`);
       await query(`
         create table if not exists event_admin_updates (
           id uuid primary key default gen_random_uuid(),
@@ -198,6 +220,7 @@ export async function getEventContractWorkflow(term) {
       payments: [],
       lodging: null,
       promoVideo: null,
+      venuePhotos: mapVenuePhotos(null),
       expenseNotes: []
     };
   }
@@ -214,6 +237,7 @@ export async function getEventContractWorkflow(term) {
     payments: paymentResult.rows.map(mapPayment),
     lodging: mapLodging(lodgingResult.rows[0]),
     promoVideo: mapAsset(assetResult.rows[0]),
+    venuePhotos: mapVenuePhotos(assetResult.rows[0]),
     expenseNotes: expenseNoteResult.rows.map(mapExpenseNote)
   };
 }
@@ -233,13 +257,75 @@ export async function reportEventPayment(userId, paymentId, amountCents) {
   if (remaining < 1) throw new Error("Este pagamento ja foi quitado.");
   if (!Number.isInteger(requested) || requested < 1 || requested > remaining) throw new Error(`Informe um valor entre R$ 0,01 e ${money(remaining)}.`);
   const result = await query(`
-    update event_contract_payments set status = 'REVIEW', reported_amount_cents = $1,
-      user_reported_at = now(), updated_at = now()
+    update event_contract_payments
+       set paid_cents = least(amount_cents, paid_cents + $1),
+           status = case when paid_cents + $1 >= amount_cents then 'CONFIRMED' else 'PENDING' end,
+           reported_amount_cents = 0,
+           user_reported_at = coalesce(user_reported_at, now()),
+           admin_confirmed_at = null,
+           admin_confirmed_by_user_id = null,
+           updated_at = now()
     where id = $2 and user_id = $3 returning *
   `, [requested, paymentId, userId]);
   const row = result.rows[0];
   await addUpdate(row.term_id, userId, "PAYMENT_REPORTED", { paymentId: row.id, order: row.payment_order, amountCents: requested });
   return mapPayment(row);
+}
+
+export async function saveEventContractVenuePhoto(userId, termId, slot, asset) {
+  await ensureEventContractingSchema();
+  const allowedSlots = new Set(["stage", "audience", "entrance"]);
+  if (!allowedSlots.has(slot)) throw new Error("Escolha um dos locais de foto disponíveis.");
+  if (!asset?.key || !asset?.fileName || !asset?.contentType || !Number(asset?.sizeBytes)) {
+    throw new Error("A foto enviada está incompleta.");
+  }
+
+  const current = await query(`
+    select venue_photos -> $3 as photo
+      from event_contract_assets
+     where term_id = $1 and user_id = $2
+     limit 1
+  `, [termId, userId, slot]);
+  let previous = current.rows[0]?.photo || null;
+  if (typeof previous === "string") {
+    try { previous = JSON.parse(previous); } catch { previous = null; }
+  }
+
+  const photo = {
+    key: asset.key,
+    fileName: asset.fileName,
+    contentType: asset.contentType,
+    sizeBytes: Number(asset.sizeBytes),
+    updatedAt: new Date().toISOString()
+  };
+  const result = await query(`
+    insert into event_contract_assets (term_id, user_id, venue_photos)
+    values ($1, $2, jsonb_build_object($3::text, $4::jsonb))
+    on conflict (term_id) do update
+       set venue_photos = jsonb_set(coalesce(event_contract_assets.venue_photos, '{}'::jsonb), array[$3::text], $4::jsonb, true),
+           updated_at = now()
+     where event_contract_assets.user_id = $2
+    returning venue_photos
+  `, [termId, userId, slot, JSON.stringify(photo)]);
+  if (!result.rows[0]) throw new Error("Evento não encontrado para salvar a foto.");
+  return { photo: mapVenuePhotos(result.rows[0])[slot], previous };
+}
+
+export async function getEventContractVenuePhoto(termId, slot) {
+  await ensureEventContractingSchema();
+  if (!new Set(["stage", "audience", "entrance"]).has(slot)) return null;
+  const result = await query(`
+    select user_id, venue_photos -> $2 as photo
+      from event_contract_assets
+     where term_id = $1
+     limit 1
+  `, [termId, slot]);
+  let photo = result.rows[0]?.photo || null;
+  if (typeof photo === "string") {
+    try { photo = JSON.parse(photo); } catch { photo = null; }
+  }
+  if (!photo?.key) return null;
+  return { userId: result.rows[0].user_id, ...photo };
 }
 
 export async function confirmEventPayment(adminId, userId, paymentId) {
