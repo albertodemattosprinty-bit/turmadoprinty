@@ -82,11 +82,9 @@
   .event-preview-slider{width:100%;height:6px;margin:0;border-radius:99px;background:#b8d7f8;accent-color:#168cf2;cursor:pointer;touch-action:pan-y}
   .event-preview-time{min-width:76px;text-align:right;font-size:11px;font-weight:850;font-variant-numeric:tabular-nums}
   .event-art svg{width:100%;height:100%;display:block}
-  .event-team{display:flex;align-items:center;gap:7px;padding:9px 14px 0;color:#69748b;font-size:11px;font-weight:700}
-  .event-team svg{width:27px;height:18px;flex:none;color:#52688c}
-  .event-type-card strong{display:block;padding:5px 14px 0;font-size:16px;line-height:1.2}
-  .event-type-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 14px 14px;font-size:12px;color:#69748b}
-  .event-type-meta b{color:var(--navy);font-size:14px}
+  .event-type-price{display:grid;justify-items:center;gap:4px;min-height:112px;align-content:center;padding:12px 16px 18px;text-align:center}
+  .event-type-price strong{color:var(--navy);font-size:clamp(34px,5vw,48px);font-weight:1000;letter-spacing:-1px;line-height:1.05}
+  .event-type-price span{color:#e88922;font-size:15px;font-weight:900}
   .event-type-center .arrow{top:42%}
   .route-card{width:min(100%,760px);margin:34px auto 0;padding:28px;border:1px solid #dce8f4;border-radius:24px;background:#f7fbff;box-shadow:var(--shadow);text-align:center}
   .route-cities{display:grid;gap:10px;width:min(100%,520px);margin:0 auto;text-align:left}
@@ -300,6 +298,7 @@
   .event-admin-field{display:grid;gap:8px;margin:14px 0;color:#28466f;font-size:13px;font-weight:850}
   .event-admin-field select,.event-admin-field input{min-height:44px;padding:10px 12px;border:1px solid #d5e0ed;border-radius:11px;background:#fff;color:var(--navy);font:inherit}
   .event-admin-help{margin:8px 0 12px;color:#66738a;font-size:12px;line-height:1.5}
+  .event-admin-audio-duration{margin:8px 0;padding:10px 12px;border-radius:10px;background:#eff7ff;color:#174f94;font-size:13px;font-weight:900}
   .event-admin-slides{display:grid;gap:10px;margin:12px 0}
   .event-admin-slide{display:grid;grid-template-columns:64px minmax(0,1fr) 110px 40px;align-items:center;gap:10px;padding:9px;border:1px solid #e0e8f2;border-radius:13px;background:#f8fbff}
   .event-admin-slide img{width:64px;height:64px;border-radius:9px;object-fit:cover}
@@ -336,10 +335,9 @@
     .capacity-carousel{grid-template-columns:42px minmax(0,1fr) 42px;gap:4px;width:calc(100% + 20px);margin-left:-10px}
     .capacity-carousel .peek.capacity-photo{height:clamp(235px,36vh,330px)}
     .capacity-carousel .card-main.capacity-photo{width:min(100%,clamp(235px,36vh,330px))}
-    .event-type-card strong{font-size:14px;padding-left:10px;padding-right:10px}
-    .event-team{padding:8px 10px 0;font-size:10px}
-    .event-type-meta{padding:6px 10px 12px;font-size:11px}
-    .event-type-meta b{font-size:12px}
+    .event-type-price{min-height:96px;padding:10px 10px 14px}
+    .event-type-price strong{font-size:clamp(30px,8vw,40px)}
+    .event-type-price span{font-size:14px}
     .route-card{padding:20px 15px;margin-top:24px}
     .contract-fields{grid-template-columns:1fr;gap:12px}
     .contract-field.full{grid-column:auto}
@@ -731,6 +729,7 @@
       <input id="eventAdminFiles" type="file" accept="image/png,image/jpeg,image/webp" multiple onchange="addEventAdminFiles(this.files)">
     </label>
     <p class="event-admin-help">Selecione todas as imagens da nova sequência de uma vez. A primeira será a capa. Informe um tempo como <b>4,2seg</b>; os quadros sem tempo dividem o restante do áudio. Se todos ficarem vazios, a sequência será distribuída igualmente.</p>
+    <p class="event-admin-audio-duration" id="eventAdminAudioDuration" aria-live="polite">Duração do áudio atual: carregando…</p>
     <div class="event-admin-slides" id="eventAdminSlides"></div>
     <p class="event-admin-status" id="eventAdminStatus" role="status" aria-live="polite"></p>
     <footer class="event-admin-actions">
@@ -829,6 +828,7 @@
   let currentProposalTotalCents=0;
   const teamIcon='<svg viewBox="0 0 44 24" aria-hidden="true"><circle cx="14" cy="7" r="5" fill="currentColor"/><path d="M4 22v-3a10 10 0 0 1 20 0v3z" fill="currentColor"/><circle cx="32" cy="8" r="4" fill="currentColor" opacity=".72"/><path d="M25 22v-3a8 8 0 0 1 15 0v3z" fill="currentColor" opacity=".72"/></svg>';
   function formatMoney(cents){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cents/100)}
+  function formatEventTypePrice(cents){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0}).format(cents/100)}
   function updateInstallmentDisplay(){
     const slider=document.getElementById('installmentSlider');
     selectedInstallments=Math.max(1,Math.min(12,Number(slider.value)||12));
@@ -850,6 +850,8 @@
   const eventAdminDrafts=new Map();
   let eventAdminModelId='puppets';
   const eventAdminObjectUrls=new Set();
+  const eventAudioDurations=new Map();
+  const eventAudioDurationRequests=new Map();
   function eventDefaultSlides(event){
     return Array.from({length:9},(_,index)=>({url:`/midia/tipos-evento/modelo${event.model}-${String(index+1).padStart(2,'0')}.webp`,seconds:null}));
   }
@@ -874,7 +876,7 @@
     const event=eventTypes[index];
     const previous=eventAt(index-1);
     const next=eventAt(index+1);
-    document.getElementById('eventTypeGrid').innerHTML=`<article class="event-type-card" data-event-type="${event.id}" data-event-name="${event.name}" data-price-cents="${event.priceCents}" data-duration="${event.duration}" data-team="${event.team}">${renderEventArtwork(event,true)}<div class="event-team">${teamIcon}<span>${event.team} integrantes</span></div><strong>${event.name}</strong><div class="event-type-meta"><span>${event.duration}</span><b>${formatMoney(event.priceCents)}</b></div></article>`;
+    document.getElementById('eventTypeGrid').innerHTML=`<article class="event-type-card" data-event-type="${event.id}" data-event-name="${event.name}" data-price-cents="${event.priceCents}" data-duration="${event.duration}" data-team="${event.team}">${renderEventArtwork(event,true)}<div class="event-type-price"><strong>${formatEventTypePrice(event.priceCents)}</strong><span>Parcele em até 12x</span></div></article>`;
     document.getElementById('eventTypePrev').innerHTML=renderEventArtwork(previous);
     document.getElementById('eventTypePeekNext').innerHTML=renderEventArtwork(next);
   }
@@ -985,6 +987,52 @@
     const safe=Math.max(0,Math.round(Number(value)||0));
     return `${Math.floor(safe/60)}:${String(safe%60).padStart(2,'0')}`;
   }
+  function loadEventAudioDuration(id){
+    if(eventAudioDurations.has(id))return Promise.resolve(eventAudioDurations.get(id));
+    if(eventAudioDurationRequests.has(id))return eventAudioDurationRequests.get(id);
+    const durationPromise=new Promise((resolve)=>{
+      const audio=new Audio();
+      let settled=false;
+      let timeoutId=0;
+      const finish=(duration)=>{
+        if(settled)return;
+        settled=true;
+        if(timeoutId)window.clearTimeout(timeoutId);
+        audio.removeAttribute('src');audio.load();
+        const value=Number.isFinite(duration)&&duration>0?duration:null;
+        eventAudioDurations.set(id,value);
+        eventAudioDurationRequests.delete(id);
+        resolve(value);
+      };
+      audio.preload='metadata';
+      audio.addEventListener('loadedmetadata',()=>finish(audio.duration),{once:true});
+      audio.addEventListener('error',()=>finish(null),{once:true});
+      timeoutId=window.setTimeout(()=>finish(null),10000);
+      audio.src=eventTypeAudio[id];
+      audio.load();
+    });
+    eventAudioDurationRequests.set(id,durationPromise);
+    return durationPromise;
+  }
+  function eventAdminDisplaySeconds(draft){
+    const duration=eventAudioDurations.get(eventAdminModelId);
+    const seconds=duration?Math.floor(duration):0;
+    const explicitTotal=draft.reduce((sum,slide)=>sum+(Number(slide.seconds)>0?Number(slide.seconds):0),0);
+    const automatic=draft.filter((slide)=>!(Number(slide.seconds)>0)).length;
+    const remaining=Math.max(0,seconds-explicitTotal);
+    const automaticValues=[];
+    for(let index=0;index<automatic;index++){
+      const next=Math.floor((remaining*(index+1))/Math.max(1,automatic))-Math.floor((remaining*index)/Math.max(1,automatic));
+      automaticValues.push(next);
+    }
+    let automaticIndex=0;
+    return draft.map((slide)=>Number(slide.seconds)>0?Number(slide.seconds):(automaticValues[automaticIndex++]||0));
+  }
+  function renderEventAdminAudioDuration(){
+    const duration=eventAudioDurations.get(eventAdminModelId);
+    const label=document.getElementById('eventAdminAudioDuration');
+    if(label)label.textContent=`Duração do áudio atual: ${duration?eventSecondsText(duration):'indisponível'}`;
+  }
   function formatEventSecondsInput(value){
     const digits=String(value||'').replace(/\D/g,'').slice(0,5);
     if(!digits)return '';
@@ -1014,7 +1062,9 @@
   }
   function renderEventAdminSlides(){
     const draft=eventAdminDrafts.get(eventAdminModelId)||[];
-    document.getElementById('eventAdminSlides').innerHTML=draft.map((slide,index)=>`<div class="event-admin-slide" data-index="${index}"><img src="${slide.previewUrl||slide.url}" alt="Quadro ${index+1}"><span>${index===0?'Capa · ':''}${slide.file?.name||`Imagem ${index+1}`}</span><input type="text" inputmode="numeric" aria-label="Tempo do quadro ${index+1} em minutos e segundos" title="Digite em minutos e segundos: 23 vira 0:23; 120 vira 1:20. Apague para deixar automático." placeholder="0:00" value="${eventSecondsText(slide.seconds)}" onfocus="this.select()" oninput="updateEventAdminSlideTime(${index},this)"><button type="button" aria-label="Remover imagem ${index+1}" onclick="removeEventAdminSlide(${index})">×</button></div>`).join('');
+    const displaySeconds=eventAdminDisplaySeconds(draft);
+    renderEventAdminAudioDuration();
+    document.getElementById('eventAdminSlides').innerHTML=draft.map((slide,index)=>`<div class="event-admin-slide" data-index="${index}"><img src="${slide.previewUrl||slide.url}" alt="Quadro ${index+1}"><span>${index===0?'Capa · ':''}${slide.file?.name||`Imagem ${index+1}`}</span><input type="text" inputmode="numeric" aria-label="Tempo do quadro ${index+1} em minutos e segundos" title="Digite em minutos e segundos: 23 vira 0:23; 120 vira 1:20. Apague para deixar automático." placeholder="0:00" value="${eventSecondsText(displaySeconds[index])}" onfocus="this.select()" oninput="updateEventAdminSlideTime(${index},this)"><button type="button" aria-label="Remover imagem ${index+1}" onclick="removeEventAdminSlide(${index})">×</button></div>`).join('');
   }
   function updateEventAdminSlideTime(index,input){
     const draft=eventAdminDrafts.get(eventAdminModelId)||[];
@@ -1029,7 +1079,7 @@
     if(removed?.previewUrl){URL.revokeObjectURL(removed.previewUrl);eventAdminObjectUrls.delete(removed.previewUrl)}
     renderEventAdminSlides();
   }
-  function changeEventAdminModel(id){
+  async function changeEventAdminModel(id){
     eventAdminCurrentDraft();
     eventAdminModelId=id;
     if(!eventAdminDrafts.has(id)){
@@ -1037,6 +1087,8 @@
       eventAdminDrafts.set(id,eventSlidesFor(selected).map((slide)=>({...slide})));
     }
     renderEventAdminSlides();
+    await loadEventAudioDuration(id);
+    if(eventAdminModelId===id)renderEventAdminSlides();
   }
   function addEventAdminFiles(fileList){
     eventAdminCurrentDraft();
@@ -1065,6 +1117,8 @@
       if(!response.ok)throw new Error(payload.error||'Apenas administradores podem editar esta apresentação.');
       if(payload?.models)eventPreviewConfig=payload;
       for(const model of eventTypes)eventAdminDrafts.set(model.id,eventSlidesFor(model).map((slide)=>({...slide})));
+      status.textContent='Lendo a duração do áudio…';
+      await loadEventAudioDuration(eventAdminModelId);
       status.textContent='';renderEventAdminSlides();renderEventTypes();
     }catch(error){status.textContent=error.message||'Não foi possível carregar a apresentação.'}
   }

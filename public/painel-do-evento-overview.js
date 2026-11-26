@@ -16,6 +16,7 @@ const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
 }[char]));
 const icon = (name) => `${ICONS}${name}.svg`;
+const detailIcon = (name) => name.startsWith("/") ? name : icon(name);
 const money = (cents) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format((Number(cents) || 0) / 100);
 const auth = () => ({ Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY) || ""}` });
 let activePayment = null;
@@ -73,7 +74,7 @@ function videoDeadline(workflow) {
 
 function detailRow(iconName, value, label) {
   if (!value) return "";
-  return `<div class="event-overview__detail" role="group" aria-label="${esc(label)}"><img src="${icon(iconName)}" alt=""><span>${esc(value)}</span></div>`;
+  return `<div class="event-overview__detail" role="group" aria-label="${esc(label)}"><img src="${esc(detailIcon(iconName))}" alt=""><span>${esc(value)}</span></div>`;
 }
 
 function ensureHost() {
@@ -137,8 +138,8 @@ function renderOverview({ term, workflow }) {
   const photos = workflow.venuePhotos || {};
   const photoCount = slots.filter((slot) => photos[slot.id]?.url).length;
   const details = presentations[answers.presentationKey] || {};
-  const address = [answers.endereco, answers.cep].filter(Boolean).join(" · ");
-  const where = [answers.igreja, answers.localEvento, answers.cidade].filter(Boolean).join(" · ");
+  const placeType = String(answers.localEvento || "").trim();
+  const isChurch = /igreja/i.test(placeType) || /igreja/i.test(String(answers.igreja || ""));
   const date = term?.eventDate
     ? dateLabel(term.eventDate)
     : [answers.dia, answers.mes, answers.ano].filter(Boolean).join(" de ") || "Data a definir";
@@ -153,23 +154,23 @@ function renderOverview({ term, workflow }) {
     detailRow("event-time", answers.horario || term?.eventTime, "Horário do evento"),
     detailRow("event-type", type, "Tipo de evento"),
     detailRow("event-story", answers.historia, "História escolhida"),
-    detailRow("event-location", where, "Igreja, local e cidade"),
+    detailRow(isChurch ? "church" : "event-location", answers.igreja || placeType, isChurch ? "Igreja" : "Local do evento"),
+    detailRow("city", answers.cidade, "Cidade"),
     detailRow("event-audience", answers.publicoEstimado ? `${answers.publicoEstimado} pessoas` : "", "Tamanho do público"),
     detailRow("event-duration", details.duration, "Duração"),
     detailRow("event-team", details.team, "Equipe"),
-    detailRow("event-team", answers.contratante, "Nome do contratante"),
-    detailRow("event-location", answers.whatsapp, "Telefone do contratante"),
-    detailRow("event-location", address, "Endereço e CEP"),
-    detailRow("event-location", answers.pais, "País"),
+    detailRow("avatar", answers.contratante, "Nome do contratante"),
+    detailRow("whatsapp", answers.whatsapp, "Telefone do contratante"),
+    detailRow("local-two", answers.endereco, "Endereço do evento"),
+    detailRow("local-two", answers.cep, "CEP"),
+    detailRow("brazil", "Brasil", "País"),
     detailRow("event-story", answers.elementosEvento, "Elementos escolhidos"),
     detailRow("event-money", basePrice, "Valor base"),
-    detailRow("event-money", transport, "Transporte"),
-    detailRow("event-location", answers.transportRoute, "Percurso"),
+    detailRow("/midia/icons/viagem/carro.svg", transport, "Transporte"),
     detailRow("event-money", answers.finalPrice || (answers.finalPriceCents ? money(answers.finalPriceCents) : ""), "Valor total antes do parcelamento"),
-    detailRow("event-money", installmentCount ? `${installmentCount}x de ${money(installmentAmount)}` : "", "Parcelamento"),
+    detailRow("ticket-list", installmentCount ? `${installmentCount}x de ${money(installmentAmount)}` : "", "Parcelamento"),
     detailRow("event-money", answers.proposalFinancedTotalCents ? money(answers.proposalFinancedTotalCents) : "", "Total parcelado"),
-    detailRow("event-money", mealTotal || "R$ 0,00", "Refeições"),
-    detailRow("event-story", answers.mealSelectionDescription, "Refeições selecionadas"),
+    detailRow("/midia/icons/alimentacao.svg", mealTotal || "R$ 0,00", "Refeições"),
     detailRow("event-location", answers.freeLodging === "Sim" ? "Hospedagem sem custo" : "Hospedagem a definir", "Hospedagem")
   ].filter(Boolean).join("");
   host.innerHTML = `
