@@ -1,6 +1,6 @@
 import "./src/load-env.js";
 
-import { createReadStream, existsSync } from "node:fs";
+import { createReadStream, existsSync, statSync } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import crypto from "node:crypto";
 import http from "node:http";
@@ -14037,19 +14037,85 @@ async function handleProtectedAlbumBundleDownload(request, response, pathname) {
   }
 }
 
-async function serveStatic(response, filePath) {
+async function serveStatic(request, response, filePath) {
   try {
     const extension = path.extname(filePath).toLowerCase();
     const contentType = mimeTypes[extension] || "application/octet-stream";
-    const headers = { "Content-Type": contentType };
+    const fileSize = statSync(filePath).size;
+    const headers = {
+      "Content-Type": contentType,
+      "Accept-Ranges": "bytes",
+      "Content-Length": String(fileSize)
+    };
     const normalizedFilePath = filePath.replaceAll("\\", "/").toLowerCase();
 
     if (normalizedFilePath.endsWith("/public/debug.html")) {
       headers["X-Robots-Tag"] = "noindex, nofollow, noarchive, nosnippet, noimageindex";
     }
 
+    const rangeHeader = request.headers.range;
+    const rangeMatch = typeof rangeHeader === "string"
+      ? rangeHeader.match(/^bytes=(\d*)-(\d*)$/)
+      : null;
+
+    if (rangeHeader && !rangeMatch) {
+      response.writeHead(416, {
+        "Content-Range": `bytes */${fileSize}`,
+        "Content-Length": "0",
+        "Accept-Ranges": "bytes"
+      });
+      response.end();
+      return;
+    }
+
+    if (rangeMatch) {
+      let start = rangeMatch[1] ? Number(rangeMatch[1]) : null;
+      let end = rangeMatch[2] ? Number(rangeMatch[2]) : null;
+
+      if (start == null) {
+        const suffixLength = end;
+        if (!suffixLength) {
+          response.writeHead(416, {
+            "Content-Range": `bytes */${fileSize}`,
+            "Content-Length": "0",
+            "Accept-Ranges": "bytes"
+          });
+          response.end();
+          return;
+        }
+        start = Math.max(0, fileSize - suffixLength);
+        end = fileSize - 1;
+      } else if (end == null || end >= fileSize) {
+        end = fileSize - 1;
+      }
+
+      if (start >= fileSize || end < start) {
+        response.writeHead(416, {
+          "Content-Range": `bytes */${fileSize}`,
+          "Content-Length": "0",
+          "Accept-Ranges": "bytes"
+        });
+        response.end();
+        return;
+      }
+
+      headers["Content-Length"] = String(end - start + 1);
+      headers["Content-Range"] = `bytes ${start}-${end}/${fileSize}`;
+      response.writeHead(206, headers);
+      if (request.method !== "HEAD") {
+        createReadStream(filePath, { start, end }).pipe(response);
+      } else {
+        response.end();
+      }
+      return;
+    }
+
     response.writeHead(200, headers);
-    createReadStream(filePath).pipe(response);
+    if (request.method !== "HEAD") {
+      createReadStream(filePath).pipe(response);
+    } else {
+      response.end();
+    }
   } catch {
     response.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
     response.end("Erro ao carregar arquivo.");
@@ -18556,7 +18622,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (existsSync(resolvedImagePath)) {
-      await serveStatic(response, resolvedImagePath);
+      await serveStatic(request, response, resolvedImagePath);
       return;
     }
   }
@@ -18564,7 +18630,7 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "GET" && (pathname === "/200" || pathname === "/200/")) {
     const targetPath = path.join(publicDir, "200", "index.html");
     if (existsSync(targetPath)) {
-      await serveStatic(response, targetPath);
+      await serveStatic(request, response, targetPath);
       return;
     }
   }
@@ -18572,7 +18638,7 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "GET" && (pathname === "/201" || pathname === "/201/")) {
     const targetPath = path.join(publicDir, "201", "index.html");
     if (existsSync(targetPath)) {
-      await serveStatic(response, targetPath);
+      await serveStatic(request, response, targetPath);
       return;
     }
   }
@@ -18596,17 +18662,17 @@ const server = http.createServer(async (request, response) => {
   const directoryIndexPath = path.join(resolvedPath, "index.html");
 
   if (existsSync(directoryIndexPath) && directoryIndexPath.startsWith(publicDir)) {
-    await serveStatic(response, directoryIndexPath);
+    await serveStatic(request, response, directoryIndexPath);
     return;
   }
 
   if (existsSync(resolvedPath)) {
-    await serveStatic(response, resolvedPath);
+    await serveStatic(request, response, resolvedPath);
     return;
   }
 
   if (existsSync(htmlResolvedPath) && htmlResolvedPath.startsWith(publicDir)) {
-    await serveStatic(response, htmlResolvedPath);
+    await serveStatic(request, response, htmlResolvedPath);
     return;
   }
 
@@ -18614,12 +18680,12 @@ const server = http.createServer(async (request, response) => {
     try {
       const linkedTerm = await getTermByEventPageSlug(requestedPath);
       if (linkedTerm) {
-        await serveStatic(response, path.join(publicDir, "painel-do-contratante.html"));
+        await serveStatic(request, response, path.join(publicDir, "painel-do-contratante.html"));
         return;
       }
       const eventPage = await resolveEventPage(requestedPath);
       if (eventPage) {
-        await serveStatic(response, path.join(publicDir, "termo.html"));
+        await serveStatic(request, response, path.join(publicDir, "termo.html"));
         return;
       }
     } catch (error) {
