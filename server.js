@@ -15064,13 +15064,18 @@ const EVENT_PROPOSAL_ROUTE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const eventProposalRouteCache = new Map();
 const EVENT_PROPOSAL_MODEL_IDS = new Set(["puppets", "theater-music", "complete-show", "children-congress", "full-congress"]);
 
+function isAllowedEventProposalSlideUrl(value) {
+  const url = String(value || "");
+  const uploadedPrefix = buildPublicR2UrlFromKey("event-proposal/model-slides") + "/";
+  return url.startsWith(uploadedPrefix) || /^\/midia\/tipos-evento\/modelo[1-5]-\d{2}\.webp$/.test(url);
+}
+
 async function readEventProposalModels() {
   const raw = await readR2ObjectText(EVENT_PROPOSAL_MODELS_KEY);
   if (!raw) return { models: {} };
   try {
     const parsed = JSON.parse(raw);
     const models = {};
-    const allowedPrefix = buildPublicR2UrlFromKey("event-proposal/model-slides") + "/";
     for (const eventId of EVENT_PROPOSAL_MODEL_IDS) {
       const slides = parsed?.models?.[eventId];
       if (!Array.isArray(slides) || !slides.length || slides.length > 250) continue;
@@ -15078,7 +15083,7 @@ async function readEventProposalModels() {
         url: String(slide?.url || ""),
         seconds: slide?.seconds == null ? null : Number(slide.seconds)
       }));
-      if (normalized.some((slide) => !slide.url.startsWith(allowedPrefix)
+      if (normalized.some((slide) => !isAllowedEventProposalSlideUrl(slide.url)
         || (slide.seconds != null && (!Number.isFinite(slide.seconds) || slide.seconds < 0.2 || slide.seconds > 600)))) continue;
       models[eventId] = normalized;
     }
@@ -15112,18 +15117,21 @@ async function handleEventProposalModelsSave(request, response) {
   }
   const eventId = String(body?.eventId || "");
   const slides = Array.isArray(body?.slides) ? body.slides : [];
-  const allowedPrefix = buildPublicR2UrlFromKey("event-proposal/model-slides") + "/";
   if (!EVENT_PROPOSAL_MODEL_IDS.has(eventId) || !slides.length || slides.length > 250) {
     sendJson(response, 400, { error: "Escolha um modelo e envie de 1 a 250 imagens." });
     return;
   }
   const normalizedSlides = [];
-  for (const slide of slides) {
+  for (let index = 0; index < slides.length; index++) {
+    const slide = slides[index];
     const url = String(slide?.url || "");
     const seconds = slide?.seconds == null ? null : Number(slide.seconds);
-    if (!url.startsWith(allowedPrefix)
-      || (seconds != null && (!Number.isFinite(seconds) || seconds < 0.2 || seconds > 600))) {
-      sendJson(response, 400, { error: "Uma imagem ou duração da sequência é inválida." });
+    if (!isAllowedEventProposalSlideUrl(url)) {
+      sendJson(response, 400, { error: `A imagem ${index + 1} da sequência é inválida.` });
+      return;
+    }
+    if (seconds != null && (!Number.isFinite(seconds) || seconds < 0.2 || seconds > 600)) {
+      sendJson(response, 400, { error: `A duração do quadro ${index + 1} é inválida. Use um tempo entre 0,2 e 600 segundos.` });
       return;
     }
     normalizedSlides.push({ url, seconds });

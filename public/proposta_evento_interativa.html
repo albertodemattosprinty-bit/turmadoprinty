@@ -728,7 +728,7 @@
     <label class="event-admin-field" for="eventAdminFiles">Substituir a sequência por imagens
       <input id="eventAdminFiles" type="file" accept="image/png,image/jpeg,image/webp" multiple onchange="addEventAdminFiles(this.files)">
     </label>
-    <p class="event-admin-help">Selecione todas as imagens da nova sequência de uma vez. A primeira será a capa. Informe um tempo como <b>4,2seg</b>; os quadros sem tempo dividem o restante do áudio. Se todos ficarem vazios, a sequência será distribuída igualmente.</p>
+    <p class="event-admin-help">Selecione todas as imagens da nova sequência de uma vez. A primeira será a capa. Ajuste cada tempo no formato <b>minutos:segundos</b>, como 0:04 ou 1:20. Os quadros sem tempo dividem o restante do áudio.</p>
     <p class="event-admin-audio-duration" id="eventAdminAudioDuration" aria-live="polite">Duração do áudio atual: carregando…</p>
     <div class="event-admin-slides" id="eventAdminSlides"></div>
     <p class="event-admin-status" id="eventAdminStatus" role="status" aria-live="polite"></p>
@@ -1064,7 +1064,7 @@
     const draft=eventAdminDrafts.get(eventAdminModelId)||[];
     const displaySeconds=eventAdminDisplaySeconds(draft);
     renderEventAdminAudioDuration();
-    document.getElementById('eventAdminSlides').innerHTML=draft.map((slide,index)=>`<div class="event-admin-slide" data-index="${index}"><img src="${slide.previewUrl||slide.url}" alt="Quadro ${index+1}"><span>${index===0?'Capa · ':''}${slide.file?.name||`Imagem ${index+1}`}</span><input type="text" inputmode="numeric" aria-label="Tempo do quadro ${index+1} em minutos e segundos" title="Digite em minutos e segundos: 23 vira 0:23; 120 vira 1:20. Apague para deixar automático." placeholder="0:00" value="${eventSecondsText(displaySeconds[index])}" onfocus="this.select()" oninput="updateEventAdminSlideTime(${index},this)"><button type="button" aria-label="Remover imagem ${index+1}" onclick="removeEventAdminSlide(${index})">×</button></div>`).join('');
+    document.getElementById('eventAdminSlides').innerHTML=draft.map((slide,index)=>`<div class="event-admin-slide" data-index="${index}"><img src="${slide.previewUrl||slide.url}" alt="Quadro ${index+1}"><span>${index===0?'Capa · ':''}${slide.file?.name||`Imagem ${index+1}`}</span><input type="text" inputmode="numeric" aria-label="Tempo do quadro ${index+1} em minutos e segundos" title="Formato minutos:segundos. Também pode digitar 23 para 0:23 ou 120 para 1:20." placeholder="0:00" value="${eventSecondsText(displaySeconds[index])}" onfocus="this.select()" oninput="updateEventAdminSlideTime(${index},this)"><button type="button" aria-label="Remover imagem ${index+1}" onclick="removeEventAdminSlide(${index})">×</button></div>`).join('');
   }
   function updateEventAdminSlideTime(index,input){
     const draft=eventAdminDrafts.get(eventAdminModelId)||[];
@@ -1133,7 +1133,8 @@
     const button=document.getElementById('eventAdminSave');
     const draft=eventAdminCurrentDraft();
     if(!draft.length){status.textContent='Adicione ao menos uma imagem.';return}
-    if(draft.some((slide)=>Number.isNaN(slide.seconds))){status.textContent='Informe tempos no formato minutos:segundos, entre 0:01 e 10:00, ou deixe automático.';return}
+    const invalidTimeIndex=draft.findIndex((slide)=>Number.isNaN(slide.seconds));
+    if(invalidTimeIndex>=0){status.textContent=`O tempo do quadro ${invalidTimeIndex+1} está inválido. Use minutos:segundos entre 0:01 e 10:00, ou apague o campo para deixar automático.`;return}
     button.disabled=true;
     try{
       for(let index=0;index<draft.length;index++){
