@@ -5,7 +5,7 @@
 .event-overview__status--confirmed { color:#187a47; }
 .event-overview__status--cancelled { color:#bc2838; }
 .event-overview__layout { display:grid; grid-template-columns:1fr; gap:16px; }
-.event-overview__cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.event-overview__cards { display:grid; grid-template-columns:1fr; gap:12px; }
 .event-overview__card { display:grid; align-content:start; gap:10px; min-width:0; padding:18px; border:1px solid #e2e9f2; border-radius:18px; background:#fff; box-shadow:0 8px 24px rgba(30,55,91,.05); }
 .event-overview__card-head { display:flex; align-items:center; gap:10px; color:#21365b; font-weight:850; }
 .event-overview__card-head img { width:38px; height:38px; object-fit:contain; }
@@ -81,5 +81,5 @@
 .event-photo-dialog__dots { display:flex; gap:8px; }
 .event-photo-dialog__dots button { width:11px; min-height:11px; height:11px; padding:0; border:0; border-radius:50%; background:#c6d2e1; }
 .event-photo-dialog__dots button[aria-current="step"] { background:#2167c5; }
-@media(max-width:760px) { .event-overview__cards { grid-template-columns:1fr; } .event-overview__card { padding:15px; } }
+@media(max-width:760px) { .event-overview__card { padding:15px; } }
 @media(max-width:520px) { .event-photo-dialog__actions { display:grid; width:100%; } .event-photo-dialog__action { width:100%; } .event-overview__payment { align-items:flex-start; flex-direction:column; } }
