@@ -15084,7 +15084,7 @@ async function readEventProposalModels() {
         seconds: slide?.seconds == null ? null : Number(slide.seconds)
       }));
       if (normalized.some((slide) => !isAllowedEventProposalSlideUrl(slide.url)
-        || (slide.seconds != null && (!Number.isFinite(slide.seconds) || slide.seconds < 0.2 || slide.seconds > 600)))) continue;
+        || (slide.seconds != null && (!Number.isFinite(slide.seconds) || slide.seconds < 0 || slide.seconds > 600)))) continue;
       models[eventId] = normalized;
     }
     return { models };
@@ -15122,6 +15122,7 @@ async function handleEventProposalModelsSave(request, response) {
     return;
   }
   const normalizedSlides = [];
+  let previousEntry = -1;
   for (let index = 0; index < slides.length; index++) {
     const slide = slides[index];
     const url = String(slide?.url || "");
@@ -15130,10 +15131,15 @@ async function handleEventProposalModelsSave(request, response) {
       sendJson(response, 400, { error: `A imagem ${index + 1} da sequência é inválida.` });
       return;
     }
-    if (seconds != null && (!Number.isFinite(seconds) || seconds < 0.2 || seconds > 600)) {
-      sendJson(response, 400, { error: `A duração do quadro ${index + 1} é inválida. Use um tempo entre 0,2 e 600 segundos.` });
+    if (seconds != null && (!Number.isFinite(seconds) || seconds < 0 || seconds > 600)) {
+      sendJson(response, 400, { error: `O ponto de entrada do quadro ${index + 1} é inválido. Use um tempo entre 0:00 e 10:00.` });
       return;
     }
+    if (seconds != null && seconds <= previousEntry) {
+      sendJson(response, 400, { error: `O ponto de entrada do quadro ${index + 1} precisa ser posterior ao quadro anterior.` });
+      return;
+    }
+    if (seconds != null) previousEntry = seconds;
     normalizedSlides.push({ url, seconds });
   }
   try {

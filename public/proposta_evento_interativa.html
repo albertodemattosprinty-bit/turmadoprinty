@@ -719,7 +719,7 @@
 <div class="event-admin-backdrop" id="eventAdminModal" hidden>
   <section class="event-admin-dialog" role="dialog" aria-modal="true" aria-labelledby="eventAdminTitle">
     <header class="event-admin-header">
-      <div><h2 id="eventAdminTitle">Editar apresentação do evento</h2><p>Escolha um modelo, envie os quadros e ajuste por quantos segundos cada um aparece.</p></div>
+      <div><h2 id="eventAdminTitle">Editar apresentação do evento</h2><p>Escolha um modelo, envie os quadros e marque o segundo exato em que cada imagem entra no áudio.</p></div>
       <button class="event-admin-close" type="button" aria-label="Fechar editor" onclick="closeEventAdminModal()">×</button>
     </header>
     <label class="event-admin-field" for="eventAdminModel">Modelo de evento
@@ -728,7 +728,7 @@
     <label class="event-admin-field" for="eventAdminFiles">Substituir a sequência por imagens
       <input id="eventAdminFiles" type="file" accept="image/png,image/jpeg,image/webp" multiple onchange="addEventAdminFiles(this.files)">
     </label>
-    <p class="event-admin-help">Selecione todas as imagens da nova sequência de uma vez. A primeira será a capa. Ajuste cada tempo no formato <b>minutos:segundos</b>, como 0:04 ou 1:20. Os quadros sem tempo dividem o restante do áudio.</p>
+    <p class="event-admin-help">Informe o ponto de entrada no áudio em <b>minutos:segundos</b>. Por exemplo, 0:17 faz a imagem entrar no segundo 17. Quadros sem tempo são distribuídos automaticamente entre os pontos marcados.</p>
     <p class="event-admin-audio-duration" id="eventAdminAudioDuration" aria-live="polite">Duração do áudio atual: carregando…</p>
     <div class="event-admin-slides" id="eventAdminSlides"></div>
     <p class="event-admin-status" id="eventAdminStatus" role="status" aria-live="polite"></p>
@@ -848,6 +848,8 @@
   let eventPreviewConfig={models:{}};
   let eventPreviewState=null;
   let eventPreviewFrameRequest=0;
+  let eventPreviewLoadToken=0;
+  let eventPreviewPendingId=null;
   const eventAdminDrafts=new Map();
   let eventAdminModelId='puppets';
   const eventAdminObjectUrls=new Set();
@@ -864,12 +866,13 @@
   function eventAt(index){return eventTypes[(index+eventTypes.length)%eventTypes.length]}
   function renderEventArtwork(event,interactive=false){
     const active=eventPreviewState?.eventId===event.id;
+    const preparing=eventPreviewPendingId===event.id;
     const slides=eventSlidesFor(event);
     const frame=active?eventPreviewState.frame:0;
     const imageA=slides[frame]?.url||eventCoverFor(event);
     const imageB=slides[(frame+1)%slides.length]?.url||imageA;
     const playing=active&&!eventPreviewState.audio.paused;
-    const button=interactive?`<button class="event-audio-play" type="button" aria-label="${playing?'Pausar':'Reproduzir'} apresentação de ${event.name}" onclick="toggleEventPreview(event,'${event.id}')"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">${playing?'<path d="M7 5h4v14H7zm6 0h4v14h-4z"/>':'<path d="M7 4.8c0-.8.9-1.3 1.6-.9l10.2 6.1a1.1 1.1 0 0 1 0 1.9L8.6 18a1.1 1.1 0 0 1-1.6-.9z"/>'}</svg></button>`:'';
+    const button=interactive?`<button class="event-audio-play" type="button" aria-label="${preparing?'Preparando imagens':playing?'Pausar':'Reproduzir'} apresentação de ${event.name}" ${preparing?'disabled':''} onclick="toggleEventPreview(event,'${event.id}')"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">${playing?'<path d="M7 5h4v14H7zm6 0h4v14h-4z"/>':'<path d="M7 4.8c0-.8.9-1.3 1.6-.9l10.2 6.1a1.1 1.1 0 0 1 0 1.9L8.6 18a1.1 1.1 0 0 1-1.6-.9z"/>'}</svg></button>`:'';
     return `<div class="event-art event-art-photo" role="img" aria-label="${event.name}"><img class="event-slide visible" data-slot="0" src="${imageA}" alt="${event.name}" loading="eager"><img class="event-slide" data-slot="1" src="${imageB}" alt="" aria-hidden="true" loading="eager">${button}</div>`;
   }
   function renderEventTypes(){
@@ -881,20 +884,38 @@
     document.getElementById('eventTypePrev').innerHTML=renderEventArtwork(previous);
     document.getElementById('eventTypePeekNext').innerHTML=renderEventArtwork(next);
   }
+  function eventSlideEntryTimes(slides,duration){
+    const total=slides.length;
+    if(!total)return [];
+    const safeDuration=Number.isFinite(duration)&&duration>0?duration:0;
+    const times=slides.map((slide)=>slide.seconds==null||slide.seconds===''?null:Number(slide.seconds));
+    if(times.every((time)=>time==null))return times.map((_,index)=>safeDuration*index/total);
+    if(times[0]==null)times[0]=0;
+    const anchors=times.map((time,index)=>time==null?-1:index).filter((index)=>index>=0);
+    for(let anchor=0;anchor<anchors.length-1;anchor++){
+      const left=anchors[anchor],right=anchors[anchor+1];
+      const missing=right-left-1;
+      if(!missing)continue;
+      const start=times[left],end=times[right];
+      for(let offset=1;offset<=missing;offset++)times[left+offset]=start+(end-start)*offset/(missing+1);
+    }
+    const last=anchors[anchors.length-1];
+    const remaining=total-last-1;
+    if(remaining>0){
+      const interval=Math.max(0,(safeDuration-Number(times[last]))/(remaining+1));
+      for(let offset=1;offset<=remaining;offset++)times[last+offset]=Number(times[last])+interval*offset;
+    }
+    return times.map((time,index)=>Number.isFinite(time)?time:safeDuration*index/total);
+  }
   function eventSlideIndexAt(slides,time,duration){
     if(!slides.length)return 0;
-    if(!Number.isFinite(duration)||duration<=0)return 0;
-    const custom=slides.some((slide)=>Number.isFinite(Number(slide.seconds))&&Number(slide.seconds)>0);
-    if(!custom)return Math.min(slides.length-1,Math.floor((time/duration)*slides.length));
-    const explicitTotal=slides.reduce((sum,slide)=>sum+(Number(slide.seconds)>0?Number(slide.seconds):0),0);
-    const automaticCount=slides.filter((slide)=>!(Number(slide.seconds)>0)).length;
-    const automaticDuration=automaticCount?Math.max(.1,(duration-explicitTotal)/automaticCount):0;
-    let cursor=0;
-    for(let index=0;index<slides.length;index++){
-      cursor+=Number(slides[index].seconds)>0?Number(slides[index].seconds):automaticDuration;
-      if(time<cursor)return index;
+    const entries=eventSlideEntryTimes(slides,duration);
+    let activeIndex=0;
+    for(let index=1;index<entries.length;index++){
+      if(time>=entries[index])activeIndex=index;
+      else break;
     }
-    return slides.length-1;
+    return activeIndex;
   }
   function eventPreviewTimeLabel(seconds){
     const safe=Math.max(0,Math.floor(Number(seconds)||0));
@@ -940,15 +961,36 @@
     syncEventPreview();
   }
   function stopEventPreview(){
-    if(!eventPreviewState)return;
+    eventPreviewLoadToken++;
+    eventPreviewPendingId=null;
     if(eventPreviewFrameRequest)window.cancelAnimationFrame(eventPreviewFrameRequest);
     eventPreviewFrameRequest=0;
+    if(!eventPreviewState)return;
     eventPreviewState.audio.pause();
     eventPreviewState.audio.removeAttribute('src');
     eventPreviewState.audio.load();
     eventPreviewState=null;
     document.getElementById('eventPreviewPlayer').hidden=true;
     renderEventTypes();
+  }
+  function preloadEventSlide(slide){
+    return new Promise((resolve,reject)=>{
+      const image=new Image();
+      image.decoding='async';
+      if('fetchPriority' in image)image.fetchPriority='high';
+      let settled=false;
+      const finish=async(error)=>{
+        if(settled)return;
+        settled=true;
+        if(error){reject(error);return}
+        try{if(typeof image.decode==='function')await image.decode()}catch{}
+        resolve(image);
+      };
+      image.onload=()=>{void finish()};
+      image.onerror=()=>{void finish(new Error('Imagem da apresentação indisponível.'))};
+      image.src=slide.url;
+      if(image.complete){if(image.naturalWidth>0)void finish();else void finish(new Error('Imagem da apresentação indisponível.'))}
+    });
   }
   async function toggleEventPreview(event,id){
     event?.stopPropagation?.();
@@ -959,9 +1001,17 @@
       else{eventPreviewState.audio.pause();renderEventTypes()}
       return;
     }
+    if(eventPreviewPendingId===id){stopEventPreview();renderEventTypes();return}
     stopEventPreview();
     const slides=eventSlidesFor(selected);
-    slides.forEach((slide)=>{const image=new Image();image.src=slide.url});
+    const loadToken=++eventPreviewLoadToken;
+    eventPreviewPendingId=id;
+    document.getElementById('eventTypeStatus').textContent='Preparando as imagens para sincronizar a apresentação…';
+    renderEventTypes();
+    try{await Promise.all(slides.map(preloadEventSlide))}
+    catch{if(loadToken===eventPreviewLoadToken){eventPreviewPendingId=null;document.getElementById('eventTypeStatus').textContent='Uma imagem não carregou. Confira a conexão e tente novamente.';renderEventTypes()}return}
+    if(loadToken!==eventPreviewLoadToken)return;
+    eventPreviewPendingId=null;
     const audio=new Audio(eventTypeAudio[id]);
     audio.preload='auto';
     eventPreviewState={eventId:id,audio,slides,frame:0,slot:0};
@@ -974,7 +1024,7 @@
     document.getElementById('eventPreviewPlayer').hidden=false;
     document.getElementById('eventPreviewSlider').value='0';
     renderEventTypes();
-    try{await audio.play();syncEventPreview();renderEventTypes();eventPreviewFrameRequest=window.requestAnimationFrame(eventPreviewAnimationTick)}
+    try{await audio.play();syncEventPreview();renderEventTypes();document.getElementById('eventTypeStatus').textContent='';eventPreviewFrameRequest=window.requestAnimationFrame(eventPreviewAnimationTick)}
     catch(error){stopEventPreview();document.getElementById('eventTypeStatus').textContent='Não foi possível reproduzir este áudio neste navegador.'}
   }
   async function loadEventPreviewConfig(){
@@ -1026,17 +1076,8 @@
   }
   function eventAdminDisplaySeconds(draft){
     const duration=eventAudioDurations.get(eventAdminModelId);
-    const seconds=duration?Math.floor(duration):0;
-    const explicitTotal=draft.reduce((sum,slide)=>sum+(Number(slide.seconds)>0?Number(slide.seconds):0),0);
-    const automatic=draft.filter((slide)=>!(Number(slide.seconds)>0)).length;
-    const remaining=Math.max(0,seconds-explicitTotal);
-    const automaticValues=[];
-    for(let index=0;index<automatic;index++){
-      const next=Math.floor((remaining*(index+1))/Math.max(1,automatic))-Math.floor((remaining*index)/Math.max(1,automatic));
-      automaticValues.push(next);
-    }
-    let automaticIndex=0;
-    return draft.map((slide)=>Number(slide.seconds)>0?Number(slide.seconds):(automaticValues[automaticIndex++]||0));
+    if(!duration)return draft.map((slide)=>slide.seconds);
+    return eventSlideEntryTimes(draft,duration);
   }
   function renderEventAdminAudioDuration(){
     const duration=eventAudioDurations.get(eventAdminModelId);
@@ -1058,7 +1099,7 @@
     const minutes=Number(match[1]);
     const seconds=Number(match[2]);
     const totalSeconds=minutes*60+seconds;
-    return seconds<60&&totalSeconds>=1&&totalSeconds<=600?totalSeconds:NaN;
+    return seconds<60&&totalSeconds>=0&&totalSeconds<=600?totalSeconds:NaN;
   }
   function eventAdminCurrentDraft(){
     const rows=[...document.querySelectorAll('#eventAdminSlides .event-admin-slide')];
@@ -1074,7 +1115,7 @@
     const draft=eventAdminDrafts.get(eventAdminModelId)||[];
     const displaySeconds=eventAdminDisplaySeconds(draft);
     renderEventAdminAudioDuration();
-    document.getElementById('eventAdminSlides').innerHTML=draft.map((slide,index)=>`<div class="event-admin-slide" data-index="${index}"><img src="${slide.previewUrl||slide.url}" alt="Quadro ${index+1}"><span>${index===0?'Capa · ':''}${slide.file?.name||`Imagem ${index+1}`}</span><input type="text" inputmode="numeric" aria-label="Tempo do quadro ${index+1} em minutos e segundos" title="Formato minutos:segundos. Também pode digitar 23 para 0:23 ou 120 para 1:20." placeholder="0:00" value="${eventSecondsText(displaySeconds[index])}" onfocus="this.select()" oninput="updateEventAdminSlideTime(${index},this)"><button type="button" aria-label="Remover imagem ${index+1}" onclick="removeEventAdminSlide(${index})">×</button></div>`).join('');
+    document.getElementById('eventAdminSlides').innerHTML=draft.map((slide,index)=>`<div class="event-admin-slide" data-index="${index}"><img src="${slide.previewUrl||slide.url}" alt="Quadro ${index+1}"><span>${index===0?'Capa · ':''}${slide.file?.name||`Imagem ${index+1}`}</span><input type="text" inputmode="numeric" aria-label="Segundo de entrada do quadro ${index+1} no áudio" title="Digite o ponto de entrada no áudio: 0:17 faz a imagem entrar no segundo 17." placeholder="0:00" value="${eventSecondsText(displaySeconds[index])}" onfocus="this.select()" oninput="updateEventAdminSlideTime(${index},this)"><button type="button" aria-label="Remover imagem ${index+1}" onclick="removeEventAdminSlide(${index})">×</button></div>`).join('');
   }
   function updateEventAdminSlideTime(index,input){
     const draft=eventAdminDrafts.get(eventAdminModelId)||[];
@@ -1144,7 +1185,14 @@
     const draft=eventAdminCurrentDraft();
     if(!draft.length){status.textContent='Adicione ao menos uma imagem.';return}
     const invalidTimeIndex=draft.findIndex((slide)=>Number.isNaN(slide.seconds));
-    if(invalidTimeIndex>=0){status.textContent=`O tempo do quadro ${invalidTimeIndex+1} está inválido. Use minutos:segundos entre 0:01 e 10:00, ou apague o campo para deixar automático.`;return}
+    if(invalidTimeIndex>=0){status.textContent=`O ponto de entrada do quadro ${invalidTimeIndex+1} está inválido. Use minutos:segundos entre 0:00 e 10:00, ou apague o campo para deixar automático.`;return}
+    let previousEntry=-1;
+    for(let index=0;index<draft.length;index++){
+      const entry=draft[index].seconds;
+      if(entry==null)continue;
+      if(entry<=previousEntry){status.textContent=`O ponto de entrada do quadro ${index+1} precisa ser posterior ao quadro anterior.`;return}
+      previousEntry=entry;
+    }
     button.disabled=true;
     try{
       for(let index=0;index<draft.length;index++){
